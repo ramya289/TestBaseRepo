@@ -33,8 +33,7 @@ public with sharing class BreadwinnerUtil{
         } 
         set;
     }
-
-    @namespaceAccessible
+    
     private static Selector_BWP_ProcessorConfig selectorProcessorConfig = new Selector_BWP_ProcessorConfig();
 
     public static String namespace {
@@ -182,6 +181,7 @@ public with sharing class BreadwinnerUtil{
         public Boolean isAlreadyDecrypted           {get;set;}
     }
     
+    @namespaceAccessible
     public static AppConfig getProcessorConfigWrapper(BWP_Processor_Config__c appC) {
         appC = appC != null ? appC : new BWP_Processor_Config__c();
         AppConfig ac = new AppConfig();
@@ -237,6 +237,7 @@ public with sharing class BreadwinnerUtil{
         return nextRunningObjectName;
     }
 
+    @namespaceAccessible
     public static Boolean isBreadwinnerActive() {
         Breadwinner_Settings__c bwSetting = Breadwinner_Settings__c.getall().values().size() > 0 ? Breadwinner_Settings__c.getall().values().get(0) : new Breadwinner_Settings__c(Name='Breadwinner');
         return bwSetting.Active__c;

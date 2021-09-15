@@ -5,7 +5,6 @@ public with sharing class SecurityUtil {
 
     // These are fields that we can't modify so don't want to check.
     // Items in the following set must be entered in lower case
-    @namespaceAccessible
     private static Set<String> exceptionFields = new Set<String> {
         'createddate',
         'createdbyid',
@@ -24,14 +23,14 @@ public with sharing class SecurityUtil {
     @namespaceAccessible public static final String FLS_CREATABLE = 'isCreateable';
     @namespaceAccessible public static final String FLS_UPDATEABLE = 'isUpdateable';
 
-    public static void dmlInsert(SObject obj){performDML(new List<SObject>{obj},DmlOp.DML_INSERT);}
-    public static void dmlUpdate(SObject obj){performDML(new List<SObject>{obj},DmlOp.DML_UPDATE);}
+    @namespaceAccessible public static void dmlInsert(SObject obj){performDML(new List<SObject>{obj},DmlOp.DML_INSERT);}
+    @namespaceAccessible public static void dmlUpdate(SObject obj){performDML(new List<SObject>{obj},DmlOp.DML_UPDATE);}
     @namespaceAccessible public static void dmlUpsert(SObject obj){performDML(new List<SObject>{obj},DmlOp.DML_UPSERT);}
-    public static void dmlDelete(SObject obj){performDML(new List<SObject>{obj},DmlOp.DML_DELETE);}
-    public static void dmlInsert(List<SObject> objList){performDML(objList,DmlOp.DML_INSERT);}
-    public static void dmlUpdate(List<SObject> objList){performDML(objList,DmlOp.DML_UPDATE);}
+    @namespaceAccessible public static void dmlDelete(SObject obj){performDML(new List<SObject>{obj},DmlOp.DML_DELETE);}
+    @namespaceAccessible public static void dmlInsert(List<SObject> objList){performDML(objList,DmlOp.DML_INSERT);}
+    @namespaceAccessible public static void dmlUpdate(List<SObject> objList){performDML(objList,DmlOp.DML_UPDATE);}
     @namespaceAccessible public static void dmlUpsert(List<SObject> objList){performDML(objList,DmlOp.DML_UPSERT);}
-    public static void dmlDelete(List<SObject> objList){performDML(objList,DmlOp.DML_DELETE);}
+    @namespaceAccessible public static void dmlDelete(List<SObject> objList){performDML(objList,DmlOp.DML_DELETE);}
 
     @namespaceAccessible
     public static void performDML(List<SObject> objList, DmlOp dmlOperation){
@@ -81,7 +80,6 @@ public with sharing class SecurityUtil {
     }
 
     // Check CRUD permissions for the current user on the object
-    @namespaceAccessible
     private static void checkCRUDPermission(SObjectType objType, DmlOp dmlOperation){
         DescribeSObjectResult describeObject = objType.getDescribe();
         if((dmlOperation == DmlOp.DML_INSERT && !describeObject.isCreateable()) ||
@@ -100,7 +98,6 @@ public with sharing class SecurityUtil {
      * @param objList List of records being acted on
      * @param dmlOperation DML Operation that should be preformed
      */
-    @namespaceAccessible
     private static void checkFieldRestrictions(List<SObject> objList, DmlOp dmlOperation){
         // no FLS needed for delete
         if (dmlOperation == DmlOp.DML_DELETE){
@@ -122,7 +119,6 @@ public with sharing class SecurityUtil {
      * @param objType objectType the action is being performed on. Needed to throw a readable 'Exception'
      * @param fldName name of the field being acted on. Needed to throw a readable 'Exception'
      */
-    @namespaceAccessible
     private static void checkFLS(Map<String,Set<String>> flsObjectMap, DmlOp dmlOperation, SObjectType objType, String fldName){
 
         if (exceptionFields.contains(fldName) || fldName.endsWithIgnoreCase('__r')){
@@ -160,7 +156,6 @@ public with sharing class SecurityUtil {
      *
      * @return Map<String, Set<String>> of accessibility options keys by field name
      */
-    @namespaceAccessible
     private static Map<String, Set<String>> createFlsObjectMap(Map<String,Schema.SObjectField> objFieldMap){
         Map<String, Set<String>> newFlsMap = new Map<String, Set<String>>();
         for (SObjectField objField : objFieldMap.values()){
