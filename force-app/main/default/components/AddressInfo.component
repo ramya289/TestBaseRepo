@@ -1,0 +1,27 @@
+<apex:component >
+    <apex:attribute name="strAddr1" type="String" description="Street Address 1" default=""/>
+    <apex:attribute name="strAddr2" type="String" description="Street Address 2" default=""/>
+    <apex:attribute name="city" type="String" description="City" default=""/>
+    <apex:attribute name="state" type="String" description="State" default=""/>
+    <apex:attribute name="country" type="String" description="Country" default=""/>
+    <apex:attribute name="postalCode" type="String" description="Postal Code" default=""/>
+    <apex:attribute name="outputPanelStyle" type="String" description="Output Panel Style" default="white-space: normal"/>
+
+    <apex:outputPanel layout="block" style="{!outputPanelStyle}" styleClass="panel" rendered="{!LEN(strAddr1)>0}">
+        <apex:outputText value="{!strAddr1}" />
+    </apex:outputPanel>
+    <apex:outputPanel layout="block" style="{!outputPanelStyle}" styleClass="panel" rendered="{!LEN(strAddr2)>0}">
+        <apex:outputText value="{!strAddr2}" />
+    </apex:outputPanel>
+    <apex:outputPanel layout="block" style="{!outputPanelStyle}" styleClass="panel">
+        <apex:outputText value="{!city}" rendered="{!LEN(city)>0}" />
+        <apex:outputText value=", " rendered="{!AND(LEN(city)>0,LEN(state)>0)}" />
+        <apex:outputText value="{!state}" rendered="{!LEN(state)>0}" />
+    </apex:outputPanel>
+    <apex:outputPanel layout="block" style="{!outputPanelStyle}" styleClass="panel">
+        <apex:outputText value="{!country}" rendered="{!LEN(country)>0}" />
+        <apex:outputText value=", " rendered="{!AND(LEN(country)>0,LEN(postalCode)>0)}" />
+        <apex:outputText value="{!postalCode}" rendered="{!LEN(postalCode)>0}" />
+    </apex:outputPanel>
+    
+</apex:component>

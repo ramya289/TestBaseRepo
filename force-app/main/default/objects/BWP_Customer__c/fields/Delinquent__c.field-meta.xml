@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Delinquent__c</fullName>
+    <defaultValue>false</defaultValue>
+    <description>When the customer’s latest invoice is billed by charging automatically, this is true if the invoice’s latest charge is failed. When the customer’s latest invoice is billed by sending an invoice, this is true if the invoice is not paid by its due date.</description>
+    <externalId>false</externalId>
+    <inlineHelpText>When the customer’s latest invoice is billed by charging automatically, this is true if the invoice’s latest charge is failed. When the customer’s latest invoice is billed by sending an invoice, this is true if the invoice is not paid by its due date.</inlineHelpText>
+    <label>Delinquent</label>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Checkbox</type>
+</CustomField>

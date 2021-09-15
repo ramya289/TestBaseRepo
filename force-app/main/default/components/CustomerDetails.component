@@ -1,0 +1,13 @@
+<apex:component >
+    <apex:attribute name="label" type="String" description="Field label" default=""/>
+    <apex:attribute name="fieldValue" type="String" description="Field Value" default=""/> 
+    <apex:attribute name="outputPanelStyleCls" type="String" description="Output Panel StyleClass value" default="slds-list_horizontal slds-p-bottom_x-small slds-wrap firstTile"/>
+    <apex:attribute name="outputTextStyleCls" type="String" description="Output Text StyleClass value" default="overflow-wrap: break-word;white-space: normal;"/>
+    <apex:outputPanel styleClass="{!outputPanelStyleCls}">
+        <dt class="slds-item_label">{!label}</dt>
+        <dd class="slds-item_detail" style="{!outputTextStyleCls}">
+            <apex:outputText value="{!fieldValue}" />
+        </dd>
+    </apex:outputPanel>
+    
+</apex:component>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ListView xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>All</fullName>
+    <columns>NAME</columns>
+    <columns>Type__c</columns>
+    <columns>Customer__c</columns>
+    <columns>Currency__c</columns>
+    <columns>Name_On_Card__c</columns>
+    <columns>Card_Brand__c</columns>
+    <columns>Bank_Account_Holder_Name__c</columns>
+    <columns>Bank_Name__c</columns>
+    <columns>Amount__c</columns>
+    <columns>Card_Status__c</columns>
+    <columns>Fingerprint__c</columns>
+    <columns>Last_4_digits__c</columns>
+    <columns>Livemode__c</columns>
+    <filterScope>Everything</filterScope>
+    <label>All</label>
+</ListView>

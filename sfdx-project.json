@@ -1,19 +1,36 @@
 {
+    "name": "Breadwinner_Payments",
+    "namespace": "bwp_rc",
+    "sfdcLoginUrl": "https://login.salesforce.com",
+    "sourceApiVersion": "52.0",
     "packageDirectories": [
         {
             "path": "force-app",
             "default": true,
-            "package": "TestBasePackage",
-            "versionName": "ver 0.1",
-            "versionNumber": "0.1.0.NEXT"
+            "package": "Breadwinner Payments",
+            "postInstallScript": "PostInstallHandler",
+            "versionName": "1.5",
+            "versionNumber": "1.5.0.NEXT",
+            "ancestorVersion": "1.3.0.RELEASED"
+        },
+        {
+            "path": "unpackaged-components",
+            "default": false
         }
     ],
-    "name": "TestBaseRepo",
-    "namespace": "RamyaBase",
-    "sfdcLoginUrl": "https://login.salesforce.com",
-    "sourceApiVersion": "52.0",
     "packageAliases": {
-        "TestBasePackage": "0Ho5g000000XZj2CAG",
-        "TestBasePackage@0.1.0-1": "04t5g0000001YwIAAU"
+        "Breadwinner Payments": "0Ho6e000000XZCXCA4",
+        "Breadwinner Payments@1.0.0-1": "04t6e000000ki2DAAQ",
+        "Breadwinner Payments@1.0.0-2": "04t6e000000ki2XAAQ",
+        "Breadwinner Payments@1.0.0-3": "04t6e000000ki2cAAA",
+        "Breadwinner Payments@1.0.0-4": "04t6e000000ki4dAAA",
+        "Breadwinner Payments@1.0.0-5": "04t6e000000ki4sAAA",
+        "Breadwinner Payments@1.0.0-6": "04t6e000000ki52AAA",
+        "Breadwinner Payments@1.2.0-1": "04t6e000000ki57AAA",
+        "Breadwinner Payments@1.3.0-1": "04t6e000001qwXCAAY",
+        "Breadwinner Payments@1.3.0-2": "04t6e000001qwbPAAQ",
+        "Breadwinner Payments@1.4.0-1": "04t6e000002AgjgAAC",
+        "Breadwinner Payments@1.5.0-1": "04t6e000002AgjlAAC",
+        "Breadwinner Payments@1.5.0-4": "04t6e000002Agk0AAC"
     }
 }

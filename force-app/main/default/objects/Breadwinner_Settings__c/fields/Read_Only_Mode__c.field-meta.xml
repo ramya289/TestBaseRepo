@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Read_Only_Mode__c</fullName>
+    <defaultValue>true</defaultValue>
+    <description>Breadwinner is in read-only mode</description>
+    <externalId>false</externalId>
+    <label>Read Only Mode</label>
+    <trackTrending>false</trackTrending>
+    <type>Checkbox</type>
+</CustomField>

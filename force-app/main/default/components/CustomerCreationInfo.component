@@ -1,0 +1,80 @@
+<apex:component >
+
+<apex:attribute name="customer" type="BWP_Customer__c" description="stores Customer data" default=""/>
+<apex:attribute name="section" type="String" description="to define the section" default=""/>
+
+    <apex:outputPanel rendered="{!(customer.Processor_Customer_Id__c!=NULL)}" layout="block" styleClass="slds-m-top_medium">
+        <apex:outputPanel rendered="{!section == 'customerSection'}"> 
+        <label class="slds-radio">
+            <input type="radio" name="customeroptions" id="{!customer.Processor_Customer_Id__c}" onchange="pushselectedBWPCustomer('{!customer.Processor_Customer_Id__c}');selectCustomer(); " value="{!customer.Processor_Customer_Id__c}" />
+            <span class="slds-radio_faux"></span>
+            <span class="slds-form-element__label" for="{!customer.Processor_Customer_Id__c}">
+                Use Existing Breadwinner Payments Customer: {!customer.Customer_Name__c} &nbsp;&nbsp;&nbsp;&nbsp;
+            </span>
+        </label>
+        </apex:outputPanel>
+        <div class="slds-grid slds-wrap slds-gutters slds-p-left_medium slds-m-bottom_medium">
+            <div style="margin-top: 8px;" class="slds-col slds-tile slds-size_1-of-1 slds-medium-size_1-of-4 slds-large-size_1-of-4 ">
+                <div style="margin-left: 12px;" class="slds-tile__detail">
+                    <dl class="slds-list_vertical slds-wrap">
+                        <dt class="slds-item_label">Customer Information</dt>
+                        <apex:outputPanel layout="block">
+                            <dd class="slds-item_detail"><apex:outputText value="{!customer.Customer_Name__c}" id="customerName"  rendered="{!NOT(ISBLANK(customer.Customer_Name__c))}"/></dd>
+                            <dd class="slds-item_detail"><apex:outputText value="{!customer.Billing_Street_Address_1__c}" id="customerStreetAddress"  rendered="{!NOT(ISBLANK(customer.Billing_Street_Address_1__c))}"/></dd>
+                            <dd class="slds-item_detail"><apex:outputText value="{!customer.Billing_Street_Address_2__c}" id="customerStreetAddress2"  rendered="{!NOT(ISBLANK(customer.Billing_Street_Address_2__c))}"/></dd>
+                            <dd class="slds-item_detail"><apex:outputText value="{!customer.Billing_City__c},&nbsp;{!customer.Billing_State__c},&nbsp;{!customer.Billing_Postal_Code__c} " id="customerPostalcode"  escape="false" rendered="{!OR(NOT(ISBLANK(customer.Billing_City__c)),NOT(ISBLANK(customer.Billing_Postal_Code__c)))}"/></dd>
+                            <dd class="slds-item_detail"><apex:outputText value="{!customer.Billing_Country__c}" id="customerCountry"  rendered="{!NOT(ISBLANK(customer.Billing_Country__c))}"/></dd>
+                        </apex:outputPanel>
+                    </dl>
+                </div>
+            </div>
+            <div class="slds-col slds-tile slds-size_1-of-1 slds-medium-size_1-of-4 slds-large-size_1-of-4">
+                <div style="margin-left: 12px;" class="slds-tile__detail">
+                    <dl class="slds-list_vertical slds-wrap">
+                        <dt class="slds-item_label">Contact Info</dt>
+                        <apex:outputPanel layout="block">
+                            <dd class="slds-item_detail"><apex:outputText value="{!customer.Email__c}" rendered="{!NOT(ISBLANK(customer.Email__c))}"/></dd>
+                            <dd class="slds-item_detail"><apex:outputText value="{!customer.Customer_Phone__c}" rendered="{!NOT(ISBLANK(customer.Customer_Phone__c))}"/></dd>
+                        </apex:outputPanel>
+                    </dl>
+                </div>
+            </div>
+            <div class="slds-col slds-tile slds-size_1-of-1 slds-medium-size_1-of-4 slds-large-size_1-of-4 ">
+                <div style="margin-left: 12px;" class="slds-tile__detail">
+                    <dl class="slds-list_vertical slds-wrap">
+                        <dt class="slds-item_label">Currency</dt>
+                        <apex:outputPanel layout="block">
+                            <dd class="slds-item_detail"><apex:outputText value="{!customer.Currency__c}" /></dd>
+                        </apex:outputPanel>
+                    </dl>
+                </div>
+            </div>
+            <div class="slds-col slds-tile slds-size_1-of-1 slds-medium-size_1-of-4 slds-large-size_1-of-4 ">
+                <div style="margin-left: 12px;" class="slds-tile__detail">
+                    <dl class="slds-list_vertical slds-wrap">
+                        <dt class="slds-item_label">Processor Information:</dt>
+                        <apex:outputPanel layout="block">
+                            <dd class="slds-item_detail">
+                                <apex:outputPanel title="{!customer.Processor_Type__c}" id="processorType" rendered="{!NOT(ISBLANK(customer.Processor_Type__c))}">
+                                    Merchant: {!customer.Processor_Type__c}
+                                </apex:outputPanel>
+                            </dd>
+                            <dd class="slds-item_detail">
+                                <apex:outputPanel title="{!customer.Livemode__c}" id="isLivemode">
+                                    Mode: {!IF(customer.Livemode__c == TRUE, 'Live', 'Test')}
+                                    <br/>
+                                </apex:outputPanel>
+                            </dd>
+                            <dd class="slds-item_detail">
+                                <apex:outputPanel title="{!customer.Processor_Org_Name__c}" id="processorOrgName" rendered="{!NOT(ISBLANK(customer.Processor_Org_Name__c))}">
+                                    Account: {!customer.Processor_Org_Name__c}
+                                    <br/>
+                                </apex:outputPanel>
+                            </dd>
+                        </apex:outputPanel>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </apex:outputPanel>
+</apex:component>

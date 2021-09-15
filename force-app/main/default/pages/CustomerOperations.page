@@ -1,0 +1,532 @@
+<apex:page sidebar="false" controller="CustomerOperationsController" tabStyle="BreadwinnerPayments__tab" title="Breadwinner {!selectedMatchType} Match">
+    <html xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+        <head>
+            <apex:slds />
+            <script src="{!URLFOR($Resource.Breadwinner_Payments,'Breadwinner_Payments/js/jquery-3.3.1.min.js')}"></script>
+            <script type="text/javascript">
+                var j$ = jQuery.noConflict();
+            
+            j$(document).keydown (
+                function(event){
+                    var code = event.keyCode || event.which;
+                    if (code == 27) {    
+                        if(j$('#showModalAftercompletion').hasClass('slds-fade-in-open')){
+                            redirectToBWPageFromESC();
+                        }
+                        j$('.slds-modal.slds-fade-in-open').removeClass('slds-fade-in-open');
+                        j$('.slds-backdrop.slds-backdrop--open').removeClass('slds-backdrop--open');
+                    }
+            });
+            function addallstyles(){
+                j$(".lookupInput a").removeClass("slds-input");
+                j$('.msgIcon').hide();
+                message();
+            }
+            j$(function(){
+                addallstyles();
+                //    if({!showMessages}){
+                //    // getCustomersCountInStripe();
+                //    }
+            });
+            
+            function message(){
+                j$(".infoM6, .infoM4, .infoM3, .infoM2, .infoS1").addClass("slds-notify slds-notify_alert slds-theme_inverse-text  slds-text-align_left slds-text-heading_small slds-m-bottom_small").css( {"font-weight":"500","line-height":"1.4","word-spacing":"1px","background-color":"rgba(84,105,141,.95)","border-color":"rgba(84,105,141,.95)"});
+                j$(".errorM6, .errorM4, .errorM3, .errorM2, .errorS1").addClass("slds-notify slds-notify_alert slds-theme_error  slds-text-align_left slds-text-heading_small slds-m-bottom_small").css({"font-weight":"500","line-height":"1.4","word-spacing":"1px","display":"block","border-radius":"5px"});
+                j$(".warningM6, .warningM4, .warningM3, .warningM2, .warningS1").addClass("slds-notify slds-notify_alert slds-theme_warning  slds-text-align_left slds-text-heading_small slds-m-bottom_small").css( {"font-weight":"500","line-height":"1.4","word-spacing":"1px"} ) ;
+                j$(".confirmM6, .confirmM4, .confirmM3, .confirmM2, .confirmS1").addClass("slds-notify slds-notify_alert slds-theme_success slds-text-align_left slds-text-heading_small slds-m-bottom_small").css( {"font-weight":"500","line-height":"1.4","word-spacing":"1px"} ) ;
+                
+                j$("div .messageText h4").css( "color", "white" );
+                j$("div[class*='warning'] div.messageText h4").css( "color", "black" );
+                j$("table.messageTable td").css({"color" : "white"});
+                j$("div[class*='warning'] table.messageTable td").css( "color", "black" );
+            }
+            
+            function redirectToBWPage(){ 
+                var actualURL = window.location.href;
+                var url = '';
+                if ({!JSENCODE(sfMode) == 'classic'}) {
+                    url = '' + actualURL.split("/apex/").reverse().pop() + '/apex/{!JSENCODE(breadwinnerPageName)}';
+                }
+                if ({!JSENCODE(sfMode) == 'lightning'}) {
+                    url = '' + actualURL.split("/apex/").reverse().pop() + '/lightning/n/{!JSENCODE(breadwinnerPageName)}';
+                }
+                if(url != null) window.open(url, "_parent");
+            } 
+            
+            function checkErrorMsg(){
+                console.log('$$$$Within CheckErrorMsg Method'+'+++'+j$('.errorMsg'));
+                var errorDiv = j$('.errorMsg');
+                if(typeof errorDiv != "undefined" && typeof j$('.errorMsg')[0] != "undefined"){
+                    console.log('$$$$$Error Meggase==>'+j$('.errorMsg')[0].innerHTML);
+                    var position = j$('.errorMsg').position();
+                    window.scroll(position.left,position.top) ;
+                }
+                else{
+                    console.log('Error Not Found everything is OK');
+                    submitAndNextJS();
+                    finalSubmitANDNext();
+                    
+                }
+            }
+            
+            function submitAndNextJS(){
+                var jsonActions = JSON.stringify(mapRecordIdAndAction);
+                console.log('jsonActions--> '+jsonActions);
+                j$("[id$=jsonOfActionsId]").val(jsonActions);
+                
+            } 
+            
+            function checkRadioButtonForManualMatch(manualMatchRadioButtonId){
+                document.getElementById(manualMatchRadioButtonId).checked = true;        
+            }
+            
+            function pushToMapRecordIdAndAction(key, value){
+                mapRecordIdAndAction[key] = value; 
+                UpdateInfo();
+            }
+            
+            function clearManualMatchOnSelectingOther(key){
+                //refreshlookupPanelPanel();
+                var mappingSpanId = key+'-mm-lookup';
+                try{
+                    var mappingSpanEle = document.getElementById(mappingSpanId);
+                        console.log(mappingSpanEle.getElementsByClassName("lookupInput")[0].children[0].value);
+                    if(mapRecordIdAndAction[key]==='manualMatch'){
+                        if(mappingSpanEle.getElementsByClassName("lookupInput")[0].children[0].value){
+                            mappingSpanEle.getElementsByClassName("lookupInput")[0].children[0].value = '';
+                        }
+                        try{
+                            mappingSpanEle.getElementsByClassName("errorMsg")[0].remove();
+                            console.log('mappingSpanId :::'+ mappingSpanId);
+                            console.log(document.getElementById(mappingSpanId).parentElement.id);
+                            var parentId = document.getElementById(mappingSpanId).parentElement.id;
+                            console.log('parentId :::'+ parentId);
+                            var selectedLookUp;
+                            var selectedLookUpOld;
+                            var selectedMatchType = {!selectedMatchType}
+                            console.log('--selectedMatchType--'+selectedMatchType);
+                            if(selectedMatchType = 'Account'){
+                                selectedLookUp = parentId.replace("lookupPanel", "accountLookup");
+                                selectedLookUpOld = parentId.replace("lookupPanel", "accountLookup_lkold");
+                            }
+                            else if(selectedMatchType = 'Contact'){
+                                selectedLookUp = parentId.replace("lookupPanel", "contactLookup");
+                                selectedLookUpOld = parentId.replace("lookupPanel", "contactLookup_lkold");
+                            }
+                            document.getElementById(selectedLookUp).value = '';
+                            document.getElementById(selectedLookUpOld).value = '';
+                        }
+                        catch(Error){
+                            console.log('Error ::: '+Error);
+                        }
+                    }
+                    
+                }
+                catch(Error){
+                    console.log(Error);
+                }
+            }
+            
+            function scrollWin(){
+                window.scrollTo(0,0);
+            }
+            
+            function displayData(key){
+                var mappingdivId = key+'-qc';
+                j$("."+mappingdivId).addClass('slds-show').removeClass('slds-hide');
+            }
+            
+            function hideData(key){
+                var mappingdivId = key+'-qc';
+                j$("."+mappingdivId).addClass('slds-hide').removeClass('slds-show'); 
+            }
+            
+            window.onload = '';
+            
+            </script>
+            <apex:outputPanel id="mapProcessorCustomerScript">
+                <script type="text/javascript">
+                var mapRecordIdAndAction = new Object();
+                </script>
+            </apex:outputPanel>
+            <style>
+                .arrow {
+                font-size: 37px;
+                color: #42B7F4;
+                }
+                .lookupInput a{
+                border: none !important;
+                min-height: 1rem !important;
+                padding:0px !important;
+                }
+                .slds-scope .slds-spinner_container{
+                position: fixed;
+                z-index: 9999;
+                }
+                .message{
+                margin-left: 0px;
+                margin-right: 0px;
+                }
+                .messageText br{
+                display: none;
+                }
+                .message .messageTable .messageCell {
+                width: 100%;
+                }
+            </style>
+            
+        </head>
+        <body>
+            <apex:form id="form">
+                
+                <!--apex:actionFunction name="refreshlookupPanelPanel" reRender="messagesSection" oncomplete="alert('refreshed')" /-->
+                
+                <!--Action Status Start-->
+                <apex:actionStatus id="action-status" layout="block">
+                    <apex:facet name="start">
+                        <div class="slds-spinner_container">
+                            <div class="slds-spinner_brand slds-spinner slds-spinner_medium" aria-hidden="false" role="alert">
+                                <div class="slds-spinner__dot-a"></div>
+                                <div class="slds-spinner__dot-b"></div>
+                            </div>
+                        </div>
+                    </apex:facet>
+                </apex:actionStatus>
+                <!--Action Status End-->
+                <div class="slds-scope {!IF(OR($User.UIThemeDisplayed == 'Theme4d',$User.UIThemeDisplayed == 'Theme4t'),'slds-p-around_x-small','')}">
+                    <div id="recordMatchContent">
+                        
+                        <!-- ..........................Page Header Start ........................... -->
+                        <div id="thePageHeader" class="slds-page-header slds-m-bottom_medium" role="banner" style="background-color: #f7f9fb">
+                            <div class="slds-media slds-media_center">
+                                <div class="slds-media__figure">
+                                    <svg aria-hidden="true" class="slds-icon slds-icon-standard-user">
+                                        <use xlink:href="{!URLFOR($Asset.SLDS, 'assets/icons/utility-sprite/svg/symbols.svg#rotate')}"></use>
+                                    </svg>
+                                </div>
+                                <div class="slds-media__body">
+                                    <p class="slds-page-header__title slds-truncate">Breadwinner {!selectedMatchType} Match with BWP Customers</p>
+                                    <p class="slds-text-body_small">Breadwinner • Payments </p>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- ............................. Page Header END ............................. -->
+                        
+                        <apex:outputPanel layout="block" rendered="{!AND(NOT(isCustomerMatchComplete),processorCustIdList.size > 0)}">
+                            <p class="slds-m-bottom_medium slds-m-horizontal_medium">
+                                Each Breadwinner Payments Customer has to be matched with one Salesforce {!selectedMatchType}. 
+                                Based on the Customer's name, phone, and address, we have tried to auto-match some Customers. If we have not been able to match it, you can select a Salesforce {!selectedMatchType} through the lookup box. You can also create a new {!selectedMatchType} in Salesforce based on the Customer. 
+                            </p>
+                        </apex:outputPanel>
+                        <apex:outputPanel layout="block" id="messagesSection" rendered="{!showMessages}">
+                            <apex:pagemessages rendered="{!NOT(isBackgroundjobRunning)}"/>
+                            <apex:outputPanel rendered="{!isBackgroundjobRunning}">
+                                <apex:pageMessage severity="INFO" strength="2" summary="<b>Customers import is in progress<b/>" escape="false" >
+                                    <p style="padding-left: 0.2rem;">&nbsp;It appears that a background job to import your Customers is in progress, please try again later.
+                                    </p>
+                                </apex:pageMessage>
+                            </apex:outputPanel>
+                            <apex:outputPanel rendered="{!restartSync}">
+                                <apex:pageMessage severity="INFO" strength="2" summary="<b>Import Customers into Salesforce<b/>" escape="false">
+                                    <p style="padding-left: 0.2rem;">&nbsp;It appears that your Import Customers background job has got failed. Please<apex:commandLink value=" restart the Historical Sync" action="{!restartHistoricalSync}" reRender="messagesSection" status="action-status" oncomplete="message();" id="restartSync" />.</p>
+                                </apex:pageMessage>
+                            </apex:outputPanel>
+                            <apex:outputPanel layout="block" rendered="{!AND(noRecordsInProcessor,NOT(isBackgroundjobRunning))}">
+                                <apex:pageMessage severity="INFO" strength="2" summary="<b>No Customers to match.<b/>" escape="false" rendered="{!!appC.isCustomerMatchComplete}">
+                                    &nbsp;<span style="padding-left: 0.2rem;">It appears that you have not setup your Payment Processor with any Customers. </span>
+                                </apex:pageMessage>
+                                <apex:pageMessage severity="INFO" strength="2" summary="<b>No Customers to match.<b/>" escape="false" rendered="{!appC.isCustomerMatchComplete}">
+                                    &nbsp;<span style="padding-left: 0.2rem;">It appears that you have already completed the {!selectedMatchType} Match.</span>
+                                </apex:pageMessage>
+                            </apex:outputPanel>
+                            <apex:outputPanel layout="block" rendered="{!AND(NOT(noRecordsInProcessor),NOT(isBackgroundjobRunning),processorCustIdList.size == 0, NOT(isCustomerMatchSettingConfigured))}">
+                                <apex:pageMessage severity="INFO" strength="2" summary="<b>No Customers to match.<b/>" escape="false" rendered="{!!appC.isCustomerMatchComplete}">
+                                    &nbsp;<span style="padding-left: 0.2rem;">There are no Customers available to match. Please restart the Historical Customer Sync from the Troubleshoot section of Breadwinner tab. </span>
+                                </apex:pageMessage>
+                            </apex:outputPanel>
+                            <apex:outputPanel layout="block" rendered="{!AND(NOT(noRecordsInProcessor),NOT(isBackgroundjobRunning),processorCustIdList.size == 0, (isCustomerMatchSettingConfigured))}">
+                                <apex:pageMessage severity="INFO" strength="2" summary="<b>No Customers to match.<b/>" escape="false" rendered="{!!appC.isCustomerMatchComplete}">
+                                    &nbsp;<span style="padding-left: 0.2rem;">There are no Customers with recorded Payments available to match. If there are Payments in Payment Processor, please restart the Historical Sync from the Troubleshoot Section of the Breadwinner tab or create Payments for existing Customers.</span>
+                                </apex:pageMessage>
+                            </apex:outputPanel>
+                        </apex:outputPanel>
+                        
+                        
+                        <apex:outputPanel layout="block" id="AccountListPanel" rendered="{!!isBackgroundjobRunning}">
+                            <apex:pageMessage summary="" detail="{!exceptionMessage}" rendered="{!AND(NOT(ISBLANK(exceptionMessage)), LEN(exceptionMessage)>5)}"  severity="ERROR" strength="3"/>
+                            <div class="slds-m-horizontal_medium">
+                                
+                                <apex:outputPanel rendered="{!AND(NOT(isCustomerMatchComplete),processorCustIdList.size > 0,NOT(isBackgroundjobRunning))}">
+                                    <div class="slds-grid slds-wrap ">
+                                        <div class="slds-m-top_large slds-size_1-of-1 slds-medium-size_3-of-7 slds-large-size_6-of-13" style="text-align: center;"> 
+                                            <div class="slds-text-heading_medium">Customer Details in Payment Processor</div>
+                                        </div>
+                                        <div class="slds-m-top_large slds-siz_1-of-1 slds-medium-size_1-of-7 slds-large-size_1-of-13">
+                                            <div style="visibility: hidden;"></div>
+                                        </div>
+                                        <div class="slds-m-top_large slds-size_1-of-1 slds-medium-size_3-of-7 slds-large-size_6-of-13" style="text-align: center;"> 
+                                            <div class="slds-text-heading_medium">Customer Details in Salesforce</div>
+                                        </div>
+                                    </div>
+                                </apex:outputPanel>
+                                
+                                
+                                <div class="slds-grid slds-wrap slds-m-top_small">
+                                    <table width="100%" class="mainTable" style="border-collapse: separate;">
+                                        <apex:repeat value="{!processorCustIdList}" var="refId" rendered="{!AND(NOT(isCustomerMatchComplete),(processorCustIdList.size > 0),NOT(isBackgroundjobRunning))}">
+                                            <apex:variable var="StrCustomer" value="{!mapStrCustIdAndCustomer[refId]}"/>
+                                            <apex:variable var="actionByDefault" value="{!mapProcessorCustIdAndDefaultAction[refId]}"/>
+                                            <apex:variable var="sfRecord" value="{!mapStrCustIdAndSFRecord[refId]}"/>
+                                            <tr class="slds-has-dividers_around-space">
+                                                <td valign="top" style="border-bottom:0px;" class=" slds-box slds-m-top_large slds-size_1-of-1 slds-medium-size_3-of-7 slds-large-size_6-of-13">
+                                                    <c:CustomerMatchInfo recordInfo="{!StrCustomer}" customerMatchTypeData="Customer"/>
+                                                </td>
+                                                <td class="slds-m-top_large slds-size_1-of-1 slds-medium-size_1-of-7 slds-large-size_1-of-13">
+                                                    <div class="arrowCell slds-align_absolute-center" width="10%">
+                                                        <span class="arrow">&#10140;</span>
+                                                    </div>
+                                                </td>
+                                                <td valign="top" style="border-bottom:0px;" class="slds-box slds-m-top_large slds-size_1-of-1 slds-medium-size_3-of-7 slds-large-size_6-of-13">
+                                                    <!--  options -->
+                                                    <div class="slds-m-horizontal_medium">
+                                                        <!-------------------------------------------------------------- Suggested Match ------------------------------------------>
+                                                        <apex:outputPanel rendered="{!IF(actionByDefault == 'suggestedMatch', true, false)}" id="options">
+                                                            <div class="slds-m-top_xx-small">
+                                                                <table style="width: 100%;">
+                                                                    <tr>
+                                                                        <td style="width: 3%;padding-right: 10px;">
+                                                                            <input type="radio" name="{!HTMLENCODE(refId)}" id="{!HTMLENCODE(refId)}-sm" onChange="clearManualMatchOnSelectingOther('{!JSENCODE(refId)}');pushToMapRecordIdAndAction('{!JSENCODE(refId)}', 'suggestedMatch');hideData('{!JSENCODE(refId)}');"/>
+                                                                        </td>
+                                                                        <td style="width: 97%;">
+                                                                            <span class="slds-radio">
+                                                                                <span class=" slds-form-element__label">Suggested Match to Existing Salesforce {!selectedMatchType}</span>
+                                                                            </span>
+                                                                        </td>
+                                                                    </tr>
+                                                                    <tr>
+                                                                        <td></td>
+                                                                        <td>
+                                                                            <apex:outputPanel rendered="{!selectedMatchType == 'Account'}">
+                                                                                <apex:variable var="list" value="{!''}{!ContactsList2}"/>
+                                                                                <apex:variable var="isContactEmailmatched" value="{!IF(contains(list, refId),true,false)}">
+                                                                                    <apex:variable var="list2" value="{!''}{!ContactsList2[refId][0]}" rendered="{!isContactEmailmatched}" />
+                                                                                    <c:CustomerMatchInfo recordInfo="{!IF(isContactEmailmatched,AccountsNameInfo[list2].account,sfRecord)}" contactInfo="{!ContactsList2[refId]}" isContactEmailmatched="{!isContactEmailmatched}" customerMatchTypeData="Account"/>
+                                                                                </apex:variable>
+                                                                            </apex:outputPanel>
+                                                                            <apex:outputPanel rendered="{!selectedMatchType == 'Contact'}">
+                                                                                <c:CustomerMatchInfo recordInfo="{!sfRecord}" customerMatchTypeData="Contact"/>
+                                                                            </apex:outputPanel>
+                                                                        </td>
+                                                                    </tr>
+                                                                </table>
+                                                            </div>
+                                                        </apex:outputPanel>
+                                                        <!-- Create New -->
+                                                        <div class="slds-m-top_x-small">
+                                                            <div class="slds-clearfix" style="display: inline-flex">
+                                                                <div class="slds-float_left" style="margin-top: 3px">
+                                                                    <input type="radio" name="{!refId}" id="{!refId}-cn" onChange="clearManualMatchOnSelectingOther('{!JSENCODE(refId)}');displayData('{!JSENCODE(refId)}');pushToMapRecordIdAndAction('{!JSENCODE(refId)}', 'createNew');"/>
+                                                                </div>
+                                                                <div class="slds-float_left">
+                                                                    <span class="slds-radio">
+                                                                        <span class=" slds-form-element__label slds-m-left_small">Create New Salesforce {!selectedMatchType} with details from BWP Customer</span>
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <!-- Manual Match -->
+                                                        <div class="slds-m-top_x-small">
+                                                            <div class="slds-clearfix" style="display: inline-flex">
+                                                                <div class="slds-float_left" style="margin-top: 3px">
+                                                                    <input type="radio" name="{!refId}"  id="{!refId}-mm" onChange="pushToMapRecordIdAndAction('{!JSENCODE(refId)}', 'manualMatch');hideData('{!JSENCODE(refId)}');" />
+                                                                </div>
+                                                                <div class="slds-float_left">
+                                                                    <span class="slds-radio">
+                                                                        <span class=" slds-form-element__label slds-m-left_small" >Manual Match to an existing Salesforce {!selectedMatchType} you select</span>
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </div> 
+                                                        <apex:outputPanel id="lookupPanel">
+                                                            <apex:actionRegion >
+                                                                <div class="lookup slds-form-element__control slds-p-around_none slds-m-top_x-small" id="{!refId}-mm-lookup" style="margin-left: 2.25rem;">
+                                                                    <apex:outputPanel rendered="{!selectedMatchType == 'Account'}" >
+                                                                        <apex:inputField value="{!mapProcessorRefIdManualMatchLookupSelector[refId].Salesforce_Account__c}" id="accountLookup" styleClass="slds-size_1-of-2 slds-input" >
+                                                                            <apex:actionSupport event="onchange" oncomplete="checkRadioButtonForManualMatch('{!JSENCODE(refId)}-mm');pushToMapRecordIdAndAction('{!JSENCODE(refId)}', 'manualMatch');addallstyles();message();" reRender="lookupPanel,options,messagesSection"/>  
+                                                                        </apex:inputField>
+                                                                    </apex:outputPanel>
+                                                                    <apex:outputPanel rendered="{!selectedMatchType == 'Contact'}" >
+                                                                        <apex:inputField value="{!mapProcessorRefIdManualMatchLookupSelector[refId].Salesforce_Contact__c}" id="contactLookup" styleClass="slds-size_1-of-2 slds-input" >
+                                                                            <apex:actionSupport event="onchange" oncomplete="checkRadioButtonForManualMatch('{!JSENCODE(refId)}-mm');pushToMapRecordIdAndAction('{!JSENCODE(refId)}', 'manualMatch');addallstyles();message();" reRender="lookupPanel,options,messagesSection"/>  
+                                                                        </apex:inputField>
+                                                                    </apex:outputPanel>
+                                                                </div>
+                                                            </apex:actionRegion>
+                                                        </apex:outputPanel>  
+                                                        <!-- Do Not Import this Processor Customer -->
+                                                        <div class="slds-m-top_x-small">
+                                                            <div class="slds-clearfix" style="display: inline-flex">
+                                                                <div class="slds-float_left" style="margin-top: 3px">
+                                                                    <input type="radio" name="{!refId}" id="{!refId}-dn" onChange="clearManualMatchOnSelectingOther('{!JSENCODE(refId)}');pushToMapRecordIdAndAction('{!JSENCODE(refId)}', 'doNotImport');hideData('{!JSENCODE(refId)}');" />
+                                                                </div>
+                                                                <div class="slds-float_left">
+                                                                    <span class="slds-radio">
+                                                                        <span class=" slds-form-element__label slds-m-left_small">Do Not associate this BWP Customer with Salesforce {!selectedMatchType}</span>
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <apex:outputPanel layout="block" styleClass="slds-m-horizontal_medium errorM3" rendered="{!StrCustomer.isUnableToCreateAccount}">
+                                                            <p>Breadwinner was unable to create this {!selectedMatchType} </p>
+                                                            <p>{!HTMLENCODE(StrCustomer.errorMessage)}</p>  
+                                                        </apex:outputPanel>
+                                                    </div>
+                                                    <script>
+                                                    if('{!JSENCODE(actionByDefault)}' == 'createNew'){
+                                                        mapRecordIdAndAction['{!JSENCODE(refId)}'] =  'createNew';
+                                                        document.getElementById('{!JSENCODE(refId)}-cn').checked = true;
+                                                    }
+                                                    else if('{!JSENCODE(actionByDefault)}' == 'suggestedMatch'){
+                                                        mapRecordIdAndAction['{!JSENCODE(refId)}'] =  'suggestedMatch';
+                                                        document.getElementById('{!JSENCODE(refId)}-sm').checked = true;
+                                                    }
+                                                    </script>
+                                                </td>
+                                            </tr>  
+                                            <tr>
+                                                <td class="slds-box" style="border-top:0px;">
+                                                    <div class="slds-m-top_small">
+                                                        <img src="{!URLFOR($Resource.Breadwinner_Payments, 'Breadwinner_Payments/images/StripeLogo.png')}" width="50px" style="display:{!if(appC.paymentProcessorType == 'Stripe', '', 'none')}"/>
+                                                        <img src="{!URLFOR($Resource.Breadwinner_Payments, 'Breadwinner_Payments/images/BraintreeLogo.png')}" width="80px" style="display:{!if(appC.paymentProcessorType == 'Braintree', '', 'none')}"/>
+                                                        <img src="{!URLFOR($Resource.Breadwinner_Payments, 'Breadwinner_Payments/images/SquareLogo.png')}" width="80px" style="margin-bottom: 0.20rem;display:{!if(appC.paymentProcessorType == 'Square', '', 'none')}"/>
+                                                        &nbsp; <span style="vertical-align: middle;"> Customer </span>
+                                                    </div>
+                                                </td>
+                                                <td></td>
+                                                <td class="slds-box" style="border-top:0px;">
+                                                    <div class="slds-m-top_small">
+                                                        <img src="{!URLFOR($Resource.Breadwinner_Payments, 'Breadwinner_Payments/images/SalesforceLogo.png')}" width="50px" />
+                                                        &nbsp; Salesforce {!selectedMatchType}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td colspan="3">
+                                                    <div class="slds-m-top_small slds-size_1-of-1 slds-medium-size_1-of-1 slds-large-size_1-of-1">
+                                                        <apex:outputPanel styleClass="slds-m-horizontal_medium slds-hide {!refId}-qc" layout="block" >
+                                                            <apex:outputPanel style="font-size:14px;" rendered="{!AND(isThereDataQualityIssue, OR(AND(NOT(ISBLANK(StrCustomer.BillingStreet)),LEN(StrCustomer.BillingStreet)>255),AND(NOT(ISBLANK(StrCustomer.BillingCity)),LEN(StrCustomer.BillingCity)>40),AND(NOT(ISBLANK(StrCustomer.BillingState)),LEN(StrCustomer.BillingState)>20),AND(NOT(ISBLANK(StrCustomer.BillingPostalCode)),LEN(StrCustomer.BillingPostalCode)>20),AND(NOT(ISBLANK(StrCustomer.BillingCountry)),LEN(StrCustomer.BillingCountry)>40)))}">
+                                                                <div class="warningM3" style="display: block;">
+                                                                    <b> Warning - Potential Data Quality Issue </b>
+                                                                    <p>Salesforce Address Fields have field length limitations, and this address exceeds them. If you are Matching this Breadwinner Payments Customer to a Salesforce {!selectedMatchType}, either by suggested match or manual match, then this is not an issue. However, if you are creating a Salesforce {!selectedMatchType} from this Processor Customer record, please be aware that one or more values are too long, and when being imported into Salesforce, those fields will be truncated.
+                                                                        <br/>Alternatively, you may edit the record in Processor and reduce the field length, and then refresh this page.</p>
+                                                                    <p>
+                                                                        <apex:outputLabel rendered="{!AND(NOT(ISBLANK(StrCustomer.BillingStreet)),LEN(StrCustomer.BillingStreet)>255)}"> <b>Street:</b> "{!HTMLENCODE(StrCustomer.BillingStreet)}" is {!LEN(HTMLENCODE(StrCustomer.BillingStreet))} characters long, but Salesforce Street fields are only 255 characters long.<br/> If you create this record, the Street field will be imported as "{!LEFT(HTMLENCODE(StrCustomer.BillingStreet) , 255)}".<br/><br/> </apex:outputLabel>
+                                                                        <apex:outputLabel rendered="{!AND(NOT(ISBLANK(StrCustomer.BillingCity)),LEN(StrCustomer.BillingCity)>40)}" > <b>City: </b>"{!HTMLENCODE(StrCustomer.BillingCity)}" is {!LEN(HTMLENCODE(StrCustomer.BillingCity))} characters long, but Salesforce City fields are only 40 characters long.<br/> If you create this record, the City field will be imported as "{!LEFT(HTMLENCODE(StrCustomer.BillingCity), 40)}".<br/> <br/></apex:outputLabel>
+                                                                        <apex:outputLabel rendered="{!AND(NOT(ISBLANK(StrCustomer.BillingState)),LEN(StrCustomer.BillingState)>20)}"> <b>State:</b> "{!HTMLENCODE(StrCustomer.BillingState)}" is {!LEN(HTMLENCODE(StrCustomer.BillingState))} characters long, but Salesforce State fields are only 20 characters long.<br/> If you create this record, the State field will be imported as "{!LEFT(HTMLENCODE(StrCustomer.BillingState) , 20)}". <br/><br/></apex:outputLabel>
+                                                                        <apex:outputLabel rendered="{!AND(NOT(ISBLANK(StrCustomer.BillingPostalCode)),LEN(StrCustomer.BillingPostalCode)>20)}"> <b>PostalCode:</b> "{!HTMLENCODE(StrCustomer.BillingPostalCode)}" is {!LEN(HTMLENCODE(StrCustomer.BillingPostalCode))} characters long, but Salesforce PostalCode fields are only 20 characters long. <br/>If you create this record, the PostalCode field will be imported as "{!LEFT(HTMLENCODE(StrCustomer.BillingPostalCode), 20)}". <br/><br/></apex:outputLabel>
+                                                                        <apex:outputLabel rendered="{!AND(NOT(ISBLANK(StrCustomer.BillingCountry)),LEN(StrCustomer.BillingCountry)>40)}"> <b>Country:</b> "{!HTMLENCODE(StrCustomer.BillingCountry)}" is {!LEN(HTMLENCODE(StrCustomer.BillingCountry))} characters long, but Salesforce Country fields are only 20 characters long. <br/>If you create this record, the Country field will be imported as "{!LEFT(HTMLENCODE(StrCustomer.BillingCountry), 40)}". <br/></apex:outputLabel>
+                                                                    </p>
+                                                                </div>
+                                                            </apex:outputPanel>
+                                                        </apex:outputPanel>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </apex:repeat>
+                                    </table>
+                                </div>
+                            </div>
+                            
+                            
+                        </apex:outputPanel>   
+                        
+                    </div>
+                    
+                    <!--End of match content-->
+                    
+                    <apex:outputPanel id="infoblock" layout="block" style="font-size:13px; text-align:center;" rendered="{!AND(NOT(isCustomerMatchComplete),(processorCustIdList.size > 0),NOT(isBackgroundjobRunning))}">
+                        <div id="info" style="color:red;"></div><br/>
+                    </apex:outputPanel>
+                    <script type="text/javascript">
+                    function UpdateInfo(){
+                        try {
+                            console.log('UpdateInfo');
+                            var newRecords = 0;
+                            var matchRecords = 0;
+                            var doNotImportRecords = 0;
+                            for(key in mapRecordIdAndAction){
+                                var type = mapRecordIdAndAction[key];
+                                if(type=='createNew'){
+                                    newRecords++;
+                                }
+                                else if(type=='doNotImport'){
+                                    doNotImportRecords++;
+                                }
+                                    else if(type=='suggestedMatch' || type=='manualMatch'){
+                                        matchRecords++;
+                                    }
+                            }
+                            var infoMessage = document.getElementById('info');
+                            if(newRecords>0 || matchRecords >0 || doNotImportRecords >0){
+                                var infoMessageText = 'Clicking "Next" button will create '+newRecords+' new Salesforce '+(newRecords == 1 ? '{!selectedMatchType} from Breadwinner Payments Customers' : '{!selectedMatchType}s from Breadwinner Payments Customers');
+                               if(matchRecords > 0){
+                                   infoMessageText = infoMessageText+', will match '+matchRecords+(matchRecords == 1 ?  ' Breadwinner Payments Customer to existing Salesforce {!selectedMatchType}' : ' Breadwinner Payments Customers to existing Salesforce {!selectedMatchType}s');
+                                }
+                                if(doNotImportRecords > 0){
+                                    infoMessageText = infoMessageText+', and will not associate '+doNotImportRecords+(doNotImportRecords == 1 ? ' Breadwinner Payments Customer to any Salesforce {!selectedMatchType}' : ' Breadwinner Payments Customers to any Salesforce {!selectedMatchType}s');
+                                }
+                                infoMessage.innerHTML = infoMessageText+'.';
+                            }
+                        }
+                        catch(err) {
+                            console.log('UpdateInfo Error:'+err.message);
+                        }
+                        // refreshlookupPanelPanel();
+                    }
+                    UpdateInfo();
+                    </script>
+                    <apex:outputPanel layout="block" id="buttonSection" styleClass="slds-m-bottom_large slds-align_absolute-center">
+                        <apex:commandButton id="theNextButton" value="Next" styleClass="slds-button slds-button_brand" oncomplete="checkErrorMsg();" status="action-status" rendered="{!AND(OR(!noRecordsInProcessor,isCustomerMatchComplete,processorCustIdList.size>0),NOT(isBackgroundjobRunning),NOT(restartSync), NOT(AND(isCustomerMatchSettingConfigured,processorCustIdList.size == 0)))}"/>
+                        <apex:inputHidden id="jsonOfActionsId" value="{!jsonUserSelectedActions}"/>
+                        <apex:actionFunction name="finalSubmitANDNext" action="{!submitAndNext}" reRender="AccountListPanel,recordFetchCompleteScript,recordMatchContent, mapProcessorCustomerScript" status="action-status" oncomplete="scrollWin();UpdateInfo();addallstyles();recordFetchComplete();" />
+                    </apex:outputPanel>
+                    
+                    <!-- Adding SLDS Modal for popup box -->
+                    <div>
+                        <div class="slds-modal slds-modal_x-small" aria-hidden="false" role="dialog" id="showModalAftercompletion">
+                            <div class="slds-modal__container">
+                                <div class="slds-modal__header">
+                                    <h2 class="slds-text-heading_medium">{!selectedMatchType} match completed successfully</h2>
+                                </div>
+                                <div class="slds-modal__content slds-p-around_medium">
+                                    Breadwinner has successfully matched all of your Breadwinner Payments Customers with Salesforce {!selectedMatchType}s.
+                                </div>
+                                <div class="slds-modal__footer">
+                                    <apex:commandLink id="okaybutton" styleClass="slds-button slds-button_brand" value="OK" onclick="redirectToBWPage();" reRender="nothing"/>
+                                    <apex:actionFunction name="redirectToBWPageFromESC" oncomplete="redirectToBWPage();" reRender="nothing" />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="slds-backdrop" id="backdrop"></div>
+                    </div>
+                    <!-- End of Modal -->
+                </div>
+            </apex:form>
+            <apex:outputPanel id="recordFetchCompleteScript">
+                <script>
+                function recordFetchComplete(){
+                    if({!isCustomerMatchComplete}  || {!noRecordsInProcessor}){ 
+                        j$('#recordMatchContent').hide();
+                        j$('#thePageHeader').hide();
+                        j$('#info').hide();
+                        j$("[id$=theNextButton]").hide();
+                        j$('#backdrop').addClass('slds-backdrop--open');
+                        j$('#showModalAftercompletion').addClass('slds-fade-in-open');
+                    }
+                }
+                </script>
+            </apex:outputPanel>
+        </body>
+    
+    </html>
+</apex:page>

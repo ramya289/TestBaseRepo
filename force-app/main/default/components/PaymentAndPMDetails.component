@@ -1,0 +1,15 @@
+<apex:component >
+    <apex:attribute name="label" type="String" description="Field label" default=""/>
+    <apex:attribute name="fieldValue" type="String" description="Field Value" default=""/> 
+    <apex:attribute name="outputTextStyleCls" type="String" description="Output Text StyleClass value" default=""/>
+    
+        <div class="slds-tile__detail">
+            <div class="slds-list_vertical slds-wrap">
+                <dt class="slds-item_label " >{!label}</dt>
+                <dd class="slds-item_detail">
+                    <apex:outputText style="{!outputTextStyleCls}" value="{!fieldValue}" />
+                </dd>
+            </div>
+        </div>
+    
+</apex:component>

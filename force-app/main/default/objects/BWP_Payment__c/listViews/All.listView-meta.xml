@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ListView xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>All</fullName>
+    <columns>NAME</columns>
+    <columns>Source__c</columns>
+    <columns>Customer__c</columns>
+    <columns>Amount__c</columns>
+    <columns>Amount_Refunded__c</columns>
+    <columns>Application_Fee__c</columns>
+    <columns>Currency__c</columns>
+    <columns>Payment_Status__c</columns>
+    <columns>Captured__c</columns>
+    <columns>Receipt_Number__c</columns>
+    <columns>Description__c</columns>
+    <columns>Is_Live_Payment__c</columns>
+    <filterScope>Everything</filterScope>
+    <label>All</label>
+</ListView>

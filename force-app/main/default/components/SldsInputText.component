@@ -1,0 +1,19 @@
+<apex:component >
+    <apex:attribute name="label" type="String" description="Field label" default=""/>
+    <apex:attribute name="fieldValue" type="String" description="Field Value" default=""/> 
+    <apex:attribute name="isRequired" type="Boolean" description="Check If required" default="false"/>
+    <apex:attribute name="styleClass" type="String" description="Style class Value" default="slds-col_padded slds-size_1-of-1 slds-medium-size_1-of-1 slds-large-size_1-of-1 slds-m-top_xx-small slds-m-bottom_xx-small"/> 
+    <apex:attribute name="onKeyPressFunction" type="String" description="onKeyPress value" default=""/>
+    <apex:attribute name="onKeyUpFunction" type="String" description="onKeyUpFunction value" default=""/>
+    <apex:attribute name="onFocusFunction" type="String" description="onFocusFunction value" default=""/>
+    
+    <apex:outputPanel layout="block" styleClass="{!styleClass}">
+        <div class="slds-form-element">
+            <apex:outputPanel rendered="{!isRequired}"><abbr class="slds-required" title="required">*</abbr></apex:outputPanel>
+            <span class="slds-form-element__label">{!label}</span>
+            <div class="slds-form-element__control">
+                <apex:inputtext value="{!fieldValue}" styleClass="slds-input" onKeyPress="{!onKeyPressFunction}" onKeyup="{!onKeyUpFunction}" onfocus="{!onFocusFunction}" />
+            </div>
+        </div>
+    </apex:outputPanel>
+</apex:component>

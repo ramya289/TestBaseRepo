@@ -1,0 +1,198 @@
+<apex:page sidebar="false" standardcontroller="BWP_Payment_Method__c" extensions="CreateCustomerExtension">
+    <html xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+        <head>
+            <apex:slds />
+            <script src="{!URLFOR($Resource.Breadwinner_Payments,'Breadwinner_Payments/js/jquery-3.3.1.min.js')}"></script>
+            <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.3/css/select2.min.css" rel="stylesheet" />
+                <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.3/js/select2.min.js"></script>
+            <script type="text/javascript" src="{!IF(payConfig.Live_Mode__c, 'https://js.squareup.com/v2/paymentform', 'https://js.squareupsandbox.com/v2/paymentform')}"></script>
+            <apex:stylesheet value="{!URLFOR($Resource.Breadwinner_Payments, 'Breadwinner_Payments/SquareCSS.css')}"/>
+                <script>
+                var j$ = jQuery.noConflict();
+            j$(document).ready(function(){
+                message();
+            });
+            function message() {
+                j$(".infoM6, .infoM4, .infoM3, .infoM2, .infoS1").addClass("slds-notify slds-notify_alert slds-theme_info slds-text-align_left slds-text-heading_small slds-m-bottom_small").css( {"font-weight":"500","line-height":"1.4","word-spacing":"1px","display":"block","background":"rgba(84,105,141,.95)"} );
+                j$(".errorM6, .errorM4, .errorM3, .errorM2, .errorS1").addClass("slds-notify slds-notify_alert slds-theme_error slds-text-align_left slds-text-heading_small slds-m-bottom_small").css({"font-weight":"500","line-height":"1.4","word-spacing":"1px","display":"block","Justify-content":"left"});
+                j$(".warningM6, .warningM4, .warningM3, .warningM2, .warningS1").addClass("slds-notify slds-notify_alert slds-theme_warning slds-text-align_left slds-text-heading_small").css( {"font-weight":"500","line-height":"1.4","word-spacing":"1px","display":"block","Justify-content":"left"} ) ;
+                j$(".confirmM6, .confirmM4, .confirmM3, .confirmM2, .confirmS1").addClass("slds-notify slds-notify_alert slds-theme_success slds-text-align_left slds-text-heading_small slds-m-bottom_small").css( {"font-weight":"500","line-height":"1.4","word-spacing":"1px","display":"block"} ) ;
+                
+                j$("div .messageText h4").css( "color", "white" );
+                j$("div[class*='warning'] div.messageText h4").css( "color", "black" );
+                j$("table.messageTable td").css({"color" : "white"});
+                j$("div[class*='warning'] table.messageTable td").css( "color", "black" );
+            }
+            function reRenderHeaderSVG(){
+                imageURL = '{!URLFOR($Asset.SLDS, 'assets/icons/custom-sprite/svg/symbols.svg#custom16')}';
+                var SVG = j$('<svg/>', {
+                    class: 'slds-icon slds-icon-standard-user',
+                });
+
+                var SVGUse = j$('<use/>');
+                SVGUse.attr('xlink:href',imageURL);
+                j$('#paymentMethodIcon').prepend(SVG.append(SVGUse));
+                j$('#paymentMethodIcon').html(j$('#paymentMethodIcon').html());
+            }
+            </script>
+            <style>
+                .message {
+                background-color: inherit;
+                border-style: none;
+                padding: initial;
+                margin: 0px;
+                }
+                .msgIcon {
+                display: none;
+                }
+                .message .messageText {
+                margin: 0px;
+                }
+                .message .messageText h4 {
+                font-weight: inherit;
+                display: initial;
+                }
+            </style>
+        </head>
+        <body>
+            <apex:form id="theForm">
+                <div class="slds-scope slds-p-around_small" style="background-color: white;">
+                    <apex:actionStatus id="action-status" layout="block">
+                        <apex:facet name="start">
+                            <div class="slds-spinner_container">
+                                <div class="slds-spinner_brand slds-spinner slds-spinner_medium" aria-hidden="false" role="alert">
+                                    <div class="slds-spinner__dot-a"></div>
+                                    <div class="slds-spinner__dot-b"></div>
+                                </div>
+                            </div>
+                        </apex:facet>
+                    </apex:actionStatus>
+                    
+                    <apex:outputPanel layout="block" id="warningMsg">
+                        <apex:outputPanel layout="block" styleClass="slds-notify slds-notify_alert slds-theme_warning slds-text-align_left slds-text-heading_small" style="color:black; border-radius: 4px; display:block; font-weight:500; line-height:1.4; word-spacing:1px; Justify-content:left" rendered="{!isPayMethodFromStandardNewButton}" >
+                            Please go to a Breadwinner Payments Customer and click the <b>Create Payment Method</b> button from that Customer.
+                            <br/>
+                            Alternatively, if this is for an entirely new Breadwinner Payments Customer, you can create a&nbsp;<apex:commandLink action="{!standardNewPayMethodButtonToCreateNewCustomer}" reRender="mainPanel, warningMsg" oncomplete="reRenderHeaderSVG();">new Customer, and Payment Method</apex:commandLink>.
+                        </apex:outputPanel>
+                    </apex:outputPanel>
+                    
+                    <apex:outputPanel layout="block" id="mainPanel">
+                        <apex:outputPanel rendered="{!If(isPayMethodFromStandardNewButton, false, true)}">
+                            <!-- ---------------------------- Page Header Start ------------------------------>
+                            <div class="slds-page-header slds-m-bottom_medium" role="banner">
+                                <div class="slds-media slds-media_center">
+                                    <div class="slds-media__figure" id="paymentMethodIcon">
+                                        <span class="slds-icon_container slds-icon-standard-user">
+                                            <svg class="slds-icon" aria-hidden="true">
+                                                <use xlink:href="{!URLFOR($Asset.SLDS, 'assets/icons/custom-sprite/svg/symbols.svg#custom16')}"></use>
+                                            </svg>
+                                        </span>
+                                    </div>
+                                    <div class="slds-media__body">
+                                        <p class="slds-page-header__title">New Payment Method</p>
+                                        <p class="slds-text-body_small">Breadwinner • Payments</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <!----------------------------- Page Header End ------------------------------------>
+                            <!----------------------------- Arrow Path Start ----------------------------------->
+                            <apex:outputPanel id="pathPanel" layout="block" styleClass="slds-m-bottom_small" >
+                                <article class="slds-card" style="border:0px;box-shadow: 0 0px">
+                                    <div class="slds-path slds-path_has-coaching">
+                                        <div class="slds-grid slds-path__track">
+                                            <div class="slds-grid slds-path__scroller-container">
+                                                <div class="slds-path__scroller" role="application">
+                                                    <div class="slds-path__scroller_inner">
+                                                        <ul class="slds-path__nav" role="listbox" aria-orientation="horizontal">
+                                                            <li class="slds-path__item {!if(isCustomerSelected, 'slds-is-complete', 'slds-is-active')}" role="presentation" style="">
+                                                                <a aria-selected="true" class="slds-path__link" href="javascript:void(0);" id="path-2" role="option" tabindex="-1">
+                                                                    <span class="slds-path__stage">
+                                                                        <svg class="slds-icon slds-icon_x-small" aria-hidden="true">
+                                                                            <use xlink:href="{!URLFOR($Asset.SLDS, 'assets/icons/utility-sprite/svg/symbols.svg#check')}" />
+                                                                        </svg>
+                                                                        <apex:outputPanel styleClass="slds-assistive-text">{!if(isCustomerSelected, 'Customer Selected', 'Select Customer')}</apex:outputPanel>
+                                                                    </span>
+                                                                    <apex:outputPanel styleClass="slds-path__title">{!if(isCustomerSelected, 'Customer Selected', 'Select Customer')}</apex:outputPanel>
+                                                                </a>
+                                                            </li>
+                                                            <li class="slds-path__item {!if(isCustomerCreated, 'slds-is-complete', 'slds-is-incomplete')}" role="presentation" style="display: {!If(selectedBWPCustomer == 'createNewBWPCustomer', '', 'none')}">
+                                                                <a aria-selected="true" class="slds-path__link" href="javascript:void(0);" id="path-3" role="option" tabindex="-1">
+                                                                    <span class="slds-path__stage">
+                                                                        <svg class="slds-icon slds-icon_x-small" aria-hidden="true">
+                                                                            <use xlink:href="{!URLFOR($Asset.SLDS, 'assets/icons/utility-sprite/svg/symbols.svg#check')}" />
+                                                                        </svg>
+                                                                        <span class="slds-assistive-text">{!if(isCustomerCreated, 'Customer Created', 'Create Customer')}</span>
+                                                                    </span>
+                                                                    <span class="slds-path__title">{!if(isCustomerCreated, 'Customer Created', 'Create Customer')}</span>
+                                                                </a>
+                                                            </li>
+                                                          
+                                                            <li class="slds-path__item {!if(isPaymentMethodCreated, 'slds-is-complete', 'slds-is-incomplete')}" role="presentation">
+                                                                <a aria-selected="true" class="slds-path__link" href="javascript:void(0);" id="path-3" role="option" tabindex="-1">
+                                                                    <span class="slds-path__stage">
+                                                                        <svg class="slds-icon slds-icon_x-small" aria-hidden="true">
+                                                                            <use xlink:href="{!URLFOR($Asset.SLDS, 'assets/icons/utility-sprite/svg/symbols.svg#check')}" />
+                                                                        </svg>
+                                                                        <span class="slds-assistive-text">{!if(isPaymentMethodCreated, 'Payment Method Added', 'Add Payment Method')}</span>
+                                                                    </span>
+                                                                    <span class="slds-path__title">{!if(isPaymentMethodCreated, 'Payment Method Added', 'Add Payment Method')}</span>
+                                                                </a>
+                                                            </li>
+                                                        </ul>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </article>
+                            </apex:outputPanel>
+                            <!----------------------------- Arrow Path End -------------------------------------->
+                            <!-- -----------------Select BWP Customer Start-------------------------------------->
+                            <apex:pageMessages />                        
+                            <apex:outputPanel id="selectCustomersSection">
+                                <apex:outputPanel rendered="{!CustomerPage}">
+                                    <div class="slds-m-top_small slds-col_padded">
+                                        <h1 class="slds-section__title">Select the Breadwinner Payments Customer for this Payment</h1>
+                                        <fieldset class="slds-form-element slds-m-top_x-small">
+                                            <div class="slds-form-element__control">
+                                                <label class="slds-radio">
+                                                    <input type="radio" name="customeroptions" id="createNewBWPCustomer" onchange="pushselectedBWPCustomer('createNewBWPCustomer');selectCustomer();" value="createNewBWPCustomer" />
+                                                    <span class="slds-radio_faux"></span>
+                                                    <span class="slds-form-element__label">Create a Breadwinner Payments Customer</span>
+                                                    <div class="slds-m-left_x-large slds-text-body_small slds-m-top_x-small">You can have multiple Breadwinner Payments Customers associated with a single Salesforce {!customerMatchType}. This might happen if you have different departments, branches, or offices of the same company. </div>
+                                                </label>
+                                            </div>
+                                            <apex:outputPanel rendered="{!customerMatchType == 'Account'}"> 
+                                                    <apex:repeat value="{!selectedAccount.BWP_Customers__r}" var="customer">
+                                                        <c:CustomerCreationInfo customer="{!customer}" section="customerSection"/>
+                                                    </apex:repeat>
+                                                </apex:outputPanel>
+                                                <apex:outputPanel rendered="{!customerMatchType == 'Contact'}"> 
+                                                    <apex:repeat value="{!selectedContact.BWP_Customers__r}" var="customer">
+                                                        <c:CustomerCreationInfo customer="{!customer}" section="customerSection"/>
+                                                    </apex:repeat>
+                                                </apex:outputPanel>
+                                        </fieldset>
+                                    </div>
+                                    <div class="slds-m-bottom_large slds-m-top_medium" style="text-align:center;">
+                                        <apex:commandButton value="Next" id="redirectToPaymentMethodPage" action="{!redirectToPaymentMethodPage}" status="action-status" styleClass="slds-button slds-button_brand slds-m-top_medium" rerender="selectCustomersSection, createPaymentSection, selectPaymentMethodSection, pathPanel" oncomplete="message();reRendercheckmarkSVGIcons();" disabled="{!(selectedObject != customerMatchType)}" />
+                                        <apex:commandButton value="Cancel" id="cancel" action="{!cancelProcess}" status="action-status" styleClass="slds-button slds-button_neutral slds-m-top_medium" reRender="selectCustomersSection" oncomplete="message()"/>
+                                    </div>
+                                    <apex:actionFunction id="selectCustomer" name="selectCustomer" reRender="pathPanel" />
+                                </apex:outputPanel>
+                                <apex:inputHidden id="selectedBWPCustomer" value="{!selectedBWPCustomer}" />
+                                <script>
+                                document.getElementById('{!JSENCODE(selectedBWPCustomer)}').checked = true;
+                                function pushselectedBWPCustomer(refId) {
+                                    document.getElementById('{!JSENCODE($Component.theForm.selectedBWPCustomer)}').value = refId;
+                                }
+                                </script>
+                            </apex:outputPanel>
+                            <!-- ----------------- Select BWP Customer End ------------------------------------->
+                        </apex:outputPanel>
+                    </apex:outputPanel>
+                </div>
+            </apex:form>
+        </body>
+    </html>
+</apex:page>

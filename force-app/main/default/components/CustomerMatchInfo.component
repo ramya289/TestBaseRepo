@@ -1,0 +1,67 @@
+<apex:component >
+    <apex:attribute name="recordInfo" type="map" description="Stores Customer/Accout/Contact Info" default=""/>
+    <apex:attribute name="contactInfo" type="map" description="Stores Account related Contact Info" default=""/>
+    <apex:attribute name="customerMatchTypeData" type="String" description="stores Customer Match Type" default=""/>
+    <apex:attribute name="isContactEmailmatched" type="Boolean" description="Checks if any there's any Account related Contact matching with Customer Email " default=""/>
+    <style>
+        .customerMatch{
+        background: #f4f6f9;
+        line-height: 22px;
+        padding: 10px;
+        text-align: left;
+        word-wrap: break-word;
+        }
+        dt{
+        font-weight: normal;
+        color: #54698d;
+        font-size:.75rem;
+        }
+        
+        
+    </style>
+    <div class="slds-m-horizontal_medium slds-tile" >
+        <ul class="slds-has-dividers_bottom-space slds-m-top_x-small">
+            <li class="slds-item"><span class="slds-text-heading_medium"><apex:outputText >{!recordInfo['name']}</apex:outputText></span> </li>
+        </ul>
+        <apex:outputPanel layout="block">
+            <div class="customerMatch slds-tile__detail">
+                <dl class="slds-list_horizontal slds-wrap">
+                    <dt class="slds-item_label" style="white-space: nowrap;">Name:</dt>
+                    <dd class="slds-item_detail">{!(recordInfo['name'])}</dd>
+                    <dt class="slds-item_label">Phone:</dt>
+                    <dd class="slds-item_detail ">{!(recordInfo['Phone'])}</dd>
+                    <apex:outputPanel layout="none" rendered="{!customerMatchTypeData != 'Account'}">
+                        <dt class="slds-item_label" style="display: {!IF(ISBLANK(recordInfo['EmailAddress']), 'none' , '')}">Email:</dt>
+                        <dd class="slds-item_detail" style="display: {!IF(ISBLANK(recordInfo['EmailAddress']), 'none' , '')}">{!(recordInfo['EmailAddress'])}</dd>
+                    </apex:outputPanel>
+                    <apex:outputPanel layout="none" rendered="{!customerMatchTypeData == 'Account'}">
+                        <dt class="slds-item_label" style="display: {!IF(ISBLANK(recordInfo['website']), 'none' , '')}">Website:</dt>
+                        <dd class="slds-item_detail" style="display: {!IF(ISBLANK(recordInfo['website']), 'none' , '')}">{!(recordInfo['website'])}</dd>
+                    </apex:outputPanel>
+                    <dt class="slds-item_label">Address:</dt>
+                    <dd class="slds-item_detail">
+                        <apex:outputPanel layout="block" rendered="{!(NOT(ISBLANK(recordInfo['billingStreet'])))}">{!recordInfo['billingStreet']}</apex:outputPanel>
+                        <apex:outputPanel layout="block" rendered="{!(NOT(ISBLANK(recordInfo['billingCity'])))}">{!recordInfo['billingCity']}</apex:outputPanel>
+                        <apex:outputPanel layout="block" rendered="{!(NOT(ISBLANK(recordInfo['billingState'])))}">{!recordInfo['billingState']} </apex:outputPanel>
+                        <apex:outputPanel layout="block" rendered="{!(NOT(ISBLANK(recordInfo['billingCountry'])))}">{!recordInfo['billingCountry']} </apex:outputPanel>
+                        <apex:outputPanel layout="block" rendered="{!(NOT(ISBLANK(recordInfo['billingPostalCode'])))}">{!recordInfo['billingPostalCode']} </apex:outputPanel>
+                    </dd >
+                </dl>
+                <!-- Mapping based on contact Email-->
+                <apex:outputpanel styleclass="slds-m-top_medium" style="background-color: ivory;padding: 15px;"  layout="block" rendered="{!isContactEmailmatched}">
+                    <div class="slds-tile slds-text-heading_small "> Matched SF Contacts</div>
+                    <apex:repeat value="{!contactInfo}" var="sfContact">
+                        <div class="slds-m-top_small slds-tile__detail">
+                            <dl class="slds-list_horizontal slds-wrap">
+                                <dt class="slds-item_label">Contact Name:</dt>
+                                <dd class="slds-item_detail">{!HTMLENCODE(sfContact['Name'])}</dd>
+                                <dt class="slds-item_label" >Contact Email:</dt>
+                                <dd class="slds-item_detail " >{!HTMLENCODE(sfContact['Email'])}</dd>
+                            </dl> 
+                        </div>
+                    </apex:repeat>
+                </apex:outputpanel>
+            </div>
+        </apex:outputPanel>
+    </div>
+</apex:component>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <applicationVisibilities>
+        <application>Breadwinner_Payments</application>
+        <visible>true</visible>
+    </applicationVisibilities>
+    <description>This Permission Set will have permissions on Breadwinner Apps and Tabs. This will not be included in the 2GP package but will be used internally while working on Scratch Orgs.</description>
+    <hasActivationRequired>false</hasActivationRequired>
+    <label>Developer Permissions</label>
+    <license>Salesforce</license>
+    <tabSettings>
+        <tab>BWP_Customer__c</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
+    <tabSettings>
+        <tab>BWP_Payment_Method__c</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
+    <tabSettings>
+        <tab>BWP_Payment__c</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
+    <tabSettings>
+        <tab>BreadwinnerPayments</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
+</PermissionSet>

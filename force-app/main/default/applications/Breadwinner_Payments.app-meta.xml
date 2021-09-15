@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomApplication xmlns="http://soap.sforce.com/2006/04/metadata">
+    <defaultLandingTab>BreadwinnerPayments</defaultLandingTab>
+    <description>Integrates with multiple Payment Processors like Stripe, Braintree, Square, PayPal e.t.c.,</description>
+    <formFactors>Large</formFactors>
+    <label>Breadwinner Payments</label>
+    <logo>Breadwinner_Payments/Logo.png</logo>
+    <tabs>BreadwinnerPayments</tabs>
+    <tabs>BWP_Customer__c</tabs>
+    <tabs>BWP_Payment__c</tabs>
+    <tabs>BWP_Payment_Method__c</tabs>
+    <tabs>standard-Account</tabs>
+    <tabs>standard-Contact</tabs>
+</CustomApplication>

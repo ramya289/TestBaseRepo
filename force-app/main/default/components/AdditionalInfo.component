@@ -1,0 +1,15 @@
+<apex:component >
+    <apex:attribute name="label" type="String" description="Field label" default=""/>
+    <apex:attribute name="fieldValue" type="String" description="Field Value" default=""/> 
+    <apex:attribute name="outputTextStyleCls" type="String" description="Output Text StyleClass value" default=""/>
+    
+        <div class="slds-form-element slds-border_bottom defaultHeight">
+            <label class="slds-form-element__label">{!label}</label>
+            <div class="slds-form-element__control">
+                <span class="slds-form-element__static">
+                    <apex:outputText value="{!fieldValue}" style="{!outputTextStyleCls}" />
+                </span>
+            </div>
+        </div>
+    
+</apex:component>
