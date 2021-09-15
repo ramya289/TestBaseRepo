@@ -23,6 +23,7 @@ public with sharing class BreadwinnerUtil{
 
     public static final String SB_PACKAGE_NAME = 'Stripe Billing';
 
+    @namespaceAccessible
     public static Boolean isBreadwinnerTransaction {
         get { 
             if (isBreadwinnerTransaction == null){
@@ -33,7 +34,7 @@ public with sharing class BreadwinnerUtil{
         set;
     }
 
-
+    @namespaceAccessible
     private static Selector_BWP_ProcessorConfig selectorProcessorConfig = new Selector_BWP_ProcessorConfig();
 
     public static String namespace {
@@ -504,6 +505,7 @@ public with sharing class BreadwinnerUtil{
         return (currentRunningContext == BreadwinnerUtil.CNTX_HIST_SYNC ? 'Historical Sync' : (currentRunningContext == BreadwinnerUtil.CNTX_HOUR_SYNC ? 'Regular Sync' : (currentRunningContext == BreadwinnerUtil.CNTX_BWAPI ? 'Breadwinner API' : BreadwinnerUtil.CNTX_BW)));
     }
     
+    @namespaceAccessible
     public static void upsertAppConfig(BWP_Processor_Config__c config){
         BreadwinnerUtil.isBreadwinnerTransaction = true;
         SecurityUtil.dmlUpsert(config);
