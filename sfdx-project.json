@@ -1,50 +1,20 @@
 {
-    "name": "Breadwinner_Payments",
-    "namespace": "bwp_rc",
-    "sfdcLoginUrl": "https://login.salesforce.com",
-    "sourceApiVersion": "52.0",
     "packageDirectories": [
         {
             "path": "force-app",
             "default": true,
-            "package": "Breadwinner Payments",
-            "postInstallScript": "PostInstallHandler",
-            "versionName": "2.5",
-            "versionNumber": "2.5.0.NEXT"
-        },
-        {
-            "path": "unpackaged-components",
-            "default": false
+            "package": "Test BWP Base Package",
+            "versionName": "ver 0.3",
+            "versionNumber": "0.3.0.NEXT"
         }
     ],
+    "name": "TestBaseRepo",
+    "namespace": "RamyaTestBWP",
+    "sfdcLoginUrl": "https://login.salesforce.com",
+    "sourceApiVersion": "52.0",
     "packageAliases": {
-        "Breadwinner Payments": "0Ho6e000000CaXjCAK",
-        "Breadwinner Payments@1.0.0-1": "04t6e000001qwVzAAI",
-        "Breadwinner Payments@1.0.0-2": "04t6e000001qwW4AAI",
-        "Breadwinner Payments@1.0.0-3": "04t6e000001qwW9AAI",
-        "Breadwinner Payments@1.0.0-5": "04t6e000001qwWJAAY",
-        "Breadwinner Payments@1.0.0-6": "04t6e000001qwWOAAY",
-        "Breadwinner Payments@1.0.0-7": "04t6e000001qwWTAAY",
-        "Breadwinner Payments@2.0.0-4": "04t6e000001qwWsAAI",
-        "Breadwinner Payments@2.0.0-5": "04t6e000001qwWxAAI",
-        "Breadwinner Payments@2.0.0-6": "04t6e000001qwX2AAI",
-        "Breadwinner Payments@2.1.0-1": "04t6e000002EsqXAAS",
-        "Breadwinner Payments@2.1.0-2": "04t6e000002AgjbAAC",
-        "Breadwinner Payments@2.2.0-1": "04t6e000002AgkAAAS",
-        "Breadwinner Payments@2.2.0-2": "04t6e000002AgkKAAS",
-        "Breadwinner Payments@2.2.0-3": "04t6e000002AgkPAAS",
-        "Breadwinner Payments@2.2.0-4": "04t6e000002AgkUAAS",
-        "Breadwinner Payments@2.3.0-1": "04t6e000002Agn9AAC",
-        "Breadwinner Payments@2.3.0-2": "04t6e000002AgndAAC",
-        "Breadwinner Payments@2.3.0-3": "04t6e000002AgniAAC",
-        "Breadwinner Payments@2.4.0-1": "04t6e000002AgolAAC",
-        "Breadwinner Payments@2.4.0-2": "04t6e000002AgpUAAS",
-        "Breadwinner Payments@2.4.0-3": "04t6e000002AgpjAAC",
-        "Breadwinner Payments@2.4.0-4": "04t6e000002AgqDAAS",
-        "Breadwinner Payments@2.4.0-5": "04t6e000002AgqIAAS",
-        "Breadwinner Payments@2.4.0-6": "04t6e000002AgqNAAS",
-        "Breadwinner Payments@2.5.0-1": "04t6e000002AgsnAAC",
-        "Breadwinner Payments@2.5.0-2": "04t6e000002AgssAAC",
-        "Breadwinner Payments@2.5.0-3": "04t6e000002AgsxAAC"
+        "Test BWP Base Package": "0Ho5g00000000XlCAI",
+        "Test BWP Base Package@0.2.0-1": "04t5g000000xzKUAAY",
+        "Test BWP Base Package@0.3.0-1": "04t5g000000xzKtAAI"
     }
 }
