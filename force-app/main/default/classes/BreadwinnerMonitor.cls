@@ -20,6 +20,7 @@ public with sharing class BreadwinnerMonitor implements Schedulable {
     
     public void execute(SchedulableContext sc) {
         try {
+            BreadwinnerUtil.deleteConfigsWhenSandboxRefresh();
             APICallHandler.asyncGetSFOrgInfo();
             //Check batches are in queue and NextFireTime is not null
             List<CronTrigger> listCronTrigger = BreadwinnerUtil.getCronTrigger(BreadwinnerUtil.SYNC_CNTX_HOURLY);
@@ -40,9 +41,26 @@ public with sharing class BreadwinnerMonitor implements Schedulable {
             HistoricalSyncBatch.scheduleWeeklyHistoricalSync();
             //Refresh the Access Token if needed
             HourlySyncBatch.checkAndRefreshAccessToken(BreadwinnerUtil.processorConfigList);
+
+            sendLogForLast90DaysTotalAmountInCents();
             
         } catch(Exception ex) {
             System.debug(ex);
         }
-    }  
+    }
+
+    private static void sendLogForLast90DaysTotalAmountInCents(){
+        Set<String> createdViaBW = new Set<String> {BreadwinnerUtil.CNTX_BWAPI, BreadwinnerUtil.CNTX_BW};
+        AggregateResult[] groupedResults = [SELECT SUM(Amount__c)totalAmt FROM BWP_Transaction__c WHERE createdDate = LAST_90_DAYS AND Amount__c!=NULL AND Created_Via__c IN : createdViaBW];
+        Decimal last90DaysTotalAmount =0;
+
+        for(AggregateResult aggr:groupedResults){
+            if(aggr.get('totalAmt') != NULL)
+                last90DaysTotalAmount+= (Decimal) aggr.get('totalAmt');
+        }
+        // Dollars to cents conversion
+        last90DaysTotalAmount = last90DaysTotalAmount * 100;
+        APICallHandler.userInteractionLogPush(FALSE, 'Payment Amount', ''+last90DaysTotalAmount , 'Total amount (in cents) collected from the Breadwinner in the last 90 days.');
+        //return last90DaysTotalAmount;
+    }
 }

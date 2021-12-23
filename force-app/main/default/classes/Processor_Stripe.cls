@@ -2,8 +2,8 @@
 public with sharing class Processor_Stripe extends Processor {
 
     private static Selector_BWP_Customer selectorCustomer = new Selector_BWP_Customer();
-    private static Selector_BWP_Payment selectorPayment = new Selector_BWP_Payment();
     private static Selector_BWP_Payment_Method selectorPaymentMethod = new Selector_BWP_Payment_Method();
+    private static Selector_BWP_Transaction selectorTransaction = new Selector_BWP_Transaction();
 
     //Stripe End points
     @namespaceAccessible public static String stripeAuthorizationUrl = 'https://connect.stripe.com/oauth/authorize';
@@ -60,8 +60,8 @@ public with sharing class Processor_Stripe extends Processor {
     public override ProcessorUtil.ResponseObject fetchCustomers(String requestJSON) {
         return fetchCustomers(apcWrapper, requestJSON);
     }
-    public override ProcessorUtil.ResponseObject fetchPayments(String requestJSON) {
-        return fetchPayments(apcWrapper, requestJSON);
+    public override ProcessorUtil.ResponseObject fetchTransactions(String requestJSON) {
+        return fetchTransactions(apcWrapper, requestJSON);
     }
     public override ProcessorUtil.ResponseObject verifyBankAccount(String requestJSON) {
         return verifyBankAccount(apcWrapper, requestJSON);
@@ -69,7 +69,6 @@ public with sharing class Processor_Stripe extends Processor {
     
     @TestVisible
     private static ProcessorUtil.ResponseObject createCustomer(BreadwinnerUtil.AppConfig apcWrapper, String requestJSON){
-
         Map<String, Customer.StripeCustomer> stripeIdCustomerMapResponse = new Map<String, Customer.StripeCustomer> ();
 
         ProcessorUtil.ResponseObject response = new ProcessorUtil.ResponseObject();
@@ -141,7 +140,6 @@ public with sharing class Processor_Stripe extends Processor {
     @TestVisible
     private static ProcessorUtil.ResponseObject updateCustomer(BreadwinnerUtil.AppConfig apcWrapper, String requestJSON){
         System.debug('request: ' + requestJSON);
-
         Map<String, Customer.StripeCustomer> stripeIdCustomerMapResponse = new Map<String, Customer.StripeCustomer> ();
 
         ProcessorUtil.ResponseObject response = new ProcessorUtil.ResponseObject();
@@ -280,7 +278,7 @@ public with sharing class Processor_Stripe extends Processor {
                         Map<String, Object> responseFromStripe = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
                         Map<String, Object> error = (Map<String, Object>)responseFromStripe.get('error');
                         response.errors.add(formatError(error, String.valueOf(res.getStatusCode())));
-                        APICallHandler.userInteractionLogPush(true, 'Create Stripe Customer', 'ERROR', 'Response for Stripe Org Name(' + apcWrapper.accountName + '): Status Code: ' + res.getStatusCode() + ' Response Body: ' + res.getBody());
+                        APICallHandler.userInteractionLogPush(true, 'Create Stripe Payment Method', 'ERROR', 'Response for Stripe Org Name(' + apcWrapper.accountName + '): Status Code: ' + res.getStatusCode() + ' Response Body: ' + res.getBody());
                     }
                 } catch (Exception ex) {
                     // We want to catch any additional errors and let the process continue.
@@ -437,7 +435,6 @@ public with sharing class Processor_Stripe extends Processor {
 
     @TestVisible
     private static ProcessorUtil.ResponseObject chargeProcessor(BreadwinnerUtil.AppConfig apcWrapper, String requestJSON, String timeout){
-
         Customer.StripeCustomer stripeCustomer = new Customer.StripeCustomer();
         Customer.Sources paymentMethod = new Customer.Sources();
 
@@ -480,7 +477,6 @@ public with sharing class Processor_Stripe extends Processor {
                 response.errors.add(new ProcessorUtil.Error('Required field missing.','"amount" is required and must be greater than zero.'));
                 return response;
             }
-
             //Check and build UrlBody
             String reqBody =  'customer=' + getURLEncodeData(charge.customer);
             reqBody += '&currency=' + getURLEncodeData(charge.stripe_currency);
@@ -548,7 +544,7 @@ public with sharing class Processor_Stripe extends Processor {
                 Map<String, Object> processorToPaymentMap = new Map<String, Object>();
                 processorToPaymentMap.put(ProcessorUtil.PAT_STRIPE, stripeIdChargeMapResponse);
                 apcWrapper.currentRunningClassContext = BreadwinnerUtil.CNTX_BWAPI;
-                response.paymentList = syncPayments(processorToPaymentMap, apcWrapper);
+                response.transactionList = syncTransactions(processorToPaymentMap, apcWrapper);
 
                 response.responseJSON = JSON.serializePretty(stripeIdChargeMapResponse);
 
@@ -580,23 +576,22 @@ public with sharing class Processor_Stripe extends Processor {
 
     @TestVisible
     private static void createPEXPayments(Charge.StripeCharge charge, BreadwinnerUtil.AppConfig apcWrapper){
-        BWP_Payment__c newCharge = new BWP_Payment__c();
-        newCharge = constructStripePayment(newCharge, charge, apcWrapper);
+        BWP_Transaction__c newCharge = new BWP_Transaction__c();
+        newCharge = constructStripeTransaction(newCharge, charge, apcWrapper);
         newCharge.Created_Date_in_Processor__c = System.now();
-        newCharge.Is_Live_Payment__c = apcWrapper.livemode;
         newCharge.Amount__c = charge.amount;
         newCharge.Charge_Status__c = ProcessorUtil.CHARGE_EXCEPTION;
         List<BWP_Customer__c> customerList = selectorCustomer.selectByProcessorCustomerId(new Set<String>{charge.customer},null);
 
         newCharge.customer__c = customerList[0].Id;
-        newCharge.Account__c = customerList[0].Salesforce_Account__c;
+        newCharge.Salesforce_Account__c = customerList[0].Salesforce_Account__c;
 
         List<BWP_Payment_Method__c> paymentMethodList = selectorPaymentMethod.selectByProcessorId(charge.paymentMethod,1);
 
         newCharge.Source__c = paymentMethodList[0].id;
-        List<BWP_Payment__c> paymentsList = new List<BWP_Payment__c>();
-        paymentsList.add(newCharge);
-        SecurityUtil.dmlInsert(paymentsList);
+        List<BWP_Transaction__c> transactionsList = new List<BWP_Transaction__c>();
+        transactionsList.add(newCharge);
+        SecurityUtil.dmlInsert(transactionsList);
     }
     @TestVisible
     private static ProcessorUtil.ResponseObject fetchCustomers(BreadwinnerUtil.AppConfig apcWrapper, String requestJSON) {
@@ -663,7 +658,7 @@ public with sharing class Processor_Stripe extends Processor {
         return response;
     }
     @TestVisible
-    private static ProcessorUtil.ResponseObject fetchPayments(BreadwinnerUtil.AppConfig apcWrapper, String requestJSON) {
+    private static ProcessorUtil.ResponseObject fetchTransactions(BreadwinnerUtil.AppConfig apcWrapper, String requestJSON) {
         ProcessorUtil.ResponseObject response = new ProcessorUtil.ResponseObject();
         response.errors = new List<ProcessorUtil.Error>();
         FetchRequest filters = (FetchRequest)System.JSON.deserialize(requestJSON, FetchRequest.class);
@@ -694,7 +689,7 @@ public with sharing class Processor_Stripe extends Processor {
         } else {
             apcWrapper.needToReconnect = true;
             apcWrapper.requireNextPaymentSyncRun = false;
-            String Action_Type = ProcessorUtil.getLogAction(apcWrapper.currentRunningClassContext, 'Fetching Payments');
+            String Action_Type = ProcessorUtil.getLogAction(apcWrapper.currentRunningClassContext, 'Fetching Transactions');
             APICallHandler.userInteractionLogPush(true, Action_Type, 'ERROR' , 'Response for Processor Org Name('+apcWrapper.accountName+'): Status Code: '+res.getStatusCode()+' Response Body: '+res.getBody() );
 
             Map<String, Object> responseFromStripe = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
@@ -790,15 +785,11 @@ public with sharing class Processor_Stripe extends Processor {
         try {
             if(String.isBlank(appConfig.customerSyncConfig) || ((String.isNotBlank(appConfig.customerSyncConfig) && (appConfig.customerSyncConfig != 'NONE')))  && appConfig.currentRunningClassContext != BreadwinnerUtil.CNTX_BWAPI)
                 processorToCustomerMap = excludeCustomers(processorToCustomerMap, appConfig);
-            //if(String.isNotBlank(appConfig.customerSyncConfig) && (appConfig.customerSyncConfig != 'NONE') && appConfig.currentRunningClassContext != 'BWAPI')
             String paymentProcessorType = '';
             Breadwinner_Settings__c bwSetting = BreadwinnerUtil.getBWSetting();
             Map<String, Customer.StripeCustomer> stripeIdCustomerMap =  new Map<String, Customer.StripeCustomer>();
-            Map<String, Customer.StripeCustomer> backupstripeIdCustomerMap = new Map<String, Customer.StripeCustomer>();
             stripeIdCustomerMap = (Map<String, Customer.StripeCustomer>) processorToCustomerMap.get(ProcessorUtil.PAT_STRIPE);
             paymentProcessorType = ProcessorUtil.PAT_STRIPE;
-
-            backupstripeIdCustomerMap.putAll(stripeIdCustomerMap);
 
             List<BWP_Customer__c> customerUpsertList = new List<BWP_Customer__c> ();
             Map<String, BWP_Customer__c> customerUpsertMap = new Map<String, BWP_Customer__c>();
@@ -837,21 +828,7 @@ public with sharing class Processor_Stripe extends Processor {
             for(String ContactId : stripeIdCustomerMap.keySet()){
                 if(!existingSFCustomersMap.containsKey(ContactId) || (existingSFCustomersMap.containsKey(ContactId) && existingSFCustomersMap.get(ContactId).Salesforce_Account__c == NULL && !existingSFCustomersMap.get(ContactId).No_Associated_SF_Account__c )){
                     Customer.StripeCustomer sc = stripeIdCustomerMap.get(ContactId);
-
-                    if(String.isNotBlank(sc.name)){
-                        String ContactName = sc.Name.toLowerCase().replace('\\', '%');
-                        Set<String> relatedNameSet = BreadwinnerUtil.getSimilarAccountNameSet(ContactName);
-                        customerNameSet.addAll(relatedNameSet);
-                    }
-                    else if(String.isNotBlank(sc.email)){
-                        String ContactEmail = sc.email.toLowerCase().replace('\\', '%');
-                        Set<String> relatedNameSet = BreadwinnerUtil.getSimilarAccountNameSet(ContactEmail);
-                        customerNameSet.addAll(relatedNameSet);
-                    }
-                    if(ProcessorUtil.arePersonAccountsEnabled() && String.isNotBlank(sc.email)){
-                        String email = sc.email.toLowerCase().replace('\\', '%');
-                        customerEmailSet.add(email);
-                    }
+                    ProcessorUtil.getExistingRecordsSet(sc.name, sc.email, customerNameSet, customerEmailSet);
                 }
             }
             //Stripe Customers
@@ -910,7 +887,7 @@ public with sharing class Processor_Stripe extends Processor {
                             BWP_Payment_Method__c srcSf =  existingSFPaymentMethodsMap.get(src.id) != null ? existingSFPaymentMethodsMap.get(src.id) : new BWP_Payment_Method__c();
                             srcSf.Customer__r = new BWP_Customer__c(Processor_Customer_Id__c = cw.id);
                             srcSf.Processor_Customer_Id__c = cw.id;
-                            srcSf.Account__c = String.isNotBlank(customerSf.Salesforce_Account__c) ? customerSf.Salesforce_Account__c : accID;
+                            srcSf.Salesforce_Account__c = String.isNotBlank(customerSf.Salesforce_Account__c) ? customerSf.Salesforce_Account__c : accID;
                             srcSf = constructStripePaymentMethod(srcSf, src, appConfig);
                             sourcesMap.put(src.id, srcSf);
                         }
@@ -1082,7 +1059,7 @@ public with sharing class Processor_Stripe extends Processor {
                             BWP_Payment_Method__c srcSf =  existingSFPaymentMethodsMap.get(src.id) != null ? existingSFPaymentMethodsMap.get(src.id) : new BWP_Payment_Method__c();
                             srcSf.Customer__r = new BWP_Customer__c(Processor_Customer_Id__c = cw.id);
                             srcSf.Processor_Customer_Id__c = cw.id;
-                            srcSf.Contact__c = String.isNotBlank(customerSf.Salesforce_Contact__c) ? customerSf.Salesforce_Contact__c : conID;
+                            srcSf.Salesforce_Contact__c = String.isNotBlank(customerSf.Salesforce_Contact__c) ? customerSf.Salesforce_Contact__c : conID;
                             srcSf = constructStripePaymentMethod(srcSf, src, appConfig);
                             sourcesMap.put(src.id, srcSf);
                         }
@@ -1186,9 +1163,9 @@ public with sharing class Processor_Stripe extends Processor {
                             srcSf.Customer__r = new BWP_Customer__c(Processor_Customer_Id__c = customer.id);
                             srcSf.Processor_Customer_Id__c = customer.id;
                             if(String.isNotBlank(customerSf.Salesforce_Account__c))
-                                srcSf.Account__c = customerSf.Salesforce_Account__c;
+                                srcSf.Salesforce_Account__c = customerSf.Salesforce_Account__c;
                             if(String.isNotBlank(customerSf.Salesforce_Contact__c))
-                                srcSf.Contact__c = customerSf.Salesforce_Contact__c;
+                                srcSf.Salesforce_Contact__c = customerSf.Salesforce_Contact__c;
                             srcSf = constructStripePaymentMethod(srcSf, src, appConfig);
                             sourcesMap.put(src.id, srcSf);
                         }
@@ -1224,8 +1201,8 @@ public with sharing class Processor_Stripe extends Processor {
 
  
     //Saving the payments to SF. Orphan records will not be saved.
-    public static List<ProcessorUtil.PaymentWrapper> syncPayments(Map<String, Object> processorIdToPaymentMap, BreadwinnerUtil.AppConfig appConfig) {
-        List<ProcessorUtil.PaymentWrapper> rtnList = new List<ProcessorUtil.PaymentWrapper>();
+    public static List<ProcessorUtil.TransactionWrapper> syncTransactions(Map<String, Object> processorIdToPaymentMap, BreadwinnerUtil.AppConfig appConfig) {
+        List<ProcessorUtil.TransactionWrapper> rtnList = new List<ProcessorUtil.TransactionWrapper>();
         Map<String, Object> returnMap = new Map<String, Object>();
         // Map tp store the Payment Id and related Customer Id
         Set<String> successfulPaymentsCustomerIdSet = new Set<String>();
@@ -1234,11 +1211,11 @@ public with sharing class Processor_Stripe extends Processor {
             return rtnList;
         }
 
-        Map<String, BWP_Payment__c> upsertMapByRefId = new Map<String, BWP_Payment__c>();
-        Map<String,BWP_Payment__c> existingSFPaymentsMap = new Map<String,BWP_Payment__c>();
-        for(BWP_Payment__c payment : selectorPayment.selectByProcessorId(stripeIdPaymentMap.keySet(), new List<String>{'Source__r.Id'})) {
-            BWP_Payment__c pmnt = new BWP_Payment__c(id = payment.id);
-            existingSFPaymentsMap.put(pmnt.Processor_Id__c, pmnt);
+        Map<String, BWP_Transaction__c> upsertMapByRefId = new Map<String, BWP_Transaction__c>();
+        Map<String,BWP_Transaction__c> existingSFPaymentsMap = new Map<String,BWP_Transaction__c>();
+        for(BWP_Transaction__c trxn : selectorTransaction.selectByProcessorId(stripeIdPaymentMap.keySet(), new List<String>{'Source__r.Id'})) {
+            BWP_Transaction__c txn = new BWP_Transaction__c(id = trxn.id, Processor_Id__c = trxn.Processor_Id__c);
+            existingSFPaymentsMap.put(txn.Processor_Id__c, txn);
         }
         try {
             // Boolean to check the syncing of failed Payments
@@ -1267,32 +1244,37 @@ public with sharing class Processor_Stripe extends Processor {
                 paymentMethodMapByProcessorId.put(pm.Processor_Id__c, pm);
             }
 
-            // Loop though the payments and create a BWP_Payment__c list
+            // Loop though the payments and create a BWP_Transaction__c list
            for (Charge.StripeCharge pw : stripeIdPaymentMap.values()) {
                 String payment_Method_Id = String.isNotBlank(pw.payment_method) ? pw.payment_method : (String.isNotBlank(pw.source.id) ? pw.source.id : NULL);
 
                 BWP_Customer__c customer = customerMapByProcessorCustomerId.get(pw.customer);
                 BWP_Payment_Method__c paymentMethod = paymentMethodMapByProcessorId.get(payment_Method_Id);
 
-                BWP_Payment__c paymentSf = existingSFPaymentsMap.get(pw.id) != null ? existingSFPaymentsMap.get(pw.id) : new BWP_Payment__c();
+                BWP_Transaction__c transactionSf = existingSFPaymentsMap.get(pw.id) != null ? existingSFPaymentsMap.get(pw.id) : new BWP_Transaction__c();
                 
                 if (customer != NULL) {
-                    paymentSf.Customer__c = customer.Id;
-                    paymentSf.Account__c = String.isNotBlank(customer.Salesforce_Account__c) ? customer.Salesforce_Account__c : NULL;
-                    paymentSf.Contact__c = String.isNotBlank(customer.Salesforce_Contact__c) ? customer.Salesforce_Contact__c : NULL;
+                    transactionSf.Customer__c = customer.Id;
+                    transactionSf.Salesforce_Account__c = String.isNotBlank(customer.Salesforce_Account__c) ? customer.Salesforce_Account__c : NULL;
+                    transactionSf.Salesforce_Contact__c = String.isNotBlank(customer.Salesforce_Contact__c) ? customer.Salesforce_Contact__c : NULL;
                 }
-                
+                // Used in associating the originating object value while creating a Transaction via Custom Guided Wizard
+                if(ProcessorUtil.originatingObjFieldToIdMap?.size()>0){
+                    for(String originatingObjField :ProcessorUtil.originatingObjFieldToIdMap.keySet()){
+                        transactionSf.put(originatingObjField, ProcessorUtil.originatingObjFieldToIdMap.get(originatingObjField));
+                    }
+                }
                 if(paymentMethod != NULL && String.isNotBlank(paymentMethod.Id))
-                    paymentSf.Source__c = paymentMethod.Id;
-                paymentSf = constructStripePayment(paymentSf, pw, appConfig);
-                if (doNotImportCustomerAndFailedPayments && paymentSf.Payment_Status__c == ProcessorUtil.CHARGE_SUCCEEDED) {
-                    if(String.isNotBlank(paymentSf.Customer__c)){
-                        successfulPaymentsCustomerIdSet.add(paymentSf.Customer__c);
+                    transactionSf.Source__c = paymentMethod.Id;
+                transactionSf = constructStripeTransaction(transactionSf, pw, appConfig);
+                if (doNotImportCustomerAndFailedPayments && transactionSf.Status__c == ProcessorUtil.CHARGE_SUCCEEDED) {
+                    if(String.isNotBlank(transactionSf.Customer__c)){
+                        successfulPaymentsCustomerIdSet.add(transactionSf.Customer__c);
                     }
                 }
 
-                if (String.isNotBlank(paymentSf.customer__c) && (doNotImportCustomerAndFailedPayments ? (paymentSf.Payment_Status__c == 'Succeeded' ? TRUE : FALSE) : TRUE)){
-                    upsertMapByRefId.put(paymentSf.Processor_Id__c, paymentSf);
+                if (String.isNotBlank(transactionSf.customer__c) && (doNotImportCustomerAndFailedPayments ? (transactionSf.Status__c == 'Succeeded' ? TRUE : FALSE) : TRUE)){
+                    upsertMapByRefId.put(transactionSf.Processor_Id__c, transactionSf);
                 }
                 system.debug('successfulPaymentsCustomerIdSet----------'+successfulPaymentsCustomerIdSet);
             }
@@ -1463,55 +1445,44 @@ public with sharing class Processor_Stripe extends Processor {
     }
 
     // This method is used to convert the Stripe Payment wrapper to Stripe Payment record.
-    private static BWP_Payment__c constructStripePayment(BWP_Payment__c paymentSf, Charge.StripeCharge pw, BreadwinnerUtil.AppConfig appConfig){
-        if(paymentSf.Id == null){
-            paymentSf.Created_Via__c = BreadwinnerUtil.getCreatedViaValue(appConfig.currentRunningClassContext);
+    private static BWP_Transaction__c constructStripeTransaction(BWP_Transaction__c transactionSf, Charge.StripeCharge pw, BreadwinnerUtil.AppConfig appConfig){
+        if(transactionSf.Id == null){
+            transactionSf.Created_Via__c = BreadwinnerUtil.getCreatedViaValue(appConfig.currentRunningClassContext);
         }
 
-        paymentSf.Processor_Id__c = pw.id;
-        paymentSf.Amount__c = BreadwinnerUtil.zeroDecimalCurrencies.contains(pw.stripe_currency.toUpperCase()) ? pw.amount : (pw.amount)/100;
+        transactionSf.Processor_Id__c = pw.id;
+        transactionSf.Amount__c = BreadwinnerUtil.zeroDecimalCurrencies.contains(pw.stripe_currency.toUpperCase()) ? pw.amount : (pw.amount)/100;
         if (pw.application_fee_amount != null) {
-            paymentSf.Application_Fee__c = BreadwinnerUtil.zeroDecimalCurrencies.contains(pw.stripe_currency.toUpperCase()) ? (pw.application_fee_amount) : (pw.application_fee_amount)/100;
+            transactionSf.Application_Fee__c = BreadwinnerUtil.zeroDecimalCurrencies.contains(pw.stripe_currency.toUpperCase()) ? (pw.application_fee_amount) : (pw.application_fee_amount)/100;
         }
         if(pw.created != null)
-            paymentSf.Created_Date_in_Processor__c = DateTime.newInstance((long)(pw.created) * 1000);
+            transactionSf.Created_Date_in_Processor__c = DateTime.newInstance((long)(pw.created) * 1000);
         if(pw.amount_refunded != null)
-            paymentSf.Amount_Refunded__c = BreadwinnerUtil.zeroDecimalCurrencies.contains(pw.stripe_currency.toUpperCase()) ? (pw.amount_refunded) : (pw.amount_refunded)/100;
-        paymentSf.Currency__c = (pw.stripe_currency).toUpperCase();
-        paymentSf.Description__c = pw.description;
-        paymentSf.Receipt_URL__c = pw.receipt_url;
-        paymentSf.Receipt_Number__c = pw.receipt_number;
+            transactionSf.Amount_Refunded__c = BreadwinnerUtil.zeroDecimalCurrencies.contains(pw.stripe_currency.toUpperCase()) ? (pw.amount_refunded) : (pw.amount_refunded)/100;
+        transactionSf.Currency__c = (pw.stripe_currency).toUpperCase();
+        transactionSf.Description__c = pw.description;
+        transactionSf.Receipt_URL__c = pw.receipt_url;
+        transactionSf.Receipt_Number__c = pw.receipt_number;
         if(pw.captured != null)
-            paymentSf.Captured__c = pw.captured;
+            transactionSf.Captured__c = pw.captured;
         if (String.isNotBlank(pw.status)) {
-            paymentSf.Payment_Status__c = (pw.status == 'succeeded' ? ProcessorUtil.CHARGE_SUCCEEDED : (pw.status == 'failed' ? ProcessorUtil.CHARGE_FAILED : ProcessorUtil.CHARGE_PENDING));
+            transactionSf.Status__c = (pw.status == 'succeeded' ? ProcessorUtil.CHARGE_SUCCEEDED : (pw.status == 'failed' ? ProcessorUtil.CHARGE_FAILED : ProcessorUtil.CHARGE_PENDING));
         }
-        paymentSf.Is_Live_Payment__c = pw.livemode;
-        paymentSf.Receipt_Email__c = pw.receipt_email;
+        transactionSf.Receipt_Email__c = pw.receipt_email;
 
         if(pw.billing_details != null && pw.billing_details.address != null) {
-            paymentSf.Billing_Street_Address_1__c = pw.billing_details.address.line1;
-            paymentSf.Billing_Street_Address_2__c = pw.billing_details.address.line2;
-            paymentSf.Billing_City__c = pw.billing_details.address.city;
-            paymentSf.Billing_State__c = pw.billing_details.address.state;
-            paymentSf.Billing_Country__c = pw.billing_details.address.country;
-            paymentSf.Billing_Postal_Code__c = pw.billing_details.address.postal_code;
+            transactionSf.Billing_Street_Address_1__c = pw.billing_details.address.line1;
+            transactionSf.Billing_Street_Address_2__c = pw.billing_details.address.line2;
+            transactionSf.Billing_City__c = pw.billing_details.address.city;
+            transactionSf.Billing_State__c = pw.billing_details.address.state;
+            transactionSf.Billing_Country__c = pw.billing_details.address.country;
+            transactionSf.Billing_Postal_Code__c = pw.billing_details.address.postal_code;
         }
-        //Source Info
-        if(pw.source != null) {
-            if (pw.source.stripe_object == 'card' || pw.source.stripe_object == 'bank_account') {
-                paymentSf.Payment_Fingerprint__c = pw.source.fingerprint;
-            } else if (pw.source.stripe_object == 'source' && pw.source.stripe_type == 'card') {
-                paymentSf.Payment_Fingerprint__c = pw.source.card.fingerprint;
-            } else if (pw.source.stripe_object == 'source' && pw.source.stripe_type == 'ach_credit_transfer') {
-                paymentSf.Payment_Fingerprint__c = pw.source.ach_credit_transfer.fingerprint;
-            }
-        }
-        paymentSf.Processor_Customer_Id__c = pw.customer;
-        paymentSf.Processor_Type__c = appConfig.PaymentProcessorType;
-        paymentSf.Processor_Org_Id__c = appConfig.accountId;
+        transactionSf.Processor_Customer_Id__c = pw.customer;
+        transactionSf.Processor_Type__c = appConfig.PaymentProcessorType;
+        transactionSf.Processor_Org_Id__c = appConfig.accountId;
 
-        return paymentSf;
+        return transactionSf;
     }
 
     private static Map<String, Object> excludeCustomers(Map<String, Object> processorToCustomerMap, BreadwinnerUtil.AppConfig appConfig){
@@ -1707,7 +1678,7 @@ public with sharing class Processor_Stripe extends Processor {
 
     //To save Connected app info(works in both cases connect and reconnect)
     @namespaceAccessible
-    public static void saveAppCredentials(String connectionMode, BWP_Processor_Config__c config) {
+    public static BWP_Processor_Config__c saveAppCredentials(String connectionMode, BWP_Processor_Config__c config) {
         String code = ApexPages.currentPage().getParameters().get('code');
         String accountName = '';
         String accountCurrency = '';
@@ -1750,7 +1721,7 @@ public with sharing class Processor_Stripe extends Processor {
                 accountName =  accInfo.settings.dashboard.display_name;
                 accountCurrency = accInfo.default_currency;
             }
-            config = BreadwinnerUtil.getProcessorConfig(tokenResponse.stripe_user_id)!= null ? BreadwinnerUtil.getProcessorConfig(tokenResponse.stripe_user_id) : new BWP_Processor_Config__c();
+            config = BreadwinnerUtil.getProcessorConfig(tokenResponse.stripe_user_id);
             System.debug('config--------------'+config);
             config.Account_Name__c = String.isNotBlank(accountName) ? accountName : '';
             config.Default_Currency__c = String.isNotBlank(accountCurrency) ? accountCurrency : '';
@@ -1759,6 +1730,7 @@ public with sharing class Processor_Stripe extends Processor {
                 config.Live_Mode__c = tokenResponse.livemode;
                 config.Refresh_Token__c = tokenResponse.refresh_token;
                 config.Provider_ID__c = tokenResponse.stripe_user_id;
+                config.Card_Creation_Key__c = tokenResponse.stripe_publishable_key; // used for card creation
                 config.Scope__c = tokenResponse.scope;
                 config.Name = tokenResponse.stripe_user_id;
                 config.Need_To_Reconnect__c = false;
@@ -1775,6 +1747,7 @@ public with sharing class Processor_Stripe extends Processor {
         } else {
             throw new ProcessorUtil.ConnectionException('Error occurred while connecting with Stripe.');
         }
+        return config;
     }
 
     private static ProcessorUtil.Error formatError(Map<String, Object> error, String statusCode){

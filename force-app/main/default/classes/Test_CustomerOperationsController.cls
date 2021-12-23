@@ -6,8 +6,8 @@ private class Test_CustomerOperationsController {
         Profile prof = [SELECT Id FROM Profile WHERE Name = 'Standard User' LIMIT 1 ];
         User user = new User(Alias = 'TestUser', Email = 'testuser@testorg.com', EmailEncodingKey = 'UTF-8', LastName = 'Testing', LanguageLocaleKey = 'en_US', LocaleSidKey = 'en_US', ProfileId = prof.Id, TimeZoneSidKey = 'America/Los_Angeles', UserName = uniqueUserName);
         insert user;
-        String adminPSName = 'Breadwinner_Payments_Admin_User';
-        List<PermissionSet> pset = [SELECT Id FROM PermissionSet WHERE Name = 'Breadwinner_Payments_Admin_User'];
+        String adminPSName = BreadwinnerUtil.ADMIN_PS_NAME;
+        List<PermissionSet> pset = [SELECT Id FROM PermissionSet WHERE Name = :BreadwinnerUtil.ADMIN_PS_NAME];
         insert new PermissionSetAssignment(AssigneeId = user.id, PermissionSetId = pset[0].Id);
     }
     @IsTest
@@ -15,14 +15,16 @@ private class Test_CustomerOperationsController {
         User adminUser =  [SELECT Id FROM User WHERE Alias = 'TestUser' LIMIT 1];
         System.runAs(adminUser){
             BWP_Processor_Config__c apc = UnitTests.createPayConfig(ProcessorUtil.PAT_STRIPE);
-            List<BWP_Customer__c> stripeCustomersCreated = UnitTests.customers(3);
+            List<BWP_Customer__c> stripeCustomersCreated = UnitTests.customers(4);
             List<BWP_Customer__c> stripeCustomers = new List<BWP_Customer__c> ();
             List<Schema.SObjectField> conFlds = Selector_Contact.FIELD_LIST;
             List<String> accFlds = Selector_Contact.ACCT_FIELDS;
+            Account acc = new Account(Name = 'Test Account');
+            insert acc;
             for (BWP_Customer__c cus: stripeCustomersCreated) {
                 cus.Customer_Name__c += '\\';
                 cus.Processor_Org_Id__c = apc.Name;
-                cus.Salesforce_Account__c = NULL;
+                cus.Salesforce_Account__c = acc.Id;
                 cus.No_Associated_SF_Account__c = FALSE;
                 stripeCustomers.add(cus);
             }
@@ -38,8 +40,65 @@ private class Test_CustomerOperationsController {
             CustomerOperationsController.RecordMatchWrapper wrapper = new CustomerOperationsController.RecordMatchWrapper(stripeCustomers[0]);
             CustomerOperationsController.RecordMatchWrapper sObjectWrapper = new CustomerOperationsController.RecordMatchWrapper( (Sobject)  stripeCustomers[0]);
             c.getObjectWrapper('Account', wrapper);
+            c.getObjectWrapper('Contact', wrapper);
             Test.stopTest();
             //System.assert([SELECT count() FROM BWP_Customer__c WHERE Salesforce_Account__c != null OR No_Associated_SF_Account__c = true]>0);
+        }
+    }
+    
+    @IsTest
+    private static void cover_When_selectedMatchType_Account() {
+        User adminUser =  [SELECT Id FROM User WHERE Alias = 'TestUser' LIMIT 1];
+        System.runAs(adminUser){
+            PageReference pageRef = Page.CustomerOperations;
+            pageRef.getParameters().put('customerMatchType', 'Account');
+            Test.setCurrentPage(pageRef);
+            BWP_Processor_Config__c apc = UnitTests.createPayConfig(ProcessorUtil.PAT_STRIPE);
+            List<BWP_Customer__c> stripeCustomersCreated = UnitTests.customers(3);
+            List<BWP_Customer__c> stripeCustomers = new List<BWP_Customer__c> ();
+            for (BWP_Customer__c cus: stripeCustomersCreated) {
+                cus.Customer_Name__c += '\\';
+                cus.Processor_Org_Id__c = apc.Name;
+                cus.Salesforce_Account__c = NULL;
+                cus.No_Associated_SF_Account__c = FALSE;
+                stripeCustomers.add(cus);
+            }
+            update stripeCustomers;
+            Account acc = new Account(Name = 'Customer1');
+            insert acc;
+            Contact con = new Contact(LastName = 'Customer1', AccountId = acc.Id, Email = 'testCustomerMail-1@breadwinner.com');
+            insert con;
+            Test.startTest();
+            CustomerOperationsController c = new CustomerOperationsController();
+            c.jsonUserSelectedActions = '{"' + stripeCustomers[0].Id + '":"'+ProcessorUtil.CMO_MANUAL_MATCH+'"}';
+            c.submitAndNext();
+            Test.stopTest();
+        }
+    }
+    
+    @IsTest
+    private static void cover_When_selectedMatchType_Contact() {
+        User adminUser =  [SELECT Id FROM User WHERE Alias = 'TestUser' LIMIT 1];
+        System.runAs(adminUser){
+            PageReference pageRef = Page.CustomerOperations;
+            pageRef.getParameters().put('customerMatchType', 'Contact');
+            Test.setCurrentPage(pageRef);
+            BWP_Processor_Config__c apc = UnitTests.createPayConfig(ProcessorUtil.PAT_STRIPE);
+            List<BWP_Customer__c> stripeCustomersCreated = UnitTests.customers(3);
+            List<BWP_Customer__c> stripeCustomers = new List<BWP_Customer__c> ();
+            for (BWP_Customer__c cus: stripeCustomersCreated) {
+                cus.Customer_Name__c += '\\';
+                cus.Processor_Org_Id__c = apc.Name;
+                stripeCustomers.add(cus);
+            }
+            update stripeCustomers;
+            Contact con = new Contact(LastName = 'Customer1', Email = 'testCustomerMail-1@breadwinner.com');
+            insert con;
+            Test.startTest();
+            CustomerOperationsController c = new CustomerOperationsController();
+            c.jsonUserSelectedActions = '{"' + stripeCustomers[0].Id + '":"'+ProcessorUtil.CMO_SUGGESTED_MATCH+'"}';
+            c.submitAndNext();
+            Test.stopTest();
         }
     }
     
@@ -208,5 +267,22 @@ private class Test_CustomerOperationsController {
         CustomerOperationsController.RecordMatchWrapper wrapper = new CustomerOperationsController.RecordMatchWrapper();
         Boolean noAccount = wrapper.isUnableToCreateAccount;
     }
-    
+    @IsTest
+    private static void coverSelectorContact() {
+        User adminUser =  [SELECT Id FROM User WHERE Alias = 'TestUser' LIMIT 1];
+        System.runAs(adminUser){
+            Selector_Contact sc = new Selector_Contact();
+            Schema.SObjectType contactSObjectType = sc.getSObjectType();
+            List<Schema.SObjectField> contactSObjectFieldList = sc.getSObjectFieldList();
+            List<Schema.SObjectField> conFlds = Selector_Contact.FIELD_LIST;
+            sc.setSObjectFieldList(conFlds);
+            String orderBy = sc.getOrderBy();
+            String whereClause = '';
+            List<String> relatedFields = new list<String>{'Name','Id'};
+            List<Contact> conList = sc.selectWhere(whereClause, relatedFields);
+            Set<String> idSet = new Set<String>();
+            String childWhere = '';
+            List<Contact> conList1 = sc.selectById_WithCustomers(idSet, childWhere);
+        }
+    }
 }

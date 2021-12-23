@@ -1,7 +1,7 @@
 public with sharing class Processor_PayPal extends Processor{
     
     private static Selector_BWP_Customer selectorCustomer = new Selector_BWP_Customer();
-    private static Selector_BWP_Payment selectorPayment = new Selector_BWP_Payment();
+    private static Selector_BWP_Transaction selectorTransaction = new Selector_BWP_Transaction();
     
     //PayPal Endpoints
     public static String paypalBaseUrl ='https://api.paypal.com';
@@ -20,13 +20,13 @@ public with sharing class Processor_PayPal extends Processor{
         apcWrapper = BreadwinnerUtil.getProcessorConfigWrapper(apc);
     }
     
-  /*  public override ProcessorUtil.ResponseObject fetchPayments(String requestJSON){
-        return fetchPayments(apcWrapper, requestJSON);
+  /*  public override ProcessorUtil.ResponseObject fetchTransactions(String requestJSON){
+        return fetchTransactions(apcWrapper, requestJSON);
     }
 
     @TestVisible
-    private static ProcessorUtil.ResponseObject fetchPayments(BreadwinnerUtil.AppConfig apcWrapper, String requestJSON) {
         System.debug('---in fetchPayments--');
+    private static ProcessorUtil.ResponseObject fetchTransactions(BreadwinnerUtil.AppConfig apcWrapper, String requestJSON) {
         ProcessorUtil.ResponseObject response = new ProcessorUtil.ResponseObject();
         response.errors = new List<ProcessorUtil.Error>();
         FetchRequest filters = (FetchRequest)System.JSON.deserialize(requestJSON, FetchRequest.class);
@@ -55,7 +55,7 @@ public with sharing class Processor_PayPal extends Processor{
         } else {
             apcWrapper.needToReconnect = true;
             apcWrapper.requireNextPaymentSyncRun = false;
-            String Action_Type = apcWrapper.currentRunningClassContext =='HistoricalSyncBatch' ? 'Historical Sync':(apcWrapper.currentRunningClassContext =='HourlySyncBatch' ? 'Hourly Sync':'Fetching Payments');
+            String Action_Type = apcWrapper.currentRunningClassContext == BreadwinnerUtil.CNTX_HIST_SYNC ? 'Historical Sync':(apcWrapper.currentRunningClassContext == BreadwinnerUtil.CNTX_HOUR_SYNC ? 'Hourly Sync':'Fetching Transactions');
                 APICallHandler.userInteractionLogPush(true, Action_Type, 'ERROR' , 'Response for Processor Org Name('+apcWrapper.accountName+'): Status Code: '+res.getStatusCode()+' Response Body: '+res.getBody() );
             
             JSONParser parser = JSON.createParser(res.getBody());
@@ -69,7 +69,7 @@ public with sharing class Processor_PayPal extends Processor{
     public static BreadwinnerUtil.AppConfig syncCustomers(Map<String, Object> processorToCustomerMap, BreadwinnerUtil.AppConfig appConfig) {
         try {
             System.debug('---in syncCustomers--');
-            if(String.isBlank(appConfig.customerSyncConfig) || ((String.isNotBlank(appConfig.customerSyncConfig) && (appConfig.customerSyncConfig != 'NONE')))  && appConfig.currentRunningClassContext != 'BWAPI')
+            if(String.isBlank(appConfig.customerSyncConfig) || ((String.isNotBlank(appConfig.customerSyncConfig) && (appConfig.customerSyncConfig != 'NONE')))  && appConfig.currentRunningClassContext != BreadwinnerUtil.CNTX_BWAPI)
                 processorToCustomerMap = excludeCustomers(processorToCustomerMap, appConfig);
             
             Breadwinner_Settings__c bwSetting = BreadwinnerUtil.getBWSetting();
@@ -135,7 +135,7 @@ public with sharing class Processor_PayPal extends Processor{
             
             system.debug('appConfig.isCustomerMatchComplete'+appConfig.isCustomerMatchComplete);
             system.debug('appConfig.currentRunningClassContext'+appConfig.currentRunningClassContext);
-            if(appConfig.isCustomerMatchComplete && appConfig.currentRunningClassContext != 'BWAPI'){
+            if(appConfig.isCustomerMatchComplete && appConfig.currentRunningClassContext != BreadwinnerUtil.CNTX_BWAPI){
                 for(String refId : paypalIdCustomerMap.keySet()){
                     Charge.TrasactionDetails cw = paypalIdCustomerMap.get(refId);
                     String cName = (String.isNotBlank(cw.payer_info.payer_name.given_name) ? (cw.payer_info.payer_name.given_name + (String.isNotBlank(cw.payer_info.payer_name.surname) ? (' '+cw.payer_info.payer_name.surname) : '')) : (String.isNotBlank(cw.payer_info.payer_name.surname) ? cw.payer_info.payer_name.surname : (String.isNotBlank(cw.payer_info.payer_name.alternate_full_name) ? cw.payer_info.payer_name.alternate_full_name : '')));
@@ -317,7 +317,7 @@ public with sharing class Processor_PayPal extends Processor{
         return appConfig;
     }
     
-    public static Map<String, Object> syncPayments(Map<String, Object> processorIdToPaymentMap, BreadwinnerUtil.AppConfig appConfig) {
+    public static Map<String, Object> syncTransactions(Map<String, Object> processorIdToPaymentMap, BreadwinnerUtil.AppConfig appConfig) {
         Map<String, Object> returnMap = new Map<String, Object>();
         
         // Map to store the Payment Id and related Customer Id
@@ -326,12 +326,13 @@ public with sharing class Processor_PayPal extends Processor{
         if(paypalIdPaymentMap == null) {
             return returnMap;
         }
-        List<BWP_Payment__c> payments = new List<BWP_Payment__c>();
-        Map<String,BWP_Payment__c> existingSFPaymentsMap = new Map<String,BWP_Payment__c>();
+        List<BWP_Transaction__c> payments = new List<BWP_Transaction__c>();
+        Map<String,BWP_Transaction__c> existingSFPaymentsMap = new Map<String,BWP_Transaction__c>();
         List<BWP_Customer__c> customerInfo = new List<BWP_Customer__c>();
-        List<BWP_Payment__c> existingList = selectorPayment.selectByProcessorId(paypalIdPaymentMap.keySet(), new List<String>{'Source__r.Id'});
-        for(BWP_Payment__c payment : existingList) {
-            existingSFPaymentsMap.put(payment.Processor_Id__c, payment);
+        List<BWP_Transaction__c> existingList = selectorTransaction.selectByProcessorId(paypalIdPaymentMap.keySet(), new List<String>{'Source__r.Id'});
+        for(BWP_Transaction__c trxn : existingList) {
+            BWP_Transaction__c txn = new BWP_Transaction__c(id = trxn.id, Processor_Id__c = trxn.Processor_Id__c);
+            existingSFPaymentsMap.put(txn.Processor_Id__c, txn);
         }
         try{
             // Boolean to check the syncing of failed Payments
@@ -350,27 +351,27 @@ public with sharing class Processor_PayPal extends Processor{
             }
             
             for (Charge.TrasactionDetails pw : paypalIdPaymentMap.values()) {
-                BWP_Payment__c paymentSf = existingSFPaymentsMap.get(pw.transaction_info.transaction_id) != null ? existingSFPaymentsMap.get(pw.transaction_info.transaction_id) : new BWP_Payment__c();
+                BWP_Transaction__c transactionSf = existingSFPaymentsMap.get(pw.transaction_info.transaction_id) != null ? existingSFPaymentsMap.get(pw.transaction_info.transaction_id) : new BWP_Transaction__c();
                 BWP_Customer__c customer = String.isNotBlank(pw.transaction_info.paypal_account_id) ? customerMapByProcessorCustomerId.get(pw.transaction_info.paypal_account_id) : null;
                 if(customer != null && String.isNotBlank(customer.Id))
-                    paymentSf.Customer__c = customer.Id;
-                paymentSf.Processor_Customer_Id__c = String.isNotBlank(pw.transaction_info.paypal_account_id) ? pw.transaction_info.paypal_account_id  : '';
+                    transactionSf.Customer__c = customer.Id;
+                transactionSf.Processor_Customer_Id__c = String.isNotBlank(pw.transaction_info.paypal_account_id) ? pw.transaction_info.paypal_account_id  : '';
                 
                 // TODO: In order to decide which trasactions to sync to Salesforce, study about Transaction codes 
                 if(!pw.transaction_info.transaction_event_code.contains('T15')){
                // if((!pw.transaction_info.transaction_event_code.contains('T15') && pw.transaction_info.fee_amount != null) || (pw.transaction_info.paypal_reference_id == null && pw.transaction_info.fee_amount != null)){
-                    paymentSf = constructPayPalPayment(paymentSf, pw, appConfig); 
+                    transactionSf = constructPayPalTransaction(transactionSf, pw, appConfig); 
                 }
-                if (doNotImportCustomerAndFailedPayments && paymentSf.Payment_Status__c == 'Succeeded') {
-                    if(String.isNotBlank(paymentSf.Customer__c)){
-                        successfulPaymentsCustomerIdSet.add(paymentSf.Customer__c);
+                if (doNotImportCustomerAndFailedPayments && transactionSf.Status__c == 'Succeeded') {
+                    if(String.isNotBlank(transactionSf.Customer__c)){
+                        successfulPaymentsCustomerIdSet.add(transactionSf.Customer__c);
                     }
                 }
-                if ((doNotImportCustomerAndFailedPayments ? (paymentSf.Payment_Status__c == 'Succeeded' ? TRUE : FALSE) : TRUE)){
-                    payments.add(paymentSf);
+                if ((doNotImportCustomerAndFailedPayments ? (transactionSf.Status__c == 'Succeeded' ? TRUE : FALSE) : TRUE)){
+                    payments.add(transactionSf);
                 }  
             } 
-            Database.UpsertResult[] urList = SecurityUtil.databaseUpsert(payments,BWP_Payment__c.Processor_Id__c);
+            Database.UpsertResult[] urList = SecurityUtil.databaseUpsert(payments,BWP_Transaction__c.Processor_Id__c);
             List<String> errorList = BreadwinnerUtil.checkForUpsertErrors(urList);
             if (! errorList.isEmpty()){
                 returnMap.put('errors', errorList);
@@ -469,7 +470,7 @@ public with sharing class Processor_PayPal extends Processor{
     
     public static BWP_Customer__c constructPayPalCustomer(BWP_Customer__c customerSf, Charge.TrasactionDetails cw, BreadwinnerUtil.AppConfig appConfig){
         if(customerSf.Id == null){
-            customerSf.Created_Via__c = (appConfig.currentRunningClassContext == 'HistoricalSyncBatch' ? 'Historical Sync' : (appConfig.currentRunningClassContext == 'HourlySyncBatch' ? 'Regular Sync' : (appConfig.currentRunningClassContext == 'BWAPI' ? 'Breadwinner API' : '')));
+            customerSf.Created_Via__c = (appConfig.currentRunningClassContext == BreadwinnerUtil.CNTX_HIST_SYNC ? 'Historical Sync' : (appConfig.currentRunningClassContext == BreadwinnerUtil.CNTX_HOUR_SYNC ? 'Regular Sync' : (appConfig.currentRunningClassContext == BreadwinnerUtil.CNTX_BWAPI ? 'Breadwinner API' : '')));
         }
         customerSf.Customer_ID__c = cw.transaction_info.paypal_account_id+'-'+appConfig.PaymentProcessorType+'-'+appConfig.accountId;
         customerSf.Customer_Name__c = (String.isNotBlank(cw.payer_info.payer_name.given_name) ? (cw.payer_info.payer_name.given_name + (String.isNotBlank(cw.payer_info.payer_name.surname) ? (' '+cw.payer_info.payer_name.surname) : '')) : (String.isNotBlank(cw.payer_info.payer_name.surname) ? cw.payer_info.payer_name.surname : (String.isNotBlank(cw.payer_info.payer_name.alternate_full_name) ? cw.payer_info.payer_name.alternate_full_name : '')));
@@ -498,48 +499,48 @@ public with sharing class Processor_PayPal extends Processor{
         return customerSf;
     }
     
-    public static BWP_Payment__c constructPayPalPayment(BWP_Payment__c paymentSf, Charge.TrasactionDetails pw, BreadwinnerUtil.AppConfig appConfig){
-        if(paymentSf.Id == null){
-            paymentSf.Created_Via__c = (appConfig.currentRunningClassContext == 'HistoricalSyncBatch' ? 'Historical Sync' : (appConfig.currentRunningClassContext == 'HourlySyncBatch' ? 'Regular Sync' : (appConfig.currentRunningClassContext == 'BWAPI' ? 'Breadwinner API' : '')));
+    public static BWP_Transaction__c constructPayPalTransaction(BWP_Transaction__c transactionSf, Charge.TrasactionDetails pw, BreadwinnerUtil.AppConfig appConfig){
+        if(transactionSf.Id == null){
+            transactionSf.Created_Via__c = (appConfig.currentRunningClassContext == BreadwinnerUtil.CNTX_HIST_SYNC ? 'Historical Sync' : (appConfig.currentRunningClassContext == BreadwinnerUtil.CNTX_HOUR_SYNC ? 'Regular Sync' : (appConfig.currentRunningClassContext == BreadwinnerUtil.CNTX_BWAPI ? 'Breadwinner API' : '')));
         }
-        paymentSf.Processor_Id__c = pw.transaction_info.transaction_id; 
-        paymentSf.Processor_Type__c = appConfig.PaymentProcessorType;
-        paymentSf.Processor_Org_Id__c = appConfig.accountId;
+        transactionSf.Processor_Id__c = pw.transaction_info.transaction_id; 
+        transactionSf.Processor_Type__c = appConfig.PaymentProcessorType;
+        transactionSf.Processor_Org_Id__c = appConfig.accountId;
         if (pw.transaction_info.transaction_amount != null) {  
-            paymentSf.Application_Fee__c = (pw.transaction_info.transaction_amount.value)/100;
+            transactionSf.Application_Fee__c = (pw.transaction_info.transaction_amount.value)/100;
         }    
         if (pw.transaction_info.fee_amount != null) {  
-            paymentSf.Processing_Fee__c = (pw.transaction_info.fee_amount.value)/100;
+            transactionSf.Processing_Fee__c = (pw.transaction_info.fee_amount.value)/100;
         } 
-        if ((paymentSf.Application_Fee__c !=null && paymentSf.Processing_Fee__c != null)) {
-            paymentSf.Amount__c = paymentSf.Application_Fee__c +  paymentSf.Processing_Fee__c;
+        if ((transactionSf.Application_Fee__c !=null && transactionSf.Processing_Fee__c != null)) {
+            transactionSf.Amount__c = transactionSf.Application_Fee__c +  transactionSf.Processing_Fee__c;
         }
         if (pw.transaction_info.transaction_amount != null) {
-            paymentSf.Currency__c = String.isNotBlank(pw.transaction_info.transaction_amount.currency_code) ? (pw.transaction_info.transaction_amount.currency_code).toUpperCase() : '';
+            transactionSf.Currency__c = String.isNotBlank(pw.transaction_info.transaction_amount.currency_code) ? (pw.transaction_info.transaction_amount.currency_code).toUpperCase() : '';
         }
         if (String.isNotBlank(pw.transaction_info.transaction_status)) {
             if(pw.transaction_info.transaction_status =='S')
-                paymentSf.Payment_Status__c = 'Succeeded';
+                transactionSf.Status__c = 'Succeeded';
             if(pw.transaction_info.transaction_status =='P')
-                paymentSf.Payment_Status__c = 'Pending';
+                transactionSf.Status__c = 'Pending';
             if(pw.transaction_info.transaction_status =='D')
-                paymentSf.Payment_Status__c = 'Denied';
+                transactionSf.Status__c = 'Denied';
             if(pw.transaction_info.transaction_status =='F')
-                paymentSf.Payment_Status__c = 'Partially Refunded';
+                transactionSf.Status__c = 'Partially Refunded';
             if(pw.transaction_info.transaction_status =='V')
-                paymentSf.Payment_Status__c = 'Reversed';
+                transactionSf.Status__c = 'Reversed';
         }
         DateTime createdDateTime = (DateTime) JSON.deserialize('"' + pw.transaction_info.transaction_updated_date + '"', DateTime.class);
-        paymentSf.Created_Date_in_Processor__c = createdDateTime;
+        transactionSf.Created_Date_in_Processor__c = createdDateTime;
         if(pw.shipping_info != null) {
-            paymentSf.Billing_Street_Address_1__c = pw.shipping_info.line1;
-            paymentSf.Billing_Street_Address_2__c = pw.shipping_info.line2;
-            paymentSf.Billing_City__c = pw.shipping_info.city;
-            paymentSf.Billing_State__c = pw.shipping_info.state; 
-            paymentSf.Billing_Country__c =  pw.shipping_info.country_code;
-            paymentSf.Billing_Postal_Code__c = pw.shipping_info.postal_code;
+            transactionSf.Billing_Street_Address_1__c = pw.shipping_info.line1;
+            transactionSf.Billing_Street_Address_2__c = pw.shipping_info.line2;
+            transactionSf.Billing_City__c = pw.shipping_info.city;
+            transactionSf.Billing_State__c = pw.shipping_info.state; 
+            transactionSf.Billing_Country__c =  pw.shipping_info.country_code;
+            transactionSf.Billing_Postal_Code__c = pw.shipping_info.postal_code;
         }
-        return paymentSf;
+        return transactionSf;
     }
     */
     /**
@@ -638,7 +639,7 @@ public with sharing class Processor_PayPal extends Processor{
                 accountName = (accResponse.get('name')).toString();
                 merchantId = (accResponse.get('payer_id')).toString();
             }
-            config = BreadwinnerUtil.getProcessorConfig(merchantId) != NULL ? BreadwinnerUtil.getProcessorConfig(tokenResponse.merchant_id) : new BWP_Processor_Config__c();
+            config = BreadwinnerUtil.getProcessorConfig(tokenResponse.merchant_id);
             system.debug('config----'+config);
             system.debug('accont name----'+accountName);
             config.Account_Name__c = String.isNotBlank(accountName) ? accountName : '';

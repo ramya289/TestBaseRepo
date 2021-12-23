@@ -1,8 +1,8 @@
 public with sharing class Processor_Braintree extends Processor {
 
     private static Selector_BWP_Customer selectorCustomer = new Selector_BWP_Customer();
-    private static Selector_BWP_Payment selectorPayment = new Selector_BWP_Payment();
     private static Selector_BWP_Payment_Method selectorPaymentMethod = new Selector_BWP_Payment_Method();
+    private static Selector_BWP_Transaction selectorTransaction = new Selector_BWP_Transaction();
 
     //Braintree Endpoints
     public static String braintreeSandBoxUrl = 'https://payments.sandbox.braintree-api.com/graphql';
@@ -38,8 +38,8 @@ public with sharing class Processor_Braintree extends Processor {
     public override ProcessorUtil.ResponseObject fetchCustomers(String requestJSON) {
         return fetchCustomers(apcWrapper, requestJSON);
     }
-    public override ProcessorUtil.ResponseObject fetchPayments(String requestJSON) {
-        return fetchPayments(apcWrapper, requestJSON);
+    public override ProcessorUtil.ResponseObject fetchTransactions(String requestJSON) {
+        return fetchTransactions(apcWrapper, requestJSON);
     }
     public override ProcessorUtil.ResponseObject chargeProcessor(String requestJSON, String timeout) {
         return chargeProcessor(apcWrapper, requestJSON, timeout);
@@ -56,7 +56,6 @@ public with sharing class Processor_Braintree extends Processor {
 
     @TestVisible
     private static ProcessorUtil.ResponseObject createCustomer(BreadwinnerUtil.AppConfig apcWrapper, String requestJSON){
-
         Map<String, Customer.BraintreeCustomer> braintreeIdCustomerMapResponse = new Map<String, Customer.BraintreeCustomer> ();
         ProcessorUtil.ResponseObject response = new ProcessorUtil.ResponseObject();
         response.errors = new List<ProcessorUtil.Error>();
@@ -188,6 +187,7 @@ public with sharing class Processor_Braintree extends Processor {
                             Map<String, Object> error = (Map<String, Object>)errorsList[0];
                             Map<String, Object> errorClass = (Map<String, Object>)error.get('extensions');
                             response.errors.add(new ProcessorUtil.Error(response.status, error.get('message').toString()));
+                            APICallHandler.userInteractionLogPush(TRUE, 'Updating Braintree Customer', 'ERROR', 'Response for Braintree Org Name(' + apcWrapper.accountName + '): Status Code: ' + res.getStatusCode() + ' Response Body: ' + res.getBody());
                         }
                     } 
                 } catch (Exception ex) {
@@ -242,7 +242,7 @@ public with sharing class Processor_Braintree extends Processor {
                             apcWrapper.currentRunningClassContext = BreadwinnerUtil.CNTX_BWAPI;
                             Map<String, Object> processorTypeToRecordsMap = new Map<String, Object>();
                             processorTypeToRecordsMap.put(apcWrapper.PaymentProcessorType, braintreeIdPaymentMapResponse);
-                            response.paymentList = syncPayments(processorTypeToRecordsMap, apcWrapper);
+                            response.transactionList = syncTransactions(processorTypeToRecordsMap, apcWrapper);
                             response.responseJSON = JSON.serializePretty(braintreeIdPaymentMapResponse);
                         }
                         if(errorsList != NULL){
@@ -259,13 +259,13 @@ public with sharing class Processor_Braintree extends Processor {
                     }
                 } catch (Exception ex) {
                     // We want to catch any additional errors and let the process continue.
-                    response.errors.add(new ProcessorUtil.Error('Exception Occurred', 'An Exception occurred while creating the Customer to Braintree. ' + ex.getMessage()));
-                    System.debug('Exception occurred while creating customers in Braintree.' + ex.getStackTraceString());
+                    response.errors.add(new ProcessorUtil.Error('Exception Occurred', 'An Exception occurred while creating the Payment to Braintree. ' + ex.getMessage()));
+                    System.debug('Exception occurred while creating Payment in Braintree.' + ex.getStackTraceString());
                 }
             }
         } catch (Exception ex) {
-            response.errors.add(new ProcessorUtil.Error('Exception Occurred','An Exception occurred while creating the Braintree Customer. ' + ex.getMessage()));
-            System.debug('Exception occurred while creating customers in Braintree.' + ex.getStackTraceString());
+            response.errors.add(new ProcessorUtil.Error('Exception Occurred', 'An Exception occurred while creating the Payment to Braintree. ' + ex.getMessage()));
+                    System.debug('Exception occurred while creating Payment in Braintree.' + ex.getStackTraceString());
         }
         return response;
 
@@ -292,75 +292,42 @@ public with sharing class Processor_Braintree extends Processor {
                 JSONParser objectParser = JSON.createParser(jsonObject);
                 Customer.BraintreeCustomer customer = (Customer.BraintreeCustomer) objectParser.readValueAs(Customer.BraintreeCustomer.class);
                 System.debug('createCardToken customer: ' + customer);
-
-                List<Customer.PaymentMethodDetails> sources = customer.paymentMethodDetails;
-                String query;
-                    query = '{ "query": " mutation CreditCard($input: TokenizeCreditCardInput!) { tokenizeCreditCard(input: $input){ paymentMethod { id } } }",';
-                    query += ' "variables": { "input": { ';
-                    query += '"creditCard": { "cardholderName" : ' + (String.isNotBlank(sources[0].cardholderName) ? ('\"' + sources[0].cardholderName + '\"') : null);
-                    query += ', "expirationYear" : '+(String.isNotBlank(sources[0].expirationYear) ? (sources[0].expirationYear) : null);
-                    query += ', "expirationMonth" : '+(String.isNotBlank(sources[0].expirationMonth) ? (sources[0].expirationMonth) : null);
-                    query += ', "number" : '+(String.isNotBlank(sources[0].cardNumber) ? ('\"' + sources[0].cardNumber + '\"') : null);
-                    query += '} } } }';
-
-                    HttpResponse res = APICallHandler.getList(apcWrapper, 'POST', getEndpointBaseUrl(apcWrapper), query);
-                    Map<String, Object> responseFromBraintree = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
-                    Map<String, Object> data = (Map<String, Object>)responseFromBraintree.get('data');
-                    List<Object> errorsList = (List<Object>)responseFromBraintree.get('errors');
-                    Map<String, Object> paymentMethodDetails = new Map<String, Object>();
-                    if(data.containsKey('tokenizeCreditCard'))
-                         paymentMethodDetails = (Map<String, Object>)data.get('tokenizeCreditCard');
-                    if (res.getStatusCode() == 200) {
-                        if(data != NULL && paymentMethodDetails != NULL){
-                            Map<String, Object> paymentMethod = (Map<String, Object>)paymentMethodDetails.get('paymentMethod');
-                            String token = paymentMethod.get('id').toString();
-                            if(String.isNotBlank(token) && String.isNotBlank(customer.Id)){
-                                String updateCustomerQuery = '';
-                                updateCustomerQuery = '{ "query": " mutation vaultCreditCard($input: VaultPaymentMethodInput!) { vaultPaymentMethod(input: $input){ paymentMethod { id customer { id } } } }",';
-                                updateCustomerQuery += ' "variables": { "input": { "paymentMethodId" :' + ( + '\"' + token + '\"');
-                                updateCustomerQuery += ', "customerId" : '+(String.isNotBlank(customer.Id) ? ('\"' + customer.Id + '\"') : null);
-                                updateCustomerQuery += '} } }';
-
-                                HttpResponse respe = APICallHandler.getList(apcWrapper, 'POST', getEndpointBaseUrl(apcWrapper), updateCustomerQuery);
-
-                                if(addToSalesforce){
-
-                                    Map<String, Object> responseOfVaultPM = (Map<String, Object>) JSON.deserializeUntyped(respe.getBody());
-                                    List<Object> errorsListOfVaultPM = (List<Object>)responseOfVaultPM.get('errors');
-                                    if(errorsListOfVaultPM == NULL){
-                                        String reqJSON = Processor_Braintree.getRequestBody('fetchRecentCustomers', NULL);
-                                        String reqBodyWithFilters = '"variables": { "input": { "id": {  "is": '+ ('\"' + customer.Id + '\"') + '} } } }';
-                                        reqJSON += reqBodyWithFilters;
-                                        ProcessorUtil.ResponseObject fetchCustomerResponse = fetchCustomers(apcWrapper, reqJSON);
-                                        JSONParser parser = JSON.createParser(fetchCustomerResponse.responseJSON);
-                                        FetchResponse responseData = (FetchResponse) parser.readValueAs(FetchResponse.class);
-                                        Map<String, Customer.BraintreeCustomer> braintreeCustomerMapById = new Map<String, Customer.BraintreeCustomer>();
-                                        braintreeCustomerMapById = responseData.customerMapById;
-                                        Map<String, Object> processorToCustomerMap = new Map<String, Object>();
-                                        processorToCustomerMap.put(apcWrapper.PaymentProcessorType, braintreeCustomerMapById);
-                                        apcWrapper.currentRunningClassContext = BreadwinnerUtil.CNTX_BWAPI;
-                                        response = syncCustomers(processorToCustomerMap, apcWrapper, true);
-                                        response.responseJSON = fetchCustomerResponse.responseJSON;
-                                    }
-                                    else{
-                                        Map<String, Object> error = (Map<String, Object>)errorsListOfVaultPM[0];
-                                        Map<String, Object> errorClass = (Map<String, Object>)error.get('extensions');
-                                        response.errors.add(new ProcessorUtil.Error(String.ValueOf(respe.getStatusCode()), error.get('message').toString()));
-                                    }
-                                }
-                                system.debug('response---------'+respe.getBody());
-                            }
-                            else {
-                                response.responseJSON = JSON.serializePretty(paymentMethod);
-                            }
+                
+                if(String.isNotBlank(customer.paymentMethodId) && String.isNotBlank(customer.Id)){
+                    String query = '';
+                    query = '{ "query": " mutation vaultCreditCard($input: VaultPaymentMethodInput!) { vaultPaymentMethod(input: $input){ paymentMethod { id customer { id } } } }",';
+                    query += ' "variables": { "input": { "paymentMethodId" :' + ( + '\"' + customer.paymentMethodId + '\"');
+                    query += ', "customerId" : '+(String.isNotBlank(customer.Id) ? ('\"' + customer.Id + '\"') : null);
+                    query += '} } }';
+                    
+                    HttpResponse resp = APICallHandler.getList(apcWrapper, 'POST', getEndpointBaseUrl(apcWrapper), query);
+                    
+                    if(addToSalesforce){
+                        Map<String, Object> responseOfVaultPM = (Map<String, Object>) JSON.deserializeUntyped(resp.getBody());
+                        List<Object> errorsListOfVaultPM = (List<Object>)responseOfVaultPM.get('errors');
+                        if(errorsListOfVaultPM == NULL){
+                            String reqJSON = Processor_Braintree.getRequestBody(ProcessorUtil.ACT_FETCH_CUSTOMERS_RECENT, NULL);
+                            String reqBodyWithFilters = '"variables": { "input": { "id": {  "is": '+ ('\"' + customer.Id + '\"') + '} } } }';
+                            reqJSON += reqBodyWithFilters;
+                            ProcessorUtil.ResponseObject fetchCustomerResponse = fetchCustomers(apcWrapper, reqJSON);
+                            JSONParser parser = JSON.createParser(fetchCustomerResponse.responseJSON);
+                            FetchResponse responseData = (FetchResponse) parser.readValueAs(FetchResponse.class);
+                            Map<String, Customer.BraintreeCustomer> braintreeCustomerMapById = new Map<String, Customer.BraintreeCustomer>();
+                            braintreeCustomerMapById = responseData.customerMapById;
+                            Map<String, Object> processorToCustomerMap = new Map<String, Object>();
+                            processorToCustomerMap.put(apcWrapper.PaymentProcessorType, braintreeCustomerMapById);
+                            apcWrapper.currentRunningClassContext = BreadwinnerUtil.CNTX_BWAPI;
+                            response = syncCustomers(processorToCustomerMap, apcWrapper, true);
+                            response.responseJSON = fetchCustomerResponse.responseJSON;
                         }
-                        if(errorsList != NULL){
-                            Map<String, Object> error = (Map<String, Object>)errorsList[0];
+                        else{
+                            Map<String, Object> error = (Map<String, Object>)errorsListOfVaultPM[0];
                             Map<String, Object> errorClass = (Map<String, Object>)error.get('extensions');
-                            response.errors.add(new ProcessorUtil.Error(String.valueOf(res.getStatusCode()), error.get('message').toString()));
-                            system.debug('data1----------'+error.get('message'));
+                            response.errors.add(new ProcessorUtil.Error(String.ValueOf(resp.getStatusCode()), error.get('message').toString()));
+                            APICallHandler.userInteractionLogPush(TRUE, 'Creating Braintree Payment Method', 'ERROR', 'Response for Braintree Org Name(' + apcWrapper.accountName + '): Status Code: ' + resp.getStatusCode() + ' Response Body: ' + resp.getBody());
                         }
                     }
+                }
             }
             catch (Exception ex) {
                 // We want to catch any additional errors and let the process continue.
@@ -439,7 +406,7 @@ public with sharing class Processor_Braintree extends Processor {
                                 Map<String, Object> responseOfVaultPM = (Map<String, Object>) JSON.deserializeUntyped(respe.getBody());
                                 List<Object> errorsListOfVaultPM = (List<Object>)responseOfVaultPM.get('errors');
                                 if(errorsListOfVaultPM == NULL){
-                                    String reqJSON = Processor_Braintree.getRequestBody('fetchRecentCustomers', NULL);
+                                    String reqJSON = Processor_Braintree.getRequestBody(ProcessorUtil.ACT_FETCH_CUSTOMERS_RECENT, NULL);
                                     String reqBodyWithFilters = '"variables": { "input": { "id": {  "is": '+ ('\"' + customer.Id + '\"') + '} } } }';
                                     reqJSON += reqBodyWithFilters;
                                     ProcessorUtil.ResponseObject fetchCustomerResponse = fetchCustomers(apcWrapper, reqJSON);
@@ -543,11 +510,14 @@ public with sharing class Processor_Braintree extends Processor {
                                 updateCustomerQuery += '} } }';
                                 HttpResponse resp = APICallHandler.getList(apcWrapper, 'POST', getEndpointBaseUrl(apcWrapper), updateCustomerQuery);
                                 Map<String, Object> responseOfConfirmAmounts = (Map<String, Object>) JSON.deserializeUntyped(resp.getBody());
-                                Map<String, Object> StatusResp = (Map<String, Object>) responseOfConfirmAmounts.get('data');
-                                Map<String, Object> Status = (Map<String, Object>) StatusResp.get('confirmMicroTransferAmounts');
                                 List<Object> errorsListOfConfirmAmounts = (List<Object>)responseOfConfirmAmounts.get('errors');
+                                Map<String, Object> Status = new Map<String, Object>();
+                                if(errorsListOfConfirmAmounts == NULL){
+                                    Map<String, Object> StatusResp = (Map<String, Object>) responseOfConfirmAmounts.get('data');
+                                    Status = (Map<String, Object>) StatusResp.get('confirmMicroTransferAmounts');
+                                }
                                 if(errorsListOfConfirmAmounts == NULL && Status.get('status') == 'CONFIRMED'){
-                                    String reqJSON = Processor_Braintree.getRequestBody('fetchRecentCustomers', NULL);
+                                    String reqJSON = Processor_Braintree.getRequestBody(ProcessorUtil.ACT_FETCH_CUSTOMERS_RECENT, NULL);
                                     String reqBodyWithFilters = '"variables": { "input": { "id": {  "is": '+ ('\"' + verify.customerId + '\"') + '} } } }';
                                     reqJSON += reqBodyWithFilters;
                                     ProcessorUtil.ResponseObject fetchCustomerResponse = fetchCustomers(apcWrapper, reqJSON);
@@ -574,13 +544,18 @@ public with sharing class Processor_Braintree extends Processor {
                                 else{
                                     Map<String, Object> error = (Map<String, Object>)errorsListOfConfirmAmounts[0];
                                     Map<String, Object> errorClass = (Map<String, Object>)error.get('extensions');
-                                    response.errors.add(new ProcessorUtil.Error(String.valueOf(resp.getStatusCode()), error.get('message').toString()));
+                                    String errorMessage = error.get('message').toString();
+                                    if(errorMessage.containsIgnoreCase('Variable \'amountsInCents\' has an invalid value : Expected type \'Int\' but was \'Double\'')){
+                                        errorMessage = 'Please provide valid input. Amount cannot be in Decimals.';
+                                    }
+                                    response.errors.add(new ProcessorUtil.Error(String.valueOf(resp.getStatusCode()), errorMessage));
                                 }
                             }
                         }
                     }
                     if(errorsList != NULL){
                         Map<String, Object> error = (Map<String, Object>)errorsList[0];
+                        APICallHandler.userInteractionLogPush(TRUE, 'Verify Braintree Bank Account', 'ERROR', 'Response for Braintree Org Name(' + apcWrapper.accountName + '): Status Code: ' + res.getStatusCode() + ' Response Body: ' + res.getBody());
                         response.errors.add(new ProcessorUtil.Error(String.valueOf(res.getStatusCode()), error.get('message').toString()));
                     }
                 } catch (Exception ex) {
@@ -623,7 +598,7 @@ public with sharing class Processor_Braintree extends Processor {
     }
 
     @TestVisible
-    private static ProcessorUtil.ResponseObject fetchPayments(BreadwinnerUtil.AppConfig apcWrapper, String requestJSON) {
+    private static ProcessorUtil.ResponseObject fetchTransactions(BreadwinnerUtil.AppConfig apcWrapper, String requestJSON) {
         ProcessorUtil.ResponseObject response = new ProcessorUtil.ResponseObject();
         response.errors = new List<ProcessorUtil.Error>();
         HttpResponse res = APICallHandler.getList(apcWrapper, 'POST', getEndpointBaseUrl(apcWrapper), requestJSON);
@@ -637,7 +612,7 @@ public with sharing class Processor_Braintree extends Processor {
         } else {
             apcWrapper.needToReconnect = true;
             apcWrapper.requireNextPaymentSyncRun = false;
-            String Action_Type = ProcessorUtil.getLogAction(apcWrapper.currentRunningClassContext, 'Fetching Payments');
+            String Action_Type = ProcessorUtil.getLogAction(apcWrapper.currentRunningClassContext, 'Fetching Transactions');
             APICallHandler.userInteractionLogPush(true, Action_Type, 'ERROR' , 'Response for Processor Org Name('+apcWrapper.accountName+'): Status Code: '+res.getStatusCode()+' Response Body: '+res.getBody() );
 
             JSONParser parser = JSON.createParser(res.getBody());
@@ -833,7 +808,7 @@ public with sharing class Processor_Braintree extends Processor {
                 if (receivedPaymentMethodIdSet.size() > 0) {
                     List<BWP_Payment_Method__c> pmList = selectorPaymentMethod.selectByProcessorId(receivedPaymentMethodIdSet,45000);
                     for(BWP_Payment_Method__c pm : pmList){
-                        BWP_Payment_Method__c payMethod = new BWP_Payment_Method__c(id = pm.id);
+                        BWP_Payment_Method__c payMethod = new BWP_Payment_Method__c(id = pm.id, Processor_Id__c = pm.Processor_Id__c);
                         existingSFPaymentMethodsMap.put(payMethod.Processor_Id__c, payMethod);
                     }
                 }
@@ -852,20 +827,7 @@ public with sharing class Processor_Braintree extends Processor {
                 if(!existingSFCustomersMap.containsKey(ContactId) || (existingSFCustomersMap.containsKey(ContactId) && existingSFCustomersMap.get(ContactId).Salesforce_Account__c == NULL && !existingSFCustomersMap.get(ContactId).No_Associated_SF_Account__c )){
                     Customer.BraintreeCustomer bc = braintreeIdCustomerMap.get(ContactId);
                     String customerName = formatCustomerName(bc);
-                    if(String.isNotBlank(customerName)){
-                        String ContactName = customerName.toLowerCase().replace('\\', '%');
-                        Set<String> relatedNameSet = BreadwinnerUtil.getSimilarAccountNameSet(ContactName);
-                        customerNameSet.addAll(relatedNameSet);
-                    }
-                    else if(String.isNotBlank(bc.email)){
-                        String ContactEmail = bc.email.toLowerCase().replace('\\', '%');
-                        Set<String> relatedNameSet = BreadwinnerUtil.getSimilarAccountNameSet(ContactEmail);
-                        customerNameSet.addAll(relatedNameSet);
-                    }
-                    if(ProcessorUtil.arePersonAccountsEnabled() && String.isNotBlank(bc.email)){
-                        String email = bc.email.toLowerCase().replace('\\', '%');
-                        customerEmailSet.add(email);
-                    }
+                    ProcessorUtil.getExistingRecordsSet(customerName, bc.email, customerNameSet, customerEmailSet);
                 }
             }
             
@@ -933,7 +895,7 @@ public with sharing class Processor_Braintree extends Processor {
                                 srcSf.Customer__r = new BWP_Customer__c(Processor_Customer_Id__c = bc.id);
                                 system.debug('srcSf.Customer__r'+srcSf.Customer__r);
                                 srcSf.Processor_Customer_Id__c = bc.id;
-                                srcSf.Account__c = String.isNotBlank(customerSf.Salesforce_Account__c) ? customerSf.Salesforce_Account__c : NULL;
+                                srcSf.Salesforce_Account__c = String.isNotBlank(customerSf.Salesforce_Account__c) ? customerSf.Salesforce_Account__c : NULL;
                                 constructBraintreePaymentMethod(srcSf, src, appConfig);
                                 sourcesMap.put(src.node.id, srcSf);
                             }
@@ -1079,7 +1041,7 @@ public with sharing class Processor_Braintree extends Processor {
                             BWP_Payment_Method__c srcSf =  existingSFPaymentMethodsMap.get(src.node.id) != null ? existingSFPaymentMethodsMap.get(src.node.id) : new BWP_Payment_Method__c();
                             srcSf.Customer__r = new BWP_Customer__c(Processor_Customer_Id__c = cw.id);
                             srcSf.Processor_Customer_Id__c = cw.id;
-                            srcSf.Contact__c = String.isNotBlank(customerSf.Salesforce_Contact__c) ? customerSf.Salesforce_Contact__c : conID;
+                            srcSf.Salesforce_Contact__c = String.isNotBlank(customerSf.Salesforce_Contact__c) ? customerSf.Salesforce_Contact__c : conID;
                             srcSf = constructBraintreePaymentMethod(srcSf, src, appConfig);
                             sourcesMap.put(src.node.id, srcSf);
                         }
@@ -1168,9 +1130,9 @@ public with sharing class Processor_Braintree extends Processor {
                                 srcSf.Customer__r = new BWP_Customer__c(Processor_Customer_Id__c = customer.id);
                                 srcSf.Processor_Customer_Id__c = customer.id;
                                 if(String.isNotBlank(customerSf.Salesforce_Account__c))
-                                    srcSf.Account__c = customerSf.Salesforce_Account__c;
+                                    srcSf.Salesforce_Account__c = customerSf.Salesforce_Account__c;
                                 if(String.isNotBlank(customerSf.Salesforce_Contact__c))
-                                    srcSf.Contact__c = customerSf.Salesforce_Contact__c;
+                                    srcSf.Salesforce_Contact__c = customerSf.Salesforce_Contact__c;
                                 constructBraintreePaymentMethod(srcSf, src, appConfig);
                                 sourcesMap.put(src.node.id, srcSf);
                             }
@@ -1204,8 +1166,8 @@ public with sharing class Processor_Braintree extends Processor {
     }
 
     //Saving the payments to SF. Orphan records will not be saved.
-    public static List<ProcessorUtil.PaymentWrapper> syncPayments(Map<String, Object> processorIdToPaymentMap, BreadwinnerUtil.AppConfig appConfig) {
-        List<ProcessorUtil.PaymentWrapper> rtnList = new List<ProcessorUtil.PaymentWrapper>();
+    public static List<ProcessorUtil.TransactionWrapper> syncTransactions(Map<String, Object> processorIdToPaymentMap, BreadwinnerUtil.AppConfig appConfig) {
+        List<ProcessorUtil.TransactionWrapper> rtnList = new List<ProcessorUtil.TransactionWrapper>();
         Map<String, Object> returnMap = new Map<String, Object>();
 
         // Map tp store the Payment Id and related Customer Id
@@ -1216,13 +1178,13 @@ public with sharing class Processor_Braintree extends Processor {
             return rtnList;
         }
 
-        Map<String, BWP_Payment__c> upsertMapByRefId = new Map<String, BWP_Payment__c>();
-        List<BWP_Payment__c> existingList = selectorPayment.selectByProcessorId(braintreeIdPaymentMap.keySet(), new List<String>{'Source__r.Id'});
+        Map<String, BWP_Transaction__c> upsertMapByRefId = new Map<String, BWP_Transaction__c>();
+        List<BWP_Transaction__c> existingList = selectorTransaction.selectByProcessorId(braintreeIdPaymentMap.keySet(), new List<String>{'Source__r.Id'});
 
-        Map<String,BWP_Payment__c> existingSFPaymentsMap = new Map<String,BWP_Payment__c>();
-        for(BWP_Payment__c payment : existingList) {
-            BWP_Payment__c pmnt = new BWP_Payment__c(id = payment.id);
-            existingSFPaymentsMap.put(pmnt.Processor_Id__c, pmnt);
+        Map<String,BWP_Transaction__c> existingSFPaymentsMap = new Map<String,BWP_Transaction__c>();
+        for(BWP_Transaction__c trxn : existingList) {
+            BWP_Transaction__c txn = new BWP_Transaction__c(id = trxn.id, Processor_Id__c = trxn.Processor_Id__c);
+            existingSFPaymentsMap.put(txn.Processor_Id__c, txn);
         }
 
         try {
@@ -1265,24 +1227,30 @@ public with sharing class Processor_Braintree extends Processor {
                 if(pw.paymentMethod != null && paymentMethodMapByProcessorId.get(pw.paymentMethod.id) != null) {
                     paymentMethod = paymentMethodMapByProcessorId.get(pw.paymentMethod.id);
                 }
-                BWP_Payment__c paymentSf = existingSFPaymentsMap.get(pw.id) != null ? existingSFPaymentsMap.get(pw.id) : new BWP_Payment__c();
+                BWP_Transaction__c transactionSf = existingSFPaymentsMap.get(pw.id) != null ? existingSFPaymentsMap.get(pw.id) : new BWP_Transaction__c();
 
                 if (customer != null) {
-                    paymentSf.Customer__c = customer.Id;
-                    paymentSf.Account__c = customer.Salesforce_Account__c != null ? customer.Salesforce_Account__c : null;
-                    paymentSf.Contact__c = customer.Salesforce_Contact__c != null ? customer.Salesforce_Contact__c : null;
+                    transactionSf.Customer__c = customer.Id;
+                    transactionSf.Salesforce_Account__c = customer.Salesforce_Account__c != null ? customer.Salesforce_Account__c : null;
+                    transactionSf.Salesforce_Contact__c = customer.Salesforce_Contact__c != null ? customer.Salesforce_Contact__c : null;
                 }
                 if (paymentMethod != null) {
-                    paymentSf.Source__c = paymentMethod.Id;
+                    transactionSf.Source__c = paymentMethod.Id;
                 }
-                paymentSf = constructBraintreePayment(paymentSf, pw, appConfig);
-                if (doNotImportCustomerAndFailedPayments && paymentSf.Payment_Status__c == ProcessorUtil.CHARGE_SUCCEEDED) {
-                    if(String.isNotBlank(paymentSf.Customer__c)){
-                        successfulPaymentsCustomerIdSet.add(paymentSf.Customer__c);
+                // Used in associating the originating object value while creating a Transaction via Custom Guided Wizard
+                if(ProcessorUtil.originatingObjFieldToIdMap?.size()>0){
+                    for(String originatingObjField :ProcessorUtil.originatingObjFieldToIdMap.keySet()){
+                        transactionSf.put(originatingObjField, ProcessorUtil.originatingObjFieldToIdMap.get(originatingObjField));
                     }
                 }
-                if (String.isNotBlank(paymentSf.Customer__c) && (doNotImportCustomerAndFailedPayments ? (paymentSf.Payment_Status__c == ProcessorUtil.CHARGE_SUCCEEDED ? TRUE : (appConfig.currentRunningClassContext == BreadwinnerUtil.CNTX_BWAPI ? TRUE : FALSE)) : TRUE)){
-                    upsertMapByRefId.put(paymentSf.Processor_Id__c, paymentSf);
+                transactionSf = constructBraintreeTransaction(transactionSf, pw, appConfig);
+                if (doNotImportCustomerAndFailedPayments && transactionSf.Status__c == ProcessorUtil.CHARGE_SUCCEEDED) {
+                    if(String.isNotBlank(transactionSf.Customer__c)){
+                        successfulPaymentsCustomerIdSet.add(transactionSf.Customer__c);
+                    }
+                }
+                if (String.isNotBlank(transactionSf.Customer__c) && (doNotImportCustomerAndFailedPayments ? (transactionSf.Status__c == ProcessorUtil.CHARGE_SUCCEEDED ? TRUE : (appConfig.currentRunningClassContext == BreadwinnerUtil.CNTX_BWAPI ? TRUE : FALSE)) : TRUE)){
+                    upsertMapByRefId.put(transactionSf.Processor_Id__c, transactionSf);
                 }
             }
         
@@ -1364,13 +1332,12 @@ public with sharing class Processor_Braintree extends Processor {
     }
 
     // This method is used to convert the Braintree Payment wrapper to Braintree Payment record.
-    private static BWP_Payment__c constructBraintreePayment(BWP_Payment__c paymentSf, Charge.BraintreeCharge pw, BreadwinnerUtil.AppConfig appConfig){
+    private static BWP_Transaction__c constructBraintreeTransaction(BWP_Transaction__c transactionSf, Charge.BraintreeCharge pw, BreadwinnerUtil.AppConfig appConfig){
 
-        paymentSf.Processor_Id__c = pw.id;
-        paymentSf.Created_Date_in_Processor__c = pw.createdAt;
-        paymentSf.Is_Live_Payment__c = appConfig.livemode;
-        paymentSf.Processor_Type__c = appConfig.PaymentProcessorType;
-        paymentSf.Processor_Org_Id__c = appConfig.accountId;
+        transactionSf.Processor_Id__c = pw.id;
+        transactionSf.Created_Date_in_Processor__c = pw.createdAt;
+        transactionSf.Processor_Type__c = appConfig.PaymentProcessorType;
+        transactionSf.Processor_Org_Id__c = appConfig.accountId;
 
         Map<String, String> brantreePaymentStatus = getBraintreePaymentStatus();
         if (String.isNotBlank(pw.status)) {
@@ -1394,23 +1361,23 @@ public with sharing class Processor_Braintree extends Processor {
             else if(pw.status == 'FAILED'){
                 status = ProcessorUtil.CHARGE_FAILED;
             }
-            paymentSf.Payment_Status__c = status;
+            transactionSf.Status__c = status;
         }
         if (String.isNotBlank(pw.amount.value)) {
-            paymentSf.Amount__c = Decimal.valueOf(pw.amount.value);
+            transactionSf.Amount__c = Decimal.valueOf(pw.amount.value);
         }
         if (String.isNotBlank(pw.amount.currencyISOCode)) {
-            paymentSf.Currency__c = (pw.amount.currencyISOCode).toUpperCase();
+            transactionSf.Currency__c = (pw.amount.currencyISOCode).toUpperCase();
         }
-        if(paymentSf.Id == null){
+        if(transactionSf.Id == null){
             //new payment
-            paymentSf.Created_Via__c = BreadwinnerUtil.getCreatedViaValue(appConfig.currentRunningClassContext);
+            transactionSf.Created_Via__c = BreadwinnerUtil.getCreatedViaValue(appConfig.currentRunningClassContext);
         }
 
         if (pw.customer != null && String.isNotBlank(pw.customer.id)) {
-            paymentSf.Processor_Customer_Id__c = pw.customer.id;
+            transactionSf.Processor_Customer_Id__c = pw.customer.id;
         }
-        return paymentSf;
+        return transactionSf;
     }
 
     private static Map<String, String> getBraintreePaymentStatus(){
@@ -1477,31 +1444,31 @@ public with sharing class Processor_Braintree extends Processor {
     // This method will return the Graphql query string to make a request to Braintree
     public static String getRequestBody (String typeOfAction, String Id) {
         String requestBody;
-        if (typeOfAction == 'fetchAllCustomers') {
+        if (typeOfAction == ProcessorUtil.ACT_FETCH_CUSTOMERS_ALL) {
             requestBody = '{ "query": "query { search { customers (input: {}, first: 50, after: '+(String.isNotBlank(Id) ? ('\\"'+Id+'\\"') : null);
             requestBody += ') { pageInfo { hasNextPage startCursor endCursor } edges { node { id legacyId company firstName lastName phoneNumber email createdAt defaultPaymentMethod { id }';
             requestBody += 'paymentMethods (first: 50) { edges { node { id legacyId usage details { __typename ... on CreditCardDetails { brandCode last4 expirationMonth expirationYear cardholderName uniqueNumberIdentifier } ... on UsBankAccountDetails { accountholderName accountType bankName last4 routingNumber verified } } } } }';
             requestBody +=   '} } } } }"}';
-        } else if (typeOfAction == 'fetchAllPayments') {
+        } else if (typeOfAction == ProcessorUtil.ACT_FETCH_TRANSACTIONS_ALL) {
             requestBody = '{ "query": "query { search { transactions (input: {}, first: 50, after: '+(String.isNotBlank(Id) ? ('\\"'+Id+'\\"') : null);
             requestBody += ') { pageInfo{ hasNextPage startCursor endCursor }';
             requestBody += 'edges { node { id legacyId createdAt status amount { value currencyIsoCode } customer { id } paymentMethod { id } } }';
             requestBody += '} } }"}';
-        } else if (typeOfAction == 'fetchRecentCustomers') {
+        } else if (typeOfAction == ProcessorUtil.ACT_FETCH_CUSTOMERS_RECENT) {
             requestBody = '{"query": "query Search($input: CustomerSearchInput!) { search { customers(input: $input, first: 50, after: '+(String.isNotBlank(Id) ? ('\\"'+Id+'\\"') : null);
             requestBody += ' ) { pageInfo { hasNextPage  startCursor endCursor },';
             requestBody += ' edges { node { id legacyId company firstName lastName phoneNumber email createdAt defaultPaymentMethod { id }';
             requestBody += ' paymentMethods (first: 50) { edges { node { id legacyId usage details { __typename ... on CreditCardDetails {';
             requestBody += ' brandCode last4 expirationMonth expirationYear cardholderName uniqueNumberIdentifier }';
             requestBody += ' ... on UsBankAccountDetails { accountholderName accountType bankName last4 routingNumber verified } } } } } } } } } }",';
-        } else if (typeOfAction == 'fetchRecentPayments') {
+        } else if (typeOfAction == ProcessorUtil.ACT_FETCH_TRANSACTIONS_RECENT) {
             requestBody = '{"query": "query Search($input: TransactionSearchInput!) { search { transactions(input: $input, first: 50, after: '+(String.isNotBlank(Id) ? ('\\"'+Id+'\\"') : null);
             requestBody += ' ) { pageInfo { hasNextPage  startCursor endCursor }, edges { node { id legacyId createdAt status amount { value currencyIsoCode } customer { id } paymentMethod { id } } } } } }",';
         }
         return requestBody;
     }
 
-    public static void saveAppCredentials(BWP_Processor_Config__c config, String braintreePublicKey, String braintreePrivateKey, Boolean isBraintreeProduction) {
+    public static BWP_Processor_Config__c saveAppCredentials(BWP_Processor_Config__c config, String braintreePublicKey, String braintreePrivateKey, String braintreeTokenizationKey, Boolean isBraintreeProduction) {
         String braintreeId = '';
         String braintreeAccountName = '';
         HTTPResponse res = authorizeAccount(braintreePublicKey, braintreePrivateKey, isBraintreeProduction);
@@ -1529,14 +1496,14 @@ public with sharing class Processor_Braintree extends Processor {
                 errorsMap = (Map<String, Object>)error;	
             }	
             BreadwinnerController.braintreeAuthErrors = (errorsMap.get('message') != null) ? (errorsMap.get('message')).toString() : '';	
-            return;
         }
-        if(String.isNotBlank(braintreeId)){
+        else if(String.isNotBlank(braintreeId)){
             Blob headerValue = Blob.valueOf(braintreePublicKey + ':' + braintreePrivateKey);
-            config = BreadwinnerUtil.getProcessorConfig(braintreeId) != null ? BreadwinnerUtil.getProcessorConfig(braintreeId) : new BWP_Processor_Config__c();
+            config = BreadwinnerUtil.getProcessorConfig(braintreeId);
             config.Payment_Processor_Type__c = ProcessorUtil.PAT_BRAINTREE;
             config.Access_Token__c = EncodingUtil.base64Encode(headerValue);
-            config.Name = braintreeId;
+            config.Card_Creation_Key__c = braintreeTokenizationKey; // used for card creation
+            config.Name = braintreeId; 
             config.Account_Name__c = braintreeAccountName;
             config.Provider_ID__c = braintreeId;
             config.Live_Mode__c = isBraintreeProduction ? true : false;
@@ -1552,6 +1519,7 @@ public with sharing class Processor_Braintree extends Processor {
         else {
             throw new ProcessorUtil.ConnectionException('Error occurred while connecting with Braintree.');
         }
+        return config;
     }
 
     /* This method is used to Authorize the Braintree Account */

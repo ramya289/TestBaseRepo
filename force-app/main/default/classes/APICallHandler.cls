@@ -73,6 +73,8 @@ public with sharing class APICallHandler {
             req.setHeader('Authorization', 'Bearer ' + rawAccessToken);
         } else if (ac.PaymentProcessorType == ProcessorUtil.PAT_PAYPAL){
             req.setHeader('Authorization', 'Bearer '+ rawAccessToken);
+        } else if (ac.PaymentProcessorType == ProcessorUtil.PAT_AUTHORIZE_NET){
+            req.setHeader('Authorization', 'Bearer '+ rawAccessToken);
         }
         return req;
     }
@@ -81,45 +83,41 @@ public with sharing class APICallHandler {
     /* Push logs to POW*/
     @namespaceAccessible
     public static void userInteractionLogPush(Boolean isSynchronous, String eventType, String eventDetail, String additionalDetail){
-        String orgId = UserInfo.getOrganizationId();
-        String companyName = UserInfo.getOrganizationName();
-        String firstName = UserInfo.getFirstName();
-        String lastName = UserInfo.getLastName();
-        String email = UserInfo.getUserEmail();
-        String orgType = isSandbox ? 'sandbox':'production';
         if(!Test.isRunningTest()) {
             if(isSynchronous) {
-                synchronousLogPush(orgId, companyName, eventType, eventDetail, firstName, lastName, email, additionalDetail, orgType);
+                synchronousLogPush(eventType, eventDetail, additionalDetail);
             } else {
-                asynchronousLogPush(orgId, companyName, eventType, eventDetail, firstName, lastName, email, additionalDetail, orgType);
+                asynchronousLogPush(eventType, eventDetail, additionalDetail);
             }
         }
     }
 
     @future(callout = true)
-    public static void asynchronousLogPush(String orgId, String companyName, String eventType, String eventDetail, String firstName, String lastName, String email, String additionalDetail, String orgType){
-        synchronousLogPush(orgId, companyName, eventType, eventDetail, firstName, lastName, email, additionalDetail, orgType);
+    public static void asynchronousLogPush(String eventType, String eventDetail, String additionalDetail){
+        synchronousLogPush(eventType, eventDetail, additionalDetail);
     }
 
     @TestVisible
-    private static void synchronousLogPush(String orgId, String companyName, String eventType, String eventDetail, String firstName, String lastName, String email, String additionalDetail, String orgType){
+    private static void synchronousLogPush(String eventType, String eventDetail, String additionalDetail){
         try {
             Http http = new Http();
             HttpRequest request = new HttpRequest();
             String endPointBaseURL = BreadwinnerUtil.getSupportEndpointBaseURL();
             String packageVersion = BreadwinnerUtil.getBW_PackageVersion();//BreadwinnerUtil.getBW_PackageVersion();
-            String body = '';
-
-            body = '{"org_id":"' + orgId + '",';
-            body += '"company_name":"' + companyName + '",';
+            String orgType = isSandbox ? 'sandbox':'production';
+            String body = '{"org_id":"' + UserInfo.getOrganizationId() + '",';
+            body += '"company_name":"' + UserInfo.getOrganizationName() + '",';
             body += '"event_type":"' + eventType + '",';
             body += '"event_detail":"' + eventDetail + '",';
-            body += '"first_name":"' + firstName + '",';
-            body += '"last_name":"' + lastName + '",';
-            body += '"email":"' + email + '",';
+            body += '"first_name":"' + UserInfo.getFirstName() + '",';
+            body += '"last_name":"' + UserInfo.getLastName() + '",';
+            body += '"email":"' + UserInfo.getUserEmail() + '",';
             body += '"additional_detail":"' + additionalDetail.replaceAll('"','&quot').replaceAll('\n',' &nl ') + '",';
             body += '"org_type":"' + orgType + '",';
             body += '"package_version":"' + packageVersion + '",';
+            body += '"is_human":"' + !(System.isBatch() || System.isScheduled() || System.isFuture()) + '",';
+            body += '"sf_user_id" :"' + UserInfo.getUserId() + '",';
+            body += '"sf_user_type" :"' + UserInfo.getUserType() + '",';
             body += '"app" : "Payments"}';
 
             request.setEndpoint(endPointBaseURL+'/api/v2/user_interaction_log');
@@ -282,15 +280,16 @@ public with sharing class APICallHandler {
         request.setTimeout(120000);
         authorize(request);
         String requestUrl = supportEndPointBaseURL+'/api/v2/subscriptionstatus/'+ UserInfo.getOrganizationId() + '/Payments';
+        System.debug('requestUrl: '+requestUrl);
         request.setEndpoint(requestUrl);
         try {
             HttpResponse response;
            	response = http.send(request);
             if(Test.isRunningTest()) {
-                response.setBody('{"version": "v2", "result": {"account": {"plan_code": "50", "plan_name": null, "invoice_tier": null, "status": "trial", "expiration": "2021-07-20 00:00:00", "billing_status": null, "active": "true", "days_overdue": null, "hosted_token": "", "multi_org": false, "api_enabled": false, "accounts_payable": false, "accounts_payable_mode": null, "free_plan": false}}}');
+                response.setBody('{"version":"v3","result":{"account":{"status":"trial","expiration":"2021-12-11 06:20:19","billing_status":null,"active":"true","days_overdue":null,"free_plan":false,"plan_name":"Starter","plan_code":20,"override_plan_name":"Business","override_plan_code":91,"override_plan_expiration":"2021-12-01 23:59:59"}}}');
                 response.setStatusCode(200);
             }
-            system.debug('orgCreateResponse Response :::------'+response.getBody());
+            System.debug('org Response :::------'+response.getBody());
             if(response != NULL && response.getStatusCode() == 200){
                 System.debug('response: '+response.getBody());
                 accountResponseObj = parseAccountResponse(response.getBody());
@@ -340,9 +339,12 @@ public with sharing class APICallHandler {
     public static void updateBWCustomSettingRecord(AccountResponse statusResponse) {
         Boolean isActive = statusResponse.active != 'false';
         DateTime expirationDateTime;
+        DateTime Override_Plan_Expiration_DateTime;
         
         try {
             expirationDateTime = DateTime.valueOfGmt(statusResponse.expiration);
+            if(String.isNotBlank(statusResponse.override_plan_expiration))
+                Override_Plan_Expiration_DateTime = DateTime.valueOfGmt(statusResponse.override_plan_expiration);
         }
         catch(Exception e) {System.debug('Exception in parsing date value '+e); }
         
@@ -350,24 +352,16 @@ public with sharing class APICallHandler {
         
         Breadwinner_Settings__c bwSetting = BreadwinnerUtil.getBWSetting();
         try {
-            if(Schema.SobjectType.Breadwinner_Settings__c.Fields.Active__c.isCreateable() && Schema.SobjectType.Breadwinner_Settings__c.Fields.Active__c.isUpdateable()) {
-                bwSetting.Active__c = isActive;
-            }
-            if(Schema.SobjectType.Breadwinner_Settings__c.Fields.Date_of_Expiration__c.isCreateable() && Schema.SobjectType.Breadwinner_Settings__c.Fields.Date_of_Expiration__c.isUpdateable()) {
-                bwSetting.Date_of_Expiration__c = expirationDateTime;
-            }
-            if(Schema.SobjectType.Breadwinner_Settings__c.Fields.Plan_Name__c.isCreateable() && Schema.SobjectType.Breadwinner_Settings__c.Fields.Plan_Name__c.isUpdateable()) {
-                bwSetting.Plan_Name__c = statusResponse.plan_name;
-            }
-            if(Schema.SobjectType.Breadwinner_Settings__c.Fields.Plan_Code__c.isCreateable() && Schema.SobjectType.Breadwinner_Settings__c.Fields.Plan_Code__c.isUpdateable()) {
-                bwSetting.Plan_Code__c = statusResponse.plan_code;
-            }
-            if(Schema.SobjectType.Breadwinner_Settings__c.Fields.Status__c.isCreateable() && Schema.SobjectType.Breadwinner_Settings__c.Fields.Status__c.isUpdateable()) {
-                bwSetting.Status__c = statusResponse.status;
-            }
-            if(String.isBlank(bwSetting.Support_URL__c) && Schema.SobjectType.Breadwinner_Settings__c.Fields.Support_URL__c.isCreateable() && Schema.SobjectType.Breadwinner_Settings__c.Fields.Support_URL__c.isUpdateable()) {
-                bwSetting.Support_URL__c = BreadwinnerUtil.getSupportURL();
-            }
+            bwSetting.Active__c = isActive;
+            bwSetting.Date_of_Expiration__c = expirationDateTime;
+            bwSetting.Plan_Name__c = statusResponse.plan_name;
+            bwSetting.Plan_Code__c = statusResponse.plan_code;
+            bwSetting.Override_Plan_Name__c = statusResponse.override_plan_name;
+            bwSetting.Override_Plan_Code__c = statusResponse.override_plan_code;
+            bwSetting.Override_Plan_Expiration_Date__c = Override_Plan_Expiration_DateTime;
+            bwSetting.Status__c = statusResponse.status;
+            if(String.isBlank(bwSetting.Support_URL__c)) bwSetting.Support_URL__c = BreadwinnerUtil.getSupportURL();
+            if(String.isBlank(bwSetting.Salesforce_Org_Id__c)) bwSetting.Salesforce_Org_Id__c = UserInfo.getOrganizationId();
             SecurityUtil.dmlUpsert(bwSetting);
             if(Test.isRunningTest()) { Decimal d = 5/0; }
         }
@@ -403,6 +397,11 @@ public with sharing class APICallHandler {
         public String expiration            {get; set;}
         public String plan_code             {get; set;}
         public String plan_name             {get; set;}
+
+        public String override_plan_code        {get; set;}
+        public String override_plan_name        {get; set;}
+        public String override_plan_expiration  {get; set;}
+
     }
 
 }

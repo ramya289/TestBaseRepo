@@ -5,7 +5,7 @@ public with sharing class ProcessorUtil {
     public static final String PAT_BRAINTREE = 'Braintree';
     public static final String PAT_PAYPAL = 'PayPal';
     public static final String PAT_SQUARE = 'Square';
-    public static final String PAT_STRIPE = 'Stripe';
+    @namespaceAccessible public static final String PAT_STRIPE = 'Stripe';
     public static final String PAT_AUTHORIZE_NET = 'Authorize.Net';
 
     // API Request Attributes
@@ -21,6 +21,7 @@ public with sharing class ProcessorUtil {
     public static final String RESP_VAL_REQ = 'validRequest';
     public static final String RESP_STATUS = 'status';
     public static final String RESP_JSON = 'responseJSON';
+    public static final String CHECKOUT_RESP = 'checkoutResponse';
     public static final String CUST_RESP = 'customerResponse';
     public static final String PAYMETHOD_RESP = 'payMethodResponse';
     public static final String PAYMENT_RESP = 'paymentResponse';
@@ -33,10 +34,14 @@ public with sharing class ProcessorUtil {
     public static final String ACT_CREATE_BANK_TOKEN = 'CreateBankToken';
     public static final String ACT_CREATE_CARD_TOKEN = 'CreateCardToken';
     public static final String ACT_CREATE_CUSTOMER = 'CreateCustomer';
-    public static final String ACT_FETCH_CUSTOMERS = 'FetchCustomers';
-    public static final String ACT_FETCH_PAYMENTS = 'FetchPayments';
+    public static final String ACT_FETCH_CUSTOMERS_ALL = 'FetchCustomers';
+    public static final String ACT_FETCH_TRANSACTIONS_ALL = 'FetchTransactions'; 
+    public static final String ACT_FETCH_CUSTOMERS_RECENT = 'FetchRecentCustomers';
+    public static final String ACT_FETCH_TRANSACTIONS_RECENT = 'FetchRecentTransactions';
     public static final String ACT_UPDATE_CUSTOMER = 'UpdateCustomer';
     public static final String ACT_VERIFY_BANKACCOUNT = 'VerifyBankAccount';
+    public static final String ACT_CREATE_CHECKOUT = 'CreateCheckoutURL';
+
 
     public static final String PM_CARD = 'Card';
     public static final String PM_BANK = 'BankAccount';
@@ -70,13 +75,17 @@ public with sharing class ProcessorUtil {
     public static final String CMO_SUGGESTED_MATCH = 'suggestedMatch';  
     public static final String CMO_MANUAL_MATCH = 'manualMatch';
     public static final String CMO_DO_NOT_IMPORT = 'doNotImport';
-        
+
+    //Originating Object Field to Id Map, used in associating the originating record to the transaction
+    public static Map<String, Id> originatingObjFieldToIdMap = new Map<String, Id>();
+    
     public class ResponseObject {
         public String status;
         public String responseJSON;
+        public String checkoutResponseJSON;
         public List<CustomerWrapper> customerList;
         public List<PaymentMethodWrapper> paymentMethodList;
-        public List<PaymentWrapper> paymentList;
+        public List<TransactionWrapper> transactionList;
         public List<Error> errors = new List<Error>();
     }
 
@@ -170,10 +179,27 @@ public with sharing class ProcessorUtil {
         return (List<Contact>) Database.query(conQB.toSOQL());
     }
 
+    public static void getExistingRecordsSet(String name, string email, Set<String> customerNameSet, Set<String> customerEmailSet){
+        if(String.isNotBlank(name)){
+            String customerName = name.toLowerCase().replace('\\', '%'); 
+            Set<String> relatedNameSet = BreadwinnerUtil.getSimilarAccountNameSet(customerName);
+            customerNameSet.addAll(relatedNameSet);
+        }
+      	if(String.isNotBlank(email)){
+            String customerEmail = email.toLowerCase().replace('\\', '%');
+            Set<String> relatedNameSet = BreadwinnerUtil.getSimilarAccountNameSet(customerEmail);
+            customerNameSet.addAll(relatedNameSet);
+            customerEmailSet.add(customerEmail);
+        }
+        if(ProcessorUtil.arePersonAccountsEnabled() && String.isNotBlank(email)){
+            String custEmail = email.toLowerCase().replace('\\', '%');
+            customerEmailSet.add(custEmail);
+        }
+    }
+
     public static Map<Id,Boolean> getIsPersonRTMap() {
         return new Map<Id, Boolean>();
     }
-
 
     private static Set<Id> isPersonRTSet {
         get {
@@ -392,7 +418,7 @@ public with sharing class ProcessorUtil {
         
         public PaymentMethodWrapper(BWP_Payment_Method__c pm) {
             salesforceId = pm.Id;
-            salesforceAccountId = pm.Account__c;
+            salesforceAccountId = pm.Salesforce_Account__c;
             amount = pm.Amount__c;
             bankAccountHolderName = pm.Bank_Account_Holder_Name__c;
             accountNumber = pm.Account_Number__c;
@@ -401,7 +427,7 @@ public with sharing class ProcessorUtil {
             cardBrand = pm.Card_Brand__c;
             city = pm.City__c;
             clientSecret = pm.Client_Secret__c;
-            salesforceContact = pm.Contact__c;
+            salesforceContact = pm.Salesforce_Contact__c;
             createdVia = pm.Created_Via__c;
             customerCurrency = pm.Currency__c;
             salesforceCustomerId = pm.Customer__c;
@@ -425,7 +451,7 @@ public with sharing class ProcessorUtil {
         }
     }
 
-    public class PaymentWrapper{
+    public class TransactionWrapper{
         public Id salesforceAccountId;
         public Decimal amount;
         public Decimal amountRefunded;
@@ -443,11 +469,9 @@ public with sharing class ProcessorUtil {
         public Id customer;
         public String description;
         public Boolean captured;
-        public Boolean isLivePayment;
         public String locationId;
-        public String paymentFingerprint;
         public Id Source; // payment method
-        public String paymentStatus;
+        public String status;
         public Decimal processingFee;
         public String processorCustomerId;
         public String processorId;
@@ -460,9 +484,9 @@ public with sharing class ProcessorUtil {
 		public Id salesforceId;        
         public String errorMessage;
         
-        public PaymentWrapper(BWP_Payment__c pay){
+        public TransactionWrapper(BWP_Transaction__c pay){
             salesforceId = pay.Id;
-            salesforceAccountId = pay.Account__c;
+            salesforceAccountId = pay.Salesforce_Account__c;
             amount = pay.Amount__c;
             amountRefunded = pay.Amount_Refunded__c;
             applicationFee = pay.Application_Fee__c;
@@ -472,18 +496,16 @@ public with sharing class ProcessorUtil {
             billingStreetAddress1 = pay.Billing_Street_Address_1__c;
             billingStreetAddress2 = pay.Billing_Street_Address_2__c;
             chargeStatus = pay.Charge_Status__c;
-            contact = pay.Contact__c;
+            contact = pay.Salesforce_Contact__c;
             createdDateInProcessor = pay.Created_Date_in_Processor__c;
             createdVia = pay.Created_Via__c;
             chargeCurrency = pay.Currency__c;
             customer = pay.Customer__c;
             description = pay.Description__c;
             captured = pay.Captured__c;
-            isLivePayment = pay.Is_Live_Payment__c;
             locationId = pay.Location_Id__c;
-            paymentFingerprint = pay.Payment_Fingerprint__c;
             Source = pay.Source__c; // payment method
-            paymentStatus = pay.Payment_Status__c;
+            status = pay.Status__c;
             processingFee = pay.Processing_Fee__c;
             processorCustomerId = pay.Processor_Customer_Id__c;
             processorId = pay.Processor_Id__c;
@@ -494,6 +516,24 @@ public with sharing class ProcessorUtil {
             receiptUrl = pay.Receipt_URL__c;
             staffName = pay.Staff_Name__c;
         }
+    }
+
+    public class Checkout{
+        public String location_id;
+        public String customer_id;
+        public String reference_id;
+        public Boolean ask_for_shipping_address;
+        public String merchant_support_email;
+        public String buyer_email;
+        public Customer.SquareAddress shipping;
+        public List<CheckoutLineItem> line_items;
+    }
+    public class CheckoutLineItem{
+        public String quantity;
+        public Decimal unit_price;
+        public String item_currency;
+        public String name;
+        public String note;
     }
     
     public static List<CustomerWrapper> upsertAndReturnCustomerList(List<BWP_customer__c> custList, Set<Id> updatedCustomerIdSet, Boolean addToSalesforce){
@@ -547,18 +587,18 @@ public with sharing class ProcessorUtil {
         return paymentMethodList;
     }
     
-    public static List<PaymentWrapper> upsertAndReturnPaymentList(List<BWP_Payment__c> paymentList){
-        List<PaymentWrapper> payList = new List<PaymentWrapper>();
-        Database.UpsertResult[] results = SecurityUtil.databaseUpsert(paymentList, BWP_Payment__c.Processor_Id__c);
+    public static List<TransactionWrapper> upsertAndReturnPaymentList(List<BWP_Transaction__c> transactionList){
+        List<TransactionWrapper> payList = new List<TransactionWrapper>();
+        Database.UpsertResult[] results = SecurityUtil.databaseUpsert(transactionList, BWP_Transaction__c.Processor_Id__c);
         
-        Map<String,BWP_Payment__c> updatedMapBySfId = new Map<String,BWP_Payment__c>();
-        for (BWP_Payment__c payment : paymentList){
-            updatedMapBySfId.put(payment.Id, payment);
+        Map<String,BWP_Transaction__c> updatedMapBySfId = new Map<String,BWP_Transaction__c>();
+        for (BWP_Transaction__c trxn : transactionList){
+            updatedMapBySfId.put(trxn.Id, trxn);
         }
         
         if(results != null){
             for (Database.UpsertResult result : results) {
-                ProcessorUtil.PaymentWrapper wrapper = new ProcessorUtil.PaymentWrapper(updatedMapBySfId.get(result.getId()));
+                ProcessorUtil.TransactionWrapper wrapper = new ProcessorUtil.TransactionWrapper(updatedMapBySfId.get(result.getId()));
                 if (!result.isSuccess()) {
                     wrapper.errorMessage = result.getErrors()[0].getMessage();
                 }

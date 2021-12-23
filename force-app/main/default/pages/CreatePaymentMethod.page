@@ -1,13 +1,12 @@
-<apex:page sidebar="false" standardcontroller="BWP_Payment_Method__c" extensions="CreateCustomerExtension">
+<apex:page sidebar="false" standardcontroller="BWP_Payment_Method__c" extensions="RecordCreationExtension">
     <html xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
         <head>
             <apex:slds />
-            <script src="{!URLFOR($Resource.Breadwinner_Payments,'Breadwinner_Payments/js/jquery-3.3.1.min.js')}"></script>
-            <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.3/css/select2.min.css" rel="stylesheet" />
-                <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.3/js/select2.min.js"></script>
-            <script type="text/javascript" src="{!IF(payConfig.Live_Mode__c, 'https://js.squareup.com/v2/paymentform', 'https://js.squareupsandbox.com/v2/paymentform')}"></script>
+            <script src="{!URLFOR($Resource.Breadwinner_Payments,'Breadwinner_Payments/js/jquery-3.5.1.min.js')}"></script>
+            <link href="{!URLFOR($Resource.Breadwinner_Payments,'Breadwinner_Payments/css/select2-4.0.13.min.css')}" rel="stylesheet" />
+            <script src="{!URLFOR($Resource.Breadwinner_Payments,'Breadwinner_Payments/js/select2-4.0.13.full.min.js')}"></script>
             <apex:stylesheet value="{!URLFOR($Resource.Breadwinner_Payments, 'Breadwinner_Payments/SquareCSS.css')}"/>
-                <script>
+            <script>
                 var j$ = jQuery.noConflict();
             j$(document).ready(function(){
                 message();
@@ -95,8 +94,8 @@
                                 </div>
                             </div>
                             <!----------------------------- Page Header End ------------------------------------>
-                            <!----------------------------- Arrow Path Start ----------------------------------->
-                            <apex:outputPanel id="pathPanel" layout="block" styleClass="slds-m-bottom_small" >
+                            <!----------------------------- Arrow Path Start --------------------------------- -->
+                            <apex:outputPanel id="pathPanel" layout="block" styleClass="slds-m-bottom_small" rendered="{!isProcessorConnected}">
                                 <article class="slds-card" style="border:0px;box-shadow: 0 0px">
                                     <div class="slds-path slds-path_has-coaching">
                                         <div class="slds-grid slds-path__track">
@@ -148,8 +147,8 @@
                             </apex:outputPanel>
                             <!----------------------------- Arrow Path End -------------------------------------->
                             <!-- -----------------Select BWP Customer Start-------------------------------------->
-                            <apex:pageMessages />                        
-                            <apex:outputPanel id="selectCustomersSection">
+                            <apex:pageMessages />
+                            <apex:outputPanel id="selectCustomersSection" rendered="{!isProcessorConnected}">
                                 <apex:outputPanel rendered="{!CustomerPage}">
                                     <div class="slds-m-top_small slds-col_padded">
                                         <h1 class="slds-section__title">Select the Breadwinner Payments Customer for this Payment</h1>
@@ -188,7 +187,7 @@
                                 }
                                 </script>
                             </apex:outputPanel>
-                            <!-- ----------------- Select BWP Customer End ------------------------------------->
+                            <!-- ----------------- Select BWP Customer End ----------------------------------- -->
                         </apex:outputPanel>
                     </apex:outputPanel>
                 </div>

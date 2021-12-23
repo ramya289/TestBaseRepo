@@ -2,7 +2,7 @@
     <html xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
         <head>
             <apex:slds />
-            <script src="{!URLFOR($Resource.Breadwinner_Payments,'Breadwinner_Payments/js/jquery-3.3.1.min.js')}"></script>
+            <script src="{!URLFOR($Resource.Breadwinner_Payments,'Breadwinner_Payments/js/jquery-3.5.1.min.js')}"></script>
             <script type="text/javascript">
                 var j$ = jQuery.noConflict();
             
@@ -205,7 +205,7 @@
                                     </svg>
                                 </div>
                                 <div class="slds-media__body">
-                                    <p class="slds-page-header__title slds-truncate">Breadwinner {!selectedMatchType} Match with BWP Customers</p>
+                                    <p class="slds-page-header__title slds-truncate">Breadwinner {!selectedMatchType} Match with {!appC.paymentProcessorType} Customers</p>
                                     <p class="slds-text-body_small">Breadwinner • Payments </p>
                                 </div>
                             </div>
@@ -214,21 +214,21 @@
                         
                         <apex:outputPanel layout="block" rendered="{!AND(NOT(isCustomerMatchComplete),processorCustIdList.size > 0)}">
                             <p class="slds-m-bottom_medium slds-m-horizontal_medium">
-                                Each Breadwinner Payments Customer has to be matched with one Salesforce {!selectedMatchType}. 
+                                Each {!appC.paymentProcessorType} Customer has to be matched with one Salesforce {!selectedMatchType}. 
                                 Based on the Customer's name, phone, and address, we have tried to auto-match some Customers. If we have not been able to match it, you can select a Salesforce {!selectedMatchType} through the lookup box. You can also create a new {!selectedMatchType} in Salesforce based on the Customer. 
                             </p>
                         </apex:outputPanel>
                         <apex:outputPanel layout="block" id="messagesSection" rendered="{!showMessages}">
                             <apex:pagemessages rendered="{!NOT(isBackgroundjobRunning)}"/>
                             <apex:outputPanel rendered="{!isBackgroundjobRunning}">
-                                <apex:pageMessage severity="INFO" strength="2" summary="<b>Customers import is in progress<b/>" escape="false" >
-                                    <p style="padding-left: 0.2rem;">&nbsp;It appears that a background job to import your Customers is in progress, please try again later.
+                                <apex:pageMessage severity="INFO" strength="2" summary="<b>{!appC.paymentProcessorType} Customers import is in progress<b/>" escape="false" >
+                                    <p style="padding-left: 0.2rem;">&nbsp;It appears that a background job to import your {!appC.paymentProcessorType} Customers is in progress, please try again later.
                                     </p>
                                 </apex:pageMessage>
                             </apex:outputPanel>
                             <apex:outputPanel rendered="{!restartSync}">
                                 <apex:pageMessage severity="INFO" strength="2" summary="<b>Import Customers into Salesforce<b/>" escape="false">
-                                    <p style="padding-left: 0.2rem;">&nbsp;It appears that your Import Customers background job has got failed. Please<apex:commandLink value=" restart the Historical Sync" action="{!restartHistoricalSync}" reRender="messagesSection" status="action-status" oncomplete="message();" id="restartSync" />.</p>
+                                    <p style="padding-left: 0.2rem;">&nbsp;It appears that your Import {!appC.paymentProcessorType} Customers background job has got failed. Please<apex:commandLink value=" restart the Historical Sync" action="{!restartHistoricalSync}" reRender="messagesSection" status="action-status" oncomplete="message();" id="restartSync" />.</p>
                                 </apex:pageMessage>
                             </apex:outputPanel>
                             <apex:outputPanel layout="block" rendered="{!AND(noRecordsInProcessor,NOT(isBackgroundjobRunning))}">
@@ -259,7 +259,7 @@
                                 <apex:outputPanel rendered="{!AND(NOT(isCustomerMatchComplete),processorCustIdList.size > 0,NOT(isBackgroundjobRunning))}">
                                     <div class="slds-grid slds-wrap ">
                                         <div class="slds-m-top_large slds-size_1-of-1 slds-medium-size_3-of-7 slds-large-size_6-of-13" style="text-align: center;"> 
-                                            <div class="slds-text-heading_medium">Customer Details in Payment Processor</div>
+                                            <div class="slds-text-heading_medium">Customer Details in {!appC.accountName}</div>
                                         </div>
                                         <div class="slds-m-top_large slds-siz_1-of-1 slds-medium-size_1-of-7 slds-large-size_1-of-13">
                                             <div style="visibility: hidden;"></div>
@@ -329,7 +329,7 @@
                                                                 </div>
                                                                 <div class="slds-float_left">
                                                                     <span class="slds-radio">
-                                                                        <span class=" slds-form-element__label slds-m-left_small">Create New Salesforce {!selectedMatchType} with details from BWP Customer</span>
+                                                                        <span class=" slds-form-element__label slds-m-left_small">Create New Salesforce {!selectedMatchType} with details from {!appC.paymentProcessorType} Customer</span>
                                                                     </span>
                                                                 </div>
                                                             </div>
@@ -371,7 +371,7 @@
                                                                 </div>
                                                                 <div class="slds-float_left">
                                                                     <span class="slds-radio">
-                                                                        <span class=" slds-form-element__label slds-m-left_small">Do Not associate this BWP Customer with Salesforce {!selectedMatchType}</span>
+                                                                        <span class=" slds-form-element__label slds-m-left_small">Do Not associate this {!appC.paymentProcessorType} Customer with Salesforce {!selectedMatchType}</span>
                                                                     </span>
                                                                 </div>
                                                             </div>
@@ -468,12 +468,12 @@
                             }
                             var infoMessage = document.getElementById('info');
                             if(newRecords>0 || matchRecords >0 || doNotImportRecords >0){
-                                var infoMessageText = 'Clicking "Next" button will create '+newRecords+' new Salesforce '+(newRecords == 1 ? '{!selectedMatchType} from Breadwinner Payments Customers' : '{!selectedMatchType}s from Breadwinner Payments Customers');
+                                var infoMessageText = 'Clicking "Next" button will create '+newRecords+' new Salesforce '+(newRecords == 1 ? '{!selectedMatchType} from {!appC.paymentProcessorType} Customers' : '{!selectedMatchType}s from {!appC.paymentProcessorType} Customers');
                                if(matchRecords > 0){
-                                   infoMessageText = infoMessageText+', will match '+matchRecords+(matchRecords == 1 ?  ' Breadwinner Payments Customer to existing Salesforce {!selectedMatchType}' : ' Breadwinner Payments Customers to existing Salesforce {!selectedMatchType}s');
+                                    infoMessageText = infoMessageText+', '+(doNotImportRecords == 0 ? 'and' : '')+' will match '+matchRecords+(matchRecords == 1 ?  ' {!appC.paymentProcessorType} Customer to existing Salesforce {!selectedMatchType}' : ' {!appC.paymentProcessorType} Customers to existing Salesforce {!selectedMatchType}s');
                                 }
                                 if(doNotImportRecords > 0){
-                                    infoMessageText = infoMessageText+', and will not associate '+doNotImportRecords+(doNotImportRecords == 1 ? ' Breadwinner Payments Customer to any Salesforce {!selectedMatchType}' : ' Breadwinner Payments Customers to any Salesforce {!selectedMatchType}s');
+                                    infoMessageText = infoMessageText+', and will not associate '+doNotImportRecords+(doNotImportRecords == 1 ? ' {!appC.paymentProcessorType} Customer to any Salesforce {!selectedMatchType}' : ' {!appC.paymentProcessorType} Customers to any Salesforce {!selectedMatchType}s');
                                 }
                                 infoMessage.innerHTML = infoMessageText+'.';
                             }
@@ -499,7 +499,7 @@
                                     <h2 class="slds-text-heading_medium">{!selectedMatchType} match completed successfully</h2>
                                 </div>
                                 <div class="slds-modal__content slds-p-around_medium">
-                                    Breadwinner has successfully matched all of your Breadwinner Payments Customers with Salesforce {!selectedMatchType}s.
+                                    Breadwinner has successfully matched all of your {!appC.paymentProcessorType} Customers with Salesforce {!selectedMatchType}s.
                                 </div>
                                 <div class="slds-modal__footer">
                                     <apex:commandLink id="okaybutton" styleClass="slds-button slds-button_brand" value="OK" onclick="redirectToBWPage();" reRender="nothing"/>

@@ -1,8 +1,8 @@
 public with sharing class Processor_Square  extends Processor {
 
     private static Selector_BWP_Customer selectorCustomer = new Selector_BWP_Customer();
-    private static Selector_BWP_Payment selectorPayment = new Selector_BWP_Payment();
     private static Selector_BWP_Payment_Method selectorPaymentMethod = new Selector_BWP_Payment_Method();
+    private static Selector_BWP_Transaction selectorTransaction = new Selector_BWP_Transaction();
 
     //Square Endpoints
     public static String squareBaseUrlv2 = 'https://connect.squareup.com/v2';
@@ -37,14 +37,16 @@ public with sharing class Processor_Square  extends Processor {
     public override ProcessorUtil.ResponseObject fetchCustomers(String requestJSON){
         return fetchCustomers(apcWrapper, requestJSON);
     }
-    public override ProcessorUtil.ResponseObject fetchPayments(String requestJSON){
-        return fetchPayments(apcWrapper, requestJSON);
+    public override ProcessorUtil.ResponseObject fetchTransactions(String requestJSON){
+        return fetchTransactions(apcWrapper, requestJSON);
+    }
+    public override ProcessorUtil.ResponseObject createCheckoutURL(String requestJSON){
+        return createCheckoutURL(apcWrapper, requestJSON);
     }
     
     
     @TestVisible
     private static ProcessorUtil.ResponseObject createCustomer(BreadwinnerUtil.AppConfig apcWrapper, String requestJSON){
-
         Map<String, Customer.SquareCustomer> squareIdCustomerMapResponse = new Map<String, Customer.SquareCustomer> ();
 
         ProcessorUtil.ResponseObject response = new ProcessorUtil.ResponseObject();
@@ -187,7 +189,6 @@ public with sharing class Processor_Square  extends Processor {
     
     @TestVisible
     private static ProcessorUtil.ResponseObject createCardToken(BreadwinnerUtil.AppConfig apcWrapper, String requestJSON){
-
         Map<String, Customer.SquareCustomer> squareIdCustomerMapResponse = new Map<String, Customer.SquareCustomer> ();
 
         ProcessorUtil.ResponseObject response = new ProcessorUtil.ResponseObject();
@@ -210,13 +211,15 @@ public with sharing class Processor_Square  extends Processor {
                     String jsonObject = JSON.serializePretty(obj);
                     JSONParser objectParser = JSON.createParser(jsonObject);
                     Customer.SquareCustomer customer = (Customer.SquareCustomer) objectParser.readValueAs(Customer.SquareCustomer.class);
-                    String endPoint = getEndpointBaseUrl(apcWrapper) + '/customers/'+customer.id+'/cards';
-                    String reqBody = '{"card_nonce":' +'\"'+customer.cards[0].card_nonce+'\"';
-                    reqBody += ', "cardholder_name" : '+(String.isNotBlank(customer.cards[0].cardholder_name) ? ('\"' + customer.cards[0].cardholder_name + '\"') : null);
+                    String endPoint = getEndpointBaseUrl(apcWrapper) + '/cards';
+                    String idempotencykey = generateRandomString(5);
+                    String reqBody = '{"source_id":' +('\"' + customer.cards[0]?.card_nonce + '\"');
+                    reqBody += ', "idempotency_key" : '+(String.isNotBlank(idempotencykey) ? ('\"' + idempotencykey + '\"') : null);
+                    reqBody += ', "card": {';
                     String country = '';
                     if(customer.cards[0].billing_address != null){
                         country = customer.cards[0].billing_address.country;
-                        reqBody += ', "billing_address" : {';
+                        reqBody += '"billing_address" : {';
                         reqBody += ' "address_line_1" : '+(String.isNotBlank(customer.cards[0].billing_address.address_line_1) ? ('\"' + customer.cards[0].billing_address.address_line_1 + '\"') : null);                              
                         reqBody += ', "address_line_2" : '+(String.isNotBlank(customer.cards[0].billing_address.address_line_2) ? ('\"' + customer.cards[0].billing_address.address_line_2 + '\"') : null);                              
                         reqBody += ', "administrative_district_level_1" : '+(String.isNotBlank(customer.cards[0].billing_address.administrative_district_level_1) ? ('\"' + customer.cards[0].billing_address.administrative_district_level_1 + '\"') : null);                              
@@ -225,7 +228,9 @@ public with sharing class Processor_Square  extends Processor {
                         reqBody += ', "country" : '+(String.isNotBlank(customer.cards[0].billing_address.country) ? ('\"' + customer.cards[0].billing_address.country + '\"') : null);                              
                         reqBody += '}';
                     }
-                    reqBody += '}';
+                    reqBody += ', "customer_id":' +(String.isNotBlank(customer.id) ? ('\"' + customer.id + '\"') : null);
+                    reqBody += ', "cardholder_name" : '+(String.isNotBlank(customer.cards[0].cardholder_name) ? ('\"' + customer.cards[0].cardholder_name + '\"') : null);
+                    reqBody += '}}';
                     if (customer != null && customer.accountId != null){
                         BreadwinnerUtil.accountId = customer.accountId;
                     }
@@ -270,7 +275,6 @@ public with sharing class Processor_Square  extends Processor {
 
     @TestVisible
     private static ProcessorUtil.ResponseObject chargeProcessor(BreadwinnerUtil.AppConfig apcWrapper, String requestJSON, String timeout){
-
         Customer.SquareCustomer squareCustomer = new Customer.SquareCustomer();
 
         ProcessorUtil.ResponseObject response = new ProcessorUtil.ResponseObject();
@@ -325,7 +329,7 @@ public with sharing class Processor_Square  extends Processor {
                   Map<String, Object> processorToPaymentMap = new Map<String, Object>();
                   processorToPaymentMap.put(ProcessorUtil.PAT_SQUARE, squareIdChargeMapResponse);
                   apcWrapper.currentRunningClassContext = BreadwinnerUtil.CNTX_BWAPI;
-                  response.paymentList = syncPayments(processorToPaymentMap, apcWrapper);
+                  response.transactionList = syncTransactions(processorToPaymentMap, apcWrapper);
                   response.responseJSON = JSON.serializePretty(squareIdChargeMapResponse);
                   response.status = String.valueOf(res.getStatusCode());
               }
@@ -334,7 +338,7 @@ public with sharing class Processor_Square  extends Processor {
                 List<Object> errorsListOfVaultPM = (List<Object>)responseOfVaultPM.get('errors');
                 Map<String, Object> error = (Map<String, Object>)errorsListOfVaultPM[0];
                 response.errors.add(new ProcessorUtil.Error(error.get('code').toString(), error.get('detail').toString()));
-                APICallHandler.userInteractionLogPush(true, 'Create Charge', 'ERROR' , 'Response for Square Org Name('+apcWrapper.accountName+'): Status Code: '+res.getStatusCode()+' Response Body: '+res.getBody() );
+                APICallHandler.userInteractionLogPush(true, 'Create Square Charge', 'ERROR' , 'Response for Square Org Name('+apcWrapper.accountName+'): Status Code: '+res.getStatusCode()+' Response Body: '+res.getBody() );
             }
         }
         catch (Exception ex) {
@@ -386,7 +390,7 @@ public with sharing class Processor_Square  extends Processor {
 
     }
     @TestVisible
-    private static ProcessorUtil.ResponseObject fetchPayments(BreadwinnerUtil.AppConfig apcWrapper, String requestJSON) {
+    private static ProcessorUtil.ResponseObject fetchTransactions(BreadwinnerUtil.AppConfig apcWrapper, String requestJSON) {
         ProcessorUtil.ResponseObject response = new ProcessorUtil.ResponseObject();
         response.errors = new List<ProcessorUtil.Error>();
         FetchRequest filters = (FetchRequest)System.JSON.deserialize(requestJSON, FetchRequest.class);
@@ -407,7 +411,7 @@ public with sharing class Processor_Square  extends Processor {
         } else {
             apcWrapper.needToReconnect = true;
             apcWrapper.requireNextPaymentSyncRun = false;
-            String Action_Type = ProcessorUtil.getLogAction(apcWrapper.currentRunningClassContext, 'Fetching Payments');
+            String Action_Type = ProcessorUtil.getLogAction(apcWrapper.currentRunningClassContext, 'Fetching Transactions');
             APICallHandler.userInteractionLogPush(true, Action_Type, 'ERROR' , 'Response for Processor Org Name('+apcWrapper.accountName+'): Status Code: '+res.getStatusCode()+' Response Body: '+res.getBody() );
 
             JSONParser parser = JSON.createParser(res.getBody());
@@ -417,6 +421,139 @@ public with sharing class Processor_Square  extends Processor {
 
         return response;
 
+    }
+
+    @TestVisible
+    private static ProcessorUtil.ResponseObject createCheckoutURL(BreadwinnerUtil.AppConfig apcWrapper, String requestJSON) {
+        
+        ProcessorUtil.ResponseObject response = new ProcessorUtil.ResponseObject();
+        response.errors = new List<ProcessorUtil.Error>();
+
+        Map<String, Object> objectMapTemp = (Map<String,Object>) JSON.deserializeUntyped(requestJSON);
+        Map<String, Object> objectMap = new Map<String, Object>();
+        for (String key : objectMapTemp.keySet()) {          
+            objectMap.put(key.toLowerCase(), objectMapTemp.get(key));
+        }
+        List<Object> objectList = (List<Object>) objectMap.get('checkout');
+       
+        try{
+            String jsonObject = JSON.serializePretty(objectList[0]);
+            JSONParser objectParser = JSON.createParser(jsonObject);
+            ProcessorUtil.Checkout checkout = (ProcessorUtil.Checkout) objectParser.readValueAs(ProcessorUtil.Checkout.class);
+            // Making the customer_id as required to handle the Payments syncing to Salesforce (BWP-173)
+            if (String.isBlank(checkout.customer_id)) {
+                response.errors.add(new ProcessorUtil.Error('Required field missing.','Square Customer Id is required.'));
+                return response;
+            }
+            String idempotencykey = generateRandomString(5);
+            String locationId = getLocationId(apcWrapper,checkout.location_id);
+            if (String.isBlank(locationId)) {
+                response.errors.add(new ProcessorUtil.Error('Required field missing.','Square Location Id is required.'));
+                return response;
+            }
+            String reqBody = '{"idempotency_key":' +'\"'+idempotencykey+'\"';
+            if(String.isNotBlank(checkout?.merchant_support_email)) reqBody += ', "merchant_support_email" : ' +'\"'+checkout.merchant_support_email+'\"';
+            if(String.isNotBlank(checkout?.buyer_email)) reqBody += ', "pre_populate_buyer_email" : ' +'\"'+checkout.buyer_email+'\"';
+            if(checkout.ask_for_shipping_address != null && checkout.ask_for_shipping_address){
+                reqBody += ', "ask_for_shipping_address" : ' +checkout.ask_for_shipping_address;
+                if(checkout.shipping!=null){
+                    reqBody += ', "pre_populate_shipping_address" : {';
+                    if(String.isNotBlank(checkout.shipping.first_name)) reqBody += ' "first_name" : ' +'\"'+checkout.shipping.first_name+'\",';
+                    if(String.isNotBlank(checkout.shipping.last_name)) reqBody += ' "last_name" : ' +'\"'+checkout.shipping.last_name+'\",';
+                    if(String.isNotBlank(checkout.shipping.address_line_1)) reqBody += ' "address_line_1" : ' +'\"'+checkout.shipping.address_line_1+'\",';
+                    if(String.isNotBlank(checkout.shipping.address_line_2)) reqBody += ' "address_line_2" : ' +'\"'+checkout.shipping.address_line_2+'\",';
+                    if(String.isNotBlank(checkout.shipping.locality)) reqBody += ' "locality" : ' +'\"'+checkout.shipping.locality+'\",';                
+                    if(String.isNotBlank(checkout.shipping.administrative_district_level_1)) reqBody += ' "administrative_district_level_1" : ' +'\"'+checkout.shipping.administrative_district_level_1+'\",';
+                    if(String.isNotBlank(checkout.shipping.country)) reqBody += ' "country" : ' +'\"'+checkout.shipping.country+'\",';
+                    if(String.isNotBlank(checkout.shipping.postal_code)) reqBody += ' "postal_code" : ' +'\"'+checkout.shipping.postal_code+'\",';
+                    reqBody = reqBody.removeEnd(',');
+                    reqBody += '}';
+                }                
+            }            
+            reqBody += ', "order" : {';
+            reqBody += ' "idempotency_key" : ' +'\"'+idempotencykey+'\"';
+            reqBody += ', "order" : {';
+            reqBody += ' "location_id" : ' +'\"'+locationId+'\"';
+            reqBody += ', "customer_id" : ' +'\"'+checkout.customer_id+'\"';
+            reqBody += ', "reference_id" : ' +'\"'+checkout.reference_id+'\"';
+            reqBody += ', "line_items" : [';
+            if(checkout.line_items?.size()>0){
+                for(ProcessorUtil.CheckoutLineItem li: checkout.line_items){
+                    reqBody += ' {';
+                    if(String.isNotBlank(li.quantity)) reqBody += ' "quantity" : ' +'\"' +li.quantity+'\",';
+                    reqBody += ' "base_price_money":{';
+                    if(li.unit_price != null) reqBody += ' "amount" : ' +li.unit_price+ ',';
+                    if(String.isNotBlank(li.item_currency)) reqBody += ' "currency" : ' +'\"' +li.item_currency+'\",';
+                    reqBody = reqBody.removeEnd(',');
+                    reqBody += '},';
+                    if(String.isNotBlank(li.name)) reqBody += ' "name" : ' +'\"' +li.name+'\",';
+                    if(String.isNotBlank(li.note)) reqBody += ' "note" : ' +'\"' +li.note+'\",';
+                    reqBody = reqBody.removeEnd(',');
+                    reqBody += '},';
+                }
+                reqBody = reqBody.removeEnd(',');
+            }
+            reqBody += ' ]}}}';
+            String endPoint = getEndpointBaseUrl(apcWrapper) + '/locations/'+locationId+'/checkouts';
+            HttpResponse res = APICallHandler.post(apcWrapper, 'POST', endPoint, reqBody);
+            if (res.getStatusCode() == 200) {
+                response.checkoutResponseJSON = res.getbody();
+                JSONParser parser = JSON.createParser(res.getbody());
+                SquareCheckout checkoutResp = (SquareCheckout) parser.readValueAs(SquareCheckout.class);
+                CheckoutURL cURL = new CheckoutURL();
+                cURL.checkout_page_url = checkoutResp.checkout.checkout_page_url;
+                cURL.order_id = checkoutResp.checkout.order.id;
+                response.responseJSON = JSON.serializePretty(cURL);
+                response.status = String.valueOf(res.getStatusCode());
+            }
+            else {
+                Map<String, Object> responseOfCheckout = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
+                List<Object> errorsList = (List<Object>)responseOfCheckout.get('errors');
+                Map<String, Object> error = (Map<String, Object>)errorsList[0];
+                response.errors.add(new ProcessorUtil.Error(error.get('code').toString(), error.get('detail').toString()));
+                APICallHandler.userInteractionLogPush(true, 'Create Checkout URL', 'ERROR' , 'Response for Square Org Name('+apcWrapper.accountName+'): Status Code: '+res.getStatusCode()+' Response Body: '+res.getBody() );
+            }
+        }
+        catch (Exception ex) {
+            response.errors.add(new ProcessorUtil.Error('Exception Occurred','An Exception occurred while creating Checkout URL. ' + ex.getMessage()));
+            System.debug('Exception occurred while creating Checkout URL' + ex.getStackTraceString());
+            APICallHandler.userInteractionLogPush(FALSE, 'Create Checkout URL', 'ERROR', 'Exception: '+ex.getMessage());
+        }
+        return response;
+    }
+    
+    public static String getLocationId(BreadwinnerUtil.AppConfig apcWrapper, String checkoutLocationId){
+        String locationId = '';
+        if (String.isNotBlank(checkoutLocationId)){
+            return checkoutLocationId;
+        }
+        try{
+            String endPoint = getEndpointBaseUrl(apcWrapper) + '/locations/main';
+            HttpResponse res = APICallHandler.getList(apcWrapper, 'GET', endPoint, '');
+            if (res.getStatusCode() == 200) {
+                JSONParser parser = JSON.createParser(res.getBody());
+                SquareLocation locationResp = (SquareLocation) parser.readValueAs(SquareLocation.Class);
+                locationId = locationResp.location.id;
+            }
+            else {
+                APICallHandler.userInteractionLogPush(true, 'Get Location Id', 'ERROR' , 'Response for Square Org Name('+apcWrapper.accountName+'): Status Code: '+res.getStatusCode()+' Response Body: '+res.getBody() );
+            }
+        }
+        catch (Exception ex) {
+            System.debug('Exception occurred while fetching Location Id' + ex.getStackTraceString());
+            APICallHandler.userInteractionLogPush(FALSE, 'Get Location Id', 'ERROR', 'Exception: '+ex.getMessage());
+        }
+        return locationId;
+    }
+
+    public static String generateRandomString(Integer len) {
+        final String chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz';
+        String randStr = '';
+        while (randStr.length() < len) {
+           Integer idx = Math.mod(Math.abs(Crypto.getRandomInteger()), chars.length());
+           randStr += chars.substring(idx, idx+1);
+        }
+        return randStr+System.now();
     }
 
     public static FetchResponse parseCustomers(String responseBody) {	
@@ -492,12 +629,9 @@ public with sharing class Processor_Square  extends Processor {
         try {
             if(String.isBlank(appConfig.customerSyncConfig) || ((String.isNotBlank(appConfig.customerSyncConfig) && (appConfig.customerSyncConfig != 'NONE')))  && appConfig.currentRunningClassContext != BreadwinnerUtil.CNTX_BWAPI)
                 processorToCustomerMap = excludeCustomers(processorToCustomerMap, appConfig);
-            //if(String.isNotBlank(appConfig.customerSyncConfig) && (appConfig.customerSyncConfig != 'NONE') && appConfig.currentRunningClassContext != 'BWAPI')
             system.debug('processorToCustomerMap'+processorToCustomerMap);
             Breadwinner_Settings__c bwSetting = BreadwinnerUtil.getBWSetting();
-            Map<String, Customer.SquareCustomer> backupsquareIdCustomerMap = new Map<String, Customer.SquareCustomer>();
             Map<String, Customer.SquareCustomer> squareIdCustomerMap = (Map<String, Customer.SquareCustomer>) processorToCustomerMap.get(ProcessorUtil.PAT_SQUARE);
-            backupsquareIdCustomerMap.putAll(squareIdCustomerMap);
 
             List<BWP_Customer__c> customerUpsertList = new List<BWP_Customer__c> ();
             Map<String, BWP_Customer__c> customerUpsertMap = new Map<String, BWP_Customer__c>();
@@ -521,7 +655,7 @@ public with sharing class Processor_Square  extends Processor {
             }
             //Holding existing Payment method records in Salesforce
             for(BWP_Payment_Method__c pm : selectorPaymentMethod.selectByProcessorId(receivedPaymentMethodIdSet,45000)) {
-                BWP_Payment_Method__c payMethod = new BWP_Payment_Method__c(id = pm.id);
+                BWP_Payment_Method__c payMethod = new BWP_Payment_Method__c(id = pm.id, Processor_Id__c = pm.Processor_Id__c);
                 existingSFPaymentMethodsMap.put(payMethod.Processor_Id__c, payMethod);
             }
 
@@ -538,20 +672,7 @@ public with sharing class Processor_Square  extends Processor {
                 if(!existingSFCustomersMap.containsKey(ContactId) || (existingSFCustomersMap.containsKey(ContactId) && existingSFCustomersMap.get(ContactId).Salesforce_Account__c == NULL && !existingSFCustomersMap.get(ContactId).No_Associated_SF_Account__c )){
                     Customer.SquareCustomer sc = squareIdCustomerMap.get(ContactId);
                     String customerName = (String.isNotBlank(sc.given_name) ? (sc.given_name + (String.isNotBlank(sc.family_name) ? (' '+sc.family_name) : '')) : (String.isNotBlank(sc.family_name) ? sc.family_name : ''));
-                    if(String.isNotBlank(customerName)){
-                        String ContactName = customerName.toLowerCase().replace('\\', '%');
-                        Set<String> relatedNameSet = BreadwinnerUtil.getSimilarAccountNameSet(ContactName);
-                        customerNameSet.addAll(relatedNameSet);
-                    }
-                    else if(String.isNotBlank(sc.email_address)){
-                        String ContactEmail = sc.email_address.toLowerCase().replace('\\', '%');
-                        Set<String> relatedNameSet = BreadwinnerUtil.getSimilarAccountNameSet(ContactEmail);
-                        customerNameSet.addAll(relatedNameSet);
-                    }
-                    if(ProcessorUtil.arePersonAccountsEnabled() && String.isNotBlank(sc.email_address)){
-                        String email = sc.email_address.toLowerCase().replace('\\', '%');
-                        customerEmailSet.add(email);
-                    }
+                    ProcessorUtil.getExistingRecordsSet(customerName, sc.email_address, customerNameSet, customerEmailSet);
                 }
             }
             
@@ -617,7 +738,7 @@ public with sharing class Processor_Square  extends Processor {
                                 BWP_Payment_Method__c srcSf =  existingSFPaymentMethodsMap.get(src.id) != null ? existingSFPaymentMethodsMap.get(src.id) : new BWP_Payment_Method__c();
                                 srcSf.Customer__r = new BWP_Customer__c(Processor_Customer_Id__c = cust.id);
                                 srcSf.Processor_Customer_Id__c = cust.id;
-                                srcSf.Account__c = String.isNotBlank(customerSf.Salesforce_Account__c) ? customerSf.Salesforce_Account__c : accID;
+                                srcSf.Salesforce_Account__c = String.isNotBlank(customerSf.Salesforce_Account__c) ? customerSf.Salesforce_Account__c : accID;
                                 srcSf = constructSquarePaymentMethod(srcSf, src, appConfig);
                                 sourcesMap.put(src.id, srcSf);
                             }
@@ -680,7 +801,6 @@ public with sharing class Processor_Square  extends Processor {
 
                 //Handle Exceptions and State&Country picklists
                 if(!mapCustomerIdAndNewSFAccount.isEmpty()){
-System.debug('syncCustomers - upsert new: ' + mapCustomerIdAndNewSFAccount);
                     Database.UpsertResult[]  ur1List = SecurityUtil.databaseUpsert(mapCustomerIdAndNewSFAccount.values());
 
                     //Handle exceptions
@@ -715,7 +835,6 @@ System.debug('syncCustomers - upsert new: ' + mapCustomerIdAndNewSFAccount);
                         }
                     }
                     system.debug(mapCustomerIdAndFailedAccounts);
-System.debug('syncCustomers - upsert failed: ' + mapCustomerIdAndNewSFAccount);
                     Database.UpsertResult[] upsertResultList = SecurityUtil.databaseUpsert(mapCustomerIdAndFailedAccounts.values());
                     // Iterate through each returned result
                     for (Database.UpsertResult ur : upsertResultList) {
@@ -793,7 +912,7 @@ System.debug('syncCustomers - upsert failed: ' + mapCustomerIdAndNewSFAccount);
                                 BWP_Payment_Method__c srcSf =  existingSFPaymentMethodsMap.get(src.id) != null ? existingSFPaymentMethodsMap.get(src.id) : new BWP_Payment_Method__c();
                                 srcSf.Customer__r = new BWP_Customer__c(Processor_Customer_Id__c = cw.id);
                                 srcSf.Processor_Customer_Id__c = cw.id;
-                                srcSf.Contact__c = String.isNotBlank(customerSf.Salesforce_Contact__c) ? customerSf.Salesforce_Contact__c : conID;
+                                srcSf.Salesforce_Contact__c = String.isNotBlank(customerSf.Salesforce_Contact__c) ? customerSf.Salesforce_Contact__c : conID;
                                 srcSf = constructSquarePaymentMethod(srcSf, src, appConfig);
                                 sourcesMap.put(src.id, srcSf);
                             }
@@ -882,9 +1001,9 @@ System.debug('syncCustomers - upsert failed: ' + mapCustomerIdAndNewSFAccount);
                                 srcSf.Customer__r = new BWP_Customer__c(Processor_Customer_Id__c = customer.id);
                                 srcSf.Processor_Customer_Id__c = customer.id;
                                 if(String.isNotBlank(customerSf.Salesforce_Account__c))
-                                    srcSf.Account__c = customerSf.Salesforce_Account__c;
+                                    srcSf.Salesforce_Account__c = customerSf.Salesforce_Account__c;
                                 if(String.isNotBlank(customerSf.Salesforce_Contact__c))
-                                    srcSf.Contact__c = customerSf.Salesforce_Contact__c;
+                                    srcSf.Salesforce_Contact__c = customerSf.Salesforce_Contact__c;
                                 srcSf = constructSquarePaymentMethod(srcSf, src, appConfig);
                                 sourcesMap.put(src.id, srcSf);
                             }
@@ -921,8 +1040,8 @@ System.debug('syncCustomers - upsert failed: ' + mapCustomerIdAndNewSFAccount);
     }
 
     //Saving the payments to SF. Orphan records will not be saved.
-    public static List<ProcessorUtil.PaymentWrapper> syncPayments(Map<String, Object> processorIdToPaymentMap, BreadwinnerUtil.AppConfig appConfig) {
-        List<ProcessorUtil.PaymentWrapper> rtnList = new List<ProcessorUtil.PaymentWrapper>();
+    public static List<ProcessorUtil.TransactionWrapper> syncTransactions(Map<String, Object> processorIdToPaymentMap, BreadwinnerUtil.AppConfig appConfig) {
+        List<ProcessorUtil.TransactionWrapper> rtnList = new List<ProcessorUtil.TransactionWrapper>();
         Map<String, Object> returnMap = new Map<String, Object>();
 
         // Map tp store the Payment Id and related Customer Id
@@ -933,14 +1052,14 @@ System.debug('syncCustomers - upsert failed: ' + mapCustomerIdAndNewSFAccount);
             return rtnList;
         }
         
-        Map<String, BWP_Payment__c> upsertMapByRefId = new Map<String, BWP_Payment__c>();
+        Map<String, BWP_Transaction__c> upsertMapByRefId = new Map<String, BWP_Transaction__c>();
 
-        Map<String,BWP_Payment__c> existingSFPaymentsMap = new Map<String,BWP_Payment__c>();
+        Map<String,BWP_Transaction__c> existingSFPaymentsMap = new Map<String,BWP_Transaction__c>();
 
-        List<BWP_Payment__c> existingList = selectorPayment.selectByProcessorId(squareIdPaymentMap.keySet(), new List<String>{'Source__r.Id'});
-        for(BWP_Payment__c payment : existingList) {
-            BWP_Payment__c pmnt = new BWP_Payment__c(id = payment.id);
-            existingSFPaymentsMap.put(pmnt.Processor_Id__c, pmnt);
+        List<BWP_Transaction__c> existingList = selectorTransaction.selectByProcessorId(squareIdPaymentMap.keySet(), new List<String>{'Source__r.Id'});
+        for(BWP_Transaction__c trxn : existingList) {
+            BWP_Transaction__c txn = new BWP_Transaction__c(id = trxn.id, Processor_Id__c = trxn.Processor_Id__c);
+            existingSFPaymentsMap.put(txn.Processor_Id__c, txn);
         }
 
         try {
@@ -953,30 +1072,36 @@ System.debug('syncCustomers - upsert failed: ' + mapCustomerIdAndNewSFAccount);
             Map<String, Map<String, String>> paymentIdToSFIdsMap = getSquarePaymentMethodIds(squareIdPaymentMap, paymentIdToCustomerIdMap);
 
             for(Charge.SquareCharge pw : squareIdPaymentMap.values()){
-                BWP_Payment__c paymentSf = existingSFPaymentsMap.get(pw.id) != null ? existingSFPaymentsMap.get(pw.id) : new BWP_Payment__c();
+                BWP_Transaction__c transactionSf = existingSFPaymentsMap.get(pw.id) != null ? existingSFPaymentsMap.get(pw.id) : new BWP_Transaction__c();
                 Map<String, String> salesforceIdMap = paymentIdToSFIdsMap.get(pw.id);
                 if (salesforceIdMap != null) {
                     try {
-                        paymentSf.Customer__c = String.isNotBlank(salesforceIdMap.get('CustomerSFId')) ? salesforceIdMap.get('CustomerSFId') : null;
-                        paymentSf.Account__c = String.isNotBlank(salesforceIdMap.get('CustomerSalesforceAccountId')) ? salesforceIdMap.get('CustomerSalesforceAccountId') : null;
-                        paymentSf.Contact__c = String.isNotBlank(salesforceIdMap.get('customerSalesforceContactId')) ? salesforceIdMap.get('customerSalesforceContactId') : null;
-                        paymentSf.Source__c = String.isNotBlank(salesforceIdMap.get('PaymentMethodSFId')) ? salesforceIdMap.get('PaymentMethodSFId') : null;
+                        transactionSf.Customer__c = String.isNotBlank(salesforceIdMap.get('CustomerSFId')) ? salesforceIdMap.get('CustomerSFId') : null;
+                        transactionSf.Salesforce_Account__c = String.isNotBlank(salesforceIdMap.get('CustomerSalesforceAccountId')) ? salesforceIdMap.get('CustomerSalesforceAccountId') : null;
+                        transactionSf.Salesforce_Contact__c = String.isNotBlank(salesforceIdMap.get('customerSalesforceContactId')) ? salesforceIdMap.get('customerSalesforceContactId') : null;
+                        transactionSf.Source__c = String.isNotBlank(salesforceIdMap.get('PaymentMethodSFId')) ? salesforceIdMap.get('PaymentMethodSFId') : null;
                     } catch (Exception ex){
                         System.debug('ex: ' + ex.getMessage());
                     }
                 }
 
-                paymentSf.Staff_Name__c = String.isNotBlank(pw.employee_id) ? (employeeIdToNameMap.get(pw.employee_id) != null ? employeeIdToNameMap.get(pw.employee_id) : '') : '';
-                paymentSf.Processor_Customer_Id__c = String.isNotBlank(pw.customer_id) ? pw.customer_id : (paymentIdToCustomerIdMap.get(pw.id) != null ? paymentIdToCustomerIdMap.get(pw.id) : '');
-                paymentSf = constructSquarePayment(paymentSf, pw, appConfig);
-                if (doNotImportCustomerAndFailedPayments && paymentSf.Payment_Status__c == ProcessorUtil.CHARGE_SUCCEEDED) {
-                    if(String.isNotBlank(paymentSf.Customer__c)){
-                        successfulPaymentsCustomerIdSet.add(paymentSf.Customer__c);
+                transactionSf.Staff_Name__c = String.isNotBlank(pw.employee_id) ? (employeeIdToNameMap.get(pw.employee_id) != null ? employeeIdToNameMap.get(pw.employee_id) : '') : '';
+                transactionSf.Processor_Customer_Id__c = String.isNotBlank(pw.customer_id) ? pw.customer_id : (paymentIdToCustomerIdMap.get(pw.id) != null ? paymentIdToCustomerIdMap.get(pw.id) : '');
+                // Used in associating the originating object value while creating a Transaction via Custom Guided Wizard
+                if(ProcessorUtil.originatingObjFieldToIdMap?.size()>0){
+                    for(String originatingObjField :ProcessorUtil.originatingObjFieldToIdMap.keySet()){
+                        transactionSf.put(originatingObjField, ProcessorUtil.originatingObjFieldToIdMap.get(originatingObjField));
                     }
                 }
-                if (String.isNotBlank(paymentSf.Customer__c) && (doNotImportCustomerAndFailedPayments ? (paymentSf.Payment_Status__c == 'SUCCEEDED' ? TRUE : FALSE) : TRUE)){
-                    //if(doNotImportCustomerAndFailedPayments ? (paymentSf.Payment_Status__c == 'COMPLETED' ? TRUE : FALSE) : TRUE){
-                    upsertMapByRefId.put(paymentSf.Processor_Id__c, paymentSf);
+                transactionSf = constructSquareTransaction(transactionSf, pw, appConfig);
+                if (doNotImportCustomerAndFailedPayments && transactionSf.Status__c == ProcessorUtil.CHARGE_SUCCEEDED) {
+                    if(String.isNotBlank(transactionSf.Customer__c)){
+                        successfulPaymentsCustomerIdSet.add(transactionSf.Customer__c);
+                    }
+                }
+                if (String.isNotBlank(transactionSf.Customer__c) && (doNotImportCustomerAndFailedPayments ? (transactionSf.Status__c == 'SUCCEEDED' ? TRUE : FALSE) : TRUE)){
+                    //if(doNotImportCustomerAndFailedPayments ? (transactionSf.Status__c == 'COMPLETED' ? TRUE : FALSE) : TRUE){
+                    upsertMapByRefId.put(transactionSf.Processor_Id__c, transactionSf);
                 }
             }
             
@@ -1063,42 +1188,41 @@ System.debug('syncCustomers - upsert failed: ' + mapCustomerIdAndNewSFAccount);
     }
     // This method is used to convert the Square Payment wrapper to Square Payment record.
     @TestVisible
-    private static BWP_Payment__c constructSquarePayment(BWP_Payment__c paymentSf, Charge.SquareCharge pw, BreadwinnerUtil.AppConfig appConfig){
-        if(paymentSf.Id == null){
-            paymentSf.Created_Via__c = BreadwinnerUtil.getCreatedViaValue(appConfig.currentRunningClassContext);
+    private static BWP_Transaction__c constructSquareTransaction(BWP_Transaction__c transactionSf, Charge.SquareCharge pw, BreadwinnerUtil.AppConfig appConfig){
+        if(transactionSf.Id == null){
+            transactionSf.Created_Via__c = BreadwinnerUtil.getCreatedViaValue(appConfig.currentRunningClassContext);
         }
-        paymentSf.Processor_Id__c = pw.id;
-        paymentSf.Location_Id__c = pw.location_id;
-        paymentSf.Processor_Type__c = appConfig.PaymentProcessorType;
-        paymentSf.Processor_Org_Id__c = appConfig.accountId;
-        paymentSf.Is_Live_Payment__c = appConfig.liveMode == TRUE ? TRUE : FALSE;
-        paymentSf.Amount__c = (pw.amount_money.amount)/100;
-        paymentSf.Currency__c = String.isNotBlank(pw.amount_money.square_currency) ? (pw.amount_money.square_currency).toUpperCase() : '';
+        transactionSf.Processor_Id__c = pw.id;
+        transactionSf.Location_Id__c = pw.location_id;
+        transactionSf.Processor_Type__c = appConfig.PaymentProcessorType;
+        transactionSf.Processor_Org_Id__c = appConfig.accountId;
+        transactionSf.Amount__c = (pw.amount_money.amount)/100;
+        transactionSf.Currency__c = String.isNotBlank(pw.amount_money.square_currency) ? (pw.amount_money.square_currency).toUpperCase() : '';
 
         if (pw.app_fee_money != null) {
-            paymentSf.Application_Fee__c = (pw.app_fee_money.amount)/100;
+            transactionSf.Application_Fee__c = (pw.app_fee_money.amount)/100;
         }
         if (pw.processing_fee != null)
-            paymentSf.Processing_Fee__c = (pw.processing_fee[0].amount_money.amount)/100;
+            transactionSf.Processing_Fee__c = (pw.processing_fee[0].amount_money.amount)/100;
         Datetime createdDateTime = (Datetime) JSON.deserialize('"' + pw.created_at + '"', Datetime.class);
-        paymentSf.Created_Date_in_Processor__c = createdDateTime;
-        paymentSf.Description__c = pw.note;
-        paymentSf.Receipt_URL__c = pw.receipt_url;
-        paymentSf.Receipt_Number__c = pw.receipt_number;
+        transactionSf.Created_Date_in_Processor__c = createdDateTime;
+        transactionSf.Description__c = pw.note;
+        transactionSf.Receipt_URL__c = pw.receipt_url;
+        transactionSf.Receipt_Number__c = pw.receipt_number;
         if (pw.refunded_money != null) {
-            paymentSf.Amount_Refunded__c = (pw.refunded_money.amount) / 100;
+            transactionSf.Amount_Refunded__c = (pw.refunded_money.amount) / 100;
         }
-        paymentSf.Payment_Status__c = (pw.status == 'COMPLETED' ? ProcessorUtil.CHARGE_SUCCEEDED : (pw.status == 'APPROVED' ? ProcessorUtil.CHARGE_APPROVED : (pw.status == 'CANCELED' ? ProcessorUtil.CHARGE_CANCELED : (pw.status == 'CANCELED' ? ProcessorUtil.CHARGE_CANCELED : ''))));
+        transactionSf.Status__c = (pw.status == 'COMPLETED' ? ProcessorUtil.CHARGE_SUCCEEDED : (pw.status == 'APPROVED' ? ProcessorUtil.CHARGE_APPROVED : (pw.status == 'CANCELED' ? ProcessorUtil.CHARGE_CANCELED : (pw.status == 'CANCELED' ? ProcessorUtil.CHARGE_CANCELED : ''))));
 
         if(pw.billing_address != null) {
-            paymentSf.Billing_Street_Address_1__c = pw.billing_address.address_line_1;
-            paymentSf.Billing_Street_Address_2__c = pw.billing_address.address_line_2;
-            paymentSf.Billing_City__c = pw.billing_address.locality;
-            paymentSf.Billing_State__c = pw.billing_address.administrative_district_level_1;
-            paymentSf.Billing_Country__c = pw.billing_address.country;
-            paymentSf.Billing_Postal_Code__c = pw.billing_address.postal_code;
+            transactionSf.Billing_Street_Address_1__c = pw.billing_address.address_line_1;
+            transactionSf.Billing_Street_Address_2__c = pw.billing_address.address_line_2;
+            transactionSf.Billing_City__c = pw.billing_address.locality;
+            transactionSf.Billing_State__c = pw.billing_address.administrative_district_level_1;
+            transactionSf.Billing_Country__c = pw.billing_address.country;
+            transactionSf.Billing_Postal_Code__c = pw.billing_address.postal_code;
         }
-        return paymentSf;
+        return transactionSf;
     }
 
     private static Map<String, Object> excludeCustomers(Map<String, Object> processorToCustomerMap, BreadwinnerUtil.AppConfig appConfig){
@@ -1269,7 +1393,7 @@ System.debug('syncCustomers - upsert failed: ' + mapCustomerIdAndNewSFAccount);
         String sfMode = BreadwinnerUtil.isLightning() ? 'lightning' : 'classic';
         String clientId = getClientId('live');
         String stateValue = '{"SFMode":"'+sfMode+'","ProMode":"live","ProType":"Square","Callback":"'+sfdcBaseURL+'/apex/'+BreadwinnerUtil.namespaceApi+'BreadwinnerPayments"}';
-        return squareAuthorizationUrl + '/authorize' + '?client_id=' + EncodingUtil.urlEncode((String.isNotBlank(clientId) ? clientId : ''),'UTF-8')+'&scope=MERCHANT_PROFILE_READ+CUSTOMERS_READ+CUSTOMERS_WRITE+PAYMENTS_READ+PAYMENTS_WRITE+EMPLOYEES_READ+ORDERS_READ&session=false&state='+stateValue;
+        return squareAuthorizationUrl + '/authorize' + '?client_id=' + EncodingUtil.urlEncode((String.isNotBlank(clientId) ? clientId : ''),'UTF-8')+'&scope=MERCHANT_PROFILE_READ+CUSTOMERS_READ+CUSTOMERS_WRITE+PAYMENTS_READ+PAYMENTS_WRITE+EMPLOYEES_READ+ORDERS_READ+ORDERS_WRITE&session=false&state='+stateValue;
     }
 
     /**
@@ -1282,10 +1406,10 @@ System.debug('syncCustomers - upsert failed: ' + mapCustomerIdAndNewSFAccount);
         String sfMode = BreadwinnerUtil.isLightning() ? 'lightning' : 'classic';
         String clientId = getClientId('test');
         String stateValue = '{"SFMode":"'+sfMode+'","ProMode":"test","ProType":"Square","Callback":"'+sfdcBaseURL+'/apex/'+BreadwinnerUtil.namespaceApi+'BreadwinnerPayments"}';
-        return squareTestAuthorizationUrl + '/authorize' + '?client_id=' + EncodingUtil.urlEncode((String.isNotBlank(clientId) ? clientId : ''),'UTF-8')+'&scope=MERCHANT_PROFILE_READ+CUSTOMERS_READ+CUSTOMERS_WRITE+PAYMENTS_READ+PAYMENTS_WRITE+EMPLOYEES_READ+ORDERS_READ&state='+stateValue;
+        return squareTestAuthorizationUrl + '/authorize' + '?client_id=' + EncodingUtil.urlEncode((String.isNotBlank(clientId) ? clientId : ''),'UTF-8')+'&scope=MERCHANT_PROFILE_READ+CUSTOMERS_READ+CUSTOMERS_WRITE+PAYMENTS_READ+PAYMENTS_WRITE+EMPLOYEES_READ+ORDERS_READ+ORDERS_WRITE&state='+stateValue;
     }
 
-    public static void saveAppCredentials(String connectionMode, BWP_Processor_Config__c config) {
+    public static BWP_Processor_Config__c saveAppCredentials(String connectionMode, BWP_Processor_Config__c config) {
         SquareTokenInfo tokenResponse = new SquareTokenInfo();
         String code = ApexPages.currentPage().getParameters().get('code');
         if(String.isNotBlank(code)){
@@ -1327,7 +1451,7 @@ System.debug('syncCustomers - upsert failed: ' + mapCustomerIdAndNewSFAccount);
                     }
                 }
             }
-            config = BreadwinnerUtil.getProcessorConfig(tokenResponse.merchant_id) != null ? BreadwinnerUtil.getProcessorConfig(tokenResponse.merchant_id) : new BWP_Processor_Config__c();
+            config = BreadwinnerUtil.getProcessorConfig(tokenResponse.merchant_id);
             config.Account_Name__c = String.isNotBlank(accountName) ? accountName : '';
             config.Default_Currency__c = String.isNotBlank(accountCurrency) ? accountCurrency : '';
             if (tokenResponse.access_token != null) {
@@ -1351,6 +1475,7 @@ System.debug('syncCustomers - upsert failed: ' + mapCustomerIdAndNewSFAccount);
         } else {
             throw new ProcessorUtil.ConnectionException('Error occurred while connecting with Square.');
         }
+        return config;
     }
 
     //This method is used to Refresh the Access Token
@@ -1488,6 +1613,26 @@ System.debug('syncCustomers - upsert failed: ' + mapCustomerIdAndNewSFAccount);
         public String expires_at;
         public String merchant_id;
         public String refresh_token;
+    }
+    //Square Checkout
+    public class SquareCheckout{
+        public CheckoutWrapper checkout;
+    }
+    public class CheckoutWrapper {
+        public String id;
+        public String checkout_page_url;
+        public squareOrderWrapper order;
+    }
+    public class CheckoutURL {
+        public String checkout_page_url;
+        public String order_id;
+    }
+    //Square Location
+    public class SquareLocation{
+        public locationWrapper location;
+    }
+    public class locationWrapper {
+        public String id; // we need only id as of now
     }
 
 }

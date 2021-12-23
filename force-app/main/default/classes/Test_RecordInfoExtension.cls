@@ -10,37 +10,37 @@ private class Test_RecordInfoExtension {
         Profile prof = [SELECT Id FROM Profile WHERE Name = 'Standard User' LIMIT 1 ];
         User user = new User(Alias = 'TestUser', Email = 'testuser@testorg.com', EmailEncodingKey = 'UTF-8', LastName = 'Testing', LanguageLocaleKey = 'en_US', LocaleSidKey = 'en_US', ProfileId = prof.Id, TimeZoneSidKey = 'America/Los_Angeles', UserName = uniqueUserName);
         insert user;
-        String adminPSName = 'Breadwinner_Payments_Admin_User';
-        List<PermissionSet> pset = [SELECT Id FROM PermissionSet WHERE Name = 'Breadwinner_Payments_Admin_User'];
+        String adminPSName = BreadwinnerUtil.ADMIN_PS_NAME;
+        List<PermissionSet> pset = [SELECT Id FROM PermissionSet WHERE Name = :BreadwinnerUtil.ADMIN_PS_NAME];
         insert new PermissionSetAssignment(AssigneeId = user.id, PermissionSetId = pset[0].Id);
     }
     @IsTest
-    private static void paymentRecordInfo() {
+    private static void TransactionRecordInfo() {
         User adminUser =  [SELECT Id FROM User WHERE Alias = 'TestUser' LIMIT 1];
         System.runAs(adminUser){
-            UnitTests.payments(1);
+            UnitTests.transactions(1);
             List<String> breadWinnerFieldsList = new List<String> ();
-            for (Schema.SObjectField field: BWP_Payment__c.sObjectType.getDescribe().fields.getMap().values()) {
+            for (Schema.SObjectField field: BWP_Transaction__c.sObjectType.getDescribe().fields.getMap().values()) {
                 breadWinnerFieldsList.add(field.getDescribe().getName());
             }
             List <String> customFields = new List<String> {
                 'Customer__r.Name', 'Customer__r.Email__c', 'Source__r.Card_Brand__c', 'Source__r.Last_4_digits__c', 'Source__r.Type__c', 'Source__r.Bank_Account_Holder_Name__c', 'Source__r.Bank_Name__c', 'Source__r.Account_Number__c'
                     };
                         
-                        BWP_Payment__c testPayment = Database.query('Select ' + String.join(breadWinnerFieldsList, ', ') + ',' + String.join(customFields, ', ') + ' FROM BWP_Payment__c LIMIT 1');
+                        BWP_Transaction__c testPayment = Database.query('Select ' + String.join(breadWinnerFieldsList, ', ') + ',' + String.join(customFields, ', ') + ' FROM BWP_Transaction__c LIMIT 1');
             //insert testPayment;
-            PageReference pageRef = Page.PaymentRecordInfo;
+            PageReference pageRef = Page.TransactionRecordInfo;
             pageRef.getParameters().put('id', String.valueOf(testPayment.Id));
             pageRef.getParameters().put('showBWLayout', 'true');
             Test.setCurrentPage(pageRef);
             Test.setMock(HttpCalloutMock.class, new UnitTests.MockHttpResponse());
             ApexPages.StandardController sc = new ApexPages.StandardController(testPayment);
-            RecordInfoExtension paymentInfo = new RecordInfoExtension(sc);
-            paymentInfo.newPMType = ProcessorUtil.PM_BANK;
-            paymentInfo.confirmnumber();
-            paymentInfo.getCurrencies();
-            paymentInfo.isChargeSuccess = true;
-            paymentInfo.renderpage();
+            RecordInfoExtension transactionInfo = new RecordInfoExtension(sc);
+            transactionInfo.newPMType = ProcessorUtil.PM_BANK;
+            transactionInfo.confirmnumber();
+            transactionInfo.getCurrencies();
+            transactionInfo.isChargeSuccess = true;
+            transactionInfo.renderpage();
             //  System.assert(paymentInfo.recordId != null);
         }
     }
@@ -173,10 +173,35 @@ private class Test_RecordInfoExtension {
             PageReference pageRef = Page.PaymentMethodRecordInfo;
             pageRef.getParameters().put('showBWLayout', 'true');
             Test.setCurrentPage(pageRef);
-            ApexPages.StandardController sc = new ApexPages.StandardController(UnitTests.paymentMethods(1)[0]);
+            BWP_Payment_Method__c pm = UnitTests.paymentMethods(1)[0];
+            BWP_Transaction__c payment = new BWP_Transaction__c();
+            payment.Source__c = pm.id;
+            payment.Amount__c = 100;
+            insert payment;
+            ApexPages.StandardController sc = new ApexPages.StandardController(pm);
             RecordInfoExtension paymentMethodInfo = new RecordInfoExtension(sc);
             BreadwinnerUtil.processorConfigList = UnitTests.createPayConfig(1, ProcessorUtil.PAT_STRIPE);
             paymentMethodInfo.config = BreadwinnerUtil.processorConfigList[0];
+        }
+    }
+    @IsTest
+    private static void customerRecordInfo() {
+        User adminUser =  [SELECT Id FROM User WHERE Alias = 'TestUser' LIMIT 1];
+        System.runAs(adminUser){
+            PageReference pageRef = Page.CustomerRecordInfo;
+            pageRef.getParameters().put('showBWLayout', 'true');
+            Test.setCurrentPage(pageRef);
+            BWP_Customer__c cust = UnitTests.customers(1)[0];
+            BWP_Transaction__c payment = new BWP_Transaction__c();
+            payment.Customer__c = cust.id;
+            payment.Amount__c = 100;
+            payment.Created_Date_in_Processor__c = System.today();
+            payment.Currency__c = 'USD';
+            insert payment;
+            ApexPages.StandardController sc = new ApexPages.StandardController(cust);
+            RecordInfoExtension custInfo = new RecordInfoExtension(sc);
+            BreadwinnerUtil.processorConfigList = UnitTests.createPayConfig(1, ProcessorUtil.PAT_STRIPE);
+            custInfo.config = BreadwinnerUtil.processorConfigList[0];
         }
     }
     @IsTest
@@ -189,13 +214,10 @@ private class Test_RecordInfoExtension {
             RecordInfoExtension recordInfo = new RecordInfoExtension(sc);
             recordInfo.confirmnumber();
             recordInfo.getCurrencies();
-            List<SelectOption> PaymentMethodOptions = RecordInfoExtension.PaymentMethodOptions;
+            List<SelectOption> PaymentMethodOptions = recordInfo.getPaymentMethodOptions();
             Boolean canCreatePaymentMethod = recordInfo.canCreatePaymentMethod(ProcessorUtil.PAT_STRIPE);
-            Boolean hasMultiplePmTypes = RecordInfoExtension.hasMultiplePmTypes(ProcessorUtil.PAT_STRIPE);
-            Boolean canCreatePayment = recordInfo.canCreatePayment(ProcessorUtil.PAT_STRIPE);
+            Boolean canCreateTransaction = recordInfo.canCreateTransaction(ProcessorUtil.PAT_STRIPE);
             Boolean canUpdateCustomer = recordInfo.canUpdateCustomer(ProcessorUtil.PAT_STRIPE);
-            String bankAuthMessage = RecordInfoExtension.bankAuthMessage();
-            String authorizeBankMessage =  RecordInfoExtension.authorizeBankMessage(customer);
         }
     }
     @IsTest

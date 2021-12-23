@@ -259,4 +259,63 @@ public class Charge {
         public String postal_code;
     }
   	//End PayPal Response
+
+      // Responses returned from Authoize.Net when fetching Transaction Batch Ids
+  	
+    public class AuthNetBatchResp{
+        public List<AuthNetBatchList> batchList;
+        public Messages messages;
+    }
+    
+	public class AuthNetBatchList {
+		public String batchId;
+		public String settlementTimeUTC;
+		public Boolean settlementTimeUTCSpecified;
+		public String settlementTimeLocal;
+		public Boolean settlementTimeLocalSpecified;
+		public String settlementState;
+		public String paymentMethod;
+	}
+     // AuthNet Transaction Response Wrapper
+     public class AuthNetTransaction {
+		public String transId;
+		public String submitTimeUTC;
+		public String submitTimeLocal;
+		public String transactionStatus;
+		public String accountType;
+		public String accountNumber;
+		public Double settleAmount;
+		public Boolean hasReturnedItems;
+		public String firstName;
+		public String lastName;
+		public AuthNetProfile profile;
+		public String invoiceNumber;
+		public AuthNetSubscription subscription;
+	}
+
+    public class AuthNetTransactions{
+        public List<AuthNetTransaction> transactions;
+        public Integer totalNumInResultSet;
+        public Messages messages;
+    }
+    	
+	public class AuthNetSubscription {
+		public Integer id;
+		public Integer payNum;
+	}
+
+	public class AuthNetProfile {
+		public String customerProfileId;
+		public String customerPaymentProfileId;
+	}
+
+    public class Messages {
+		public String resultCode;
+		public List<Message> message;
+	}
+    
+    public class Message {
+		public String code;
+		public String text;
+	}
 }

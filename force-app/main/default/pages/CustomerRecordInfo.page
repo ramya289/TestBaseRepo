@@ -6,15 +6,15 @@
             <title>Breadwinner Customer Record</title>
             <meta name="viewport" content="width=device-width, initial-scale=1" />
             <apex:slds />
-
-            <script type="text/javascript" src="{!IF(config.Live_Mode__c, 'https://web.squarecdn.com/v1/square.js', 'https://sandbox.web.squarecdn.com/v1/square.js')}"></script>
-
-            <script src="{!URLFOR($Resource.Breadwinner_Payments,'Breadwinner_Payments/js/jquery-3.3.1.min.js')}"></script>
-            <!-- These next two are used to search the currency and payment methods from the picklist
-                We will have to pull these into the static resource before our next security review
-             -->
-            <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.3/css/select2.min.css" rel="stylesheet" />
-            <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.3/js/select2.min.js"></script>
+            <!-- We cannot store Stripe JS in Static Resources as Stripe won't support it (https://breadwinner.atlassian.net/browse/BWP-135). -->
+            <script src="https://js.stripe.com/v3/"></script>
+            <script type="text/javascript" src="{!IF(config.Live_Mode__c, URLFOR($Resource.Breadwinner_Payments,'Breadwinner_Payments/js/square.js'), URLFOR($Resource.Breadwinner_Payments,'Breadwinner_Payments/js/square-sandbox.js'))}"></script>
+            <script src="{!URLFOR($Resource.Breadwinner_Payments,'Breadwinner_Payments/js/braintree-dropin-1.31.1.min.js')}"></script>
+            <script src="{!URLFOR($Resource.Breadwinner_Payments,'Breadwinner_Payments/js/jquery-3.5.1.min.js')}"></script>
+            <script src="{!URLFOR($Resource.Breadwinner_Payments,'Breadwinner_Payments/js/createCard.js')}"></script>
+            
+            <link href="{!URLFOR($Resource.Breadwinner_Payments,'Breadwinner_Payments/css/select2-4.0.13.min.css')}" rel="stylesheet" />
+            <script src="{!URLFOR($Resource.Breadwinner_Payments,'Breadwinner_Payments/js/select2-4.0.13.full.min.js')}"></script>
             <apex:variable value="{!OR($User.UIThemeDisplayed == 'Theme4d', $User.UIThemeDisplayed == 'Theme4t')}" var="isLightning" />
             <script type="text/javascript">
             j$ = jQuery.noConflict();
@@ -23,7 +23,6 @@
                 j$('title')[0].innerText = '{!IF(Customer.Customer_Name__c != null, JSENCODE(Customer.Customer_Name__c) + ' | ' + JSENCODE(customer.Processor_Type__c), JSENCODE(customer.Processor_Type__c) + ' Customer')}';
                 j$('[id$=paymentCurrencies]').select2();
                 message();
-                resetPMDefaultValues();
             });
             
             j$(document).keydown (
@@ -116,7 +115,19 @@
                 showModal('messageModal', 'messageBackdrop', 'deleteMessage', '');
                 //  reRenderModalCancelSVGIcons('paymentsuccessCancelIcon');
             }
-
+            function createCardForm(processorType){
+                var cardCreationKey = '{!JSENCODE(cardCreationKey)}';
+                if(processorType == 'Stripe'){
+                    stripeCreateCardForm(cardCreationKey);
+                }
+                else if(processorType == 'Square'){
+                    squareCreateCardForm(cardCreationKey, '');
+                }
+                else if(processorType == 'Braintree'){
+                    braintreeCreateCardForm(cardCreationKey);
+                }
+            }
+          
             function HideStyleSheet() {
                 j$("link.user[href$='elements.css']").each(function() {
                     j$(this).removeAttr("href");
@@ -188,7 +199,7 @@
                         var amount = chargeAmount > 0 ? (' for '+chargeAmount.toFixed(2)+' '+currency.toUpperCase()) : '';
                     }
                     console.log(amount);
-                    j$("[id$=PaymentCraeteBtn]").val('Charge '+cardOrBankAccount+''+amount);
+                    j$("[id$=PaymentCreateBtn]").val('Charge '+cardOrBankAccount+''+amount);
                     j$("[id$=PaymentCreateBtnSquare]").val('Charge '+cardOrBankAccount+''+amount);
                 }
                 
@@ -730,14 +741,14 @@
                                                     <apex:commandButton value="Edit this Customer" status="assign-action-status" rendered="{!canUpdateCustomer}" onclick="showModal('ceModal','ceBackdrop');rerenderEditCustomerErrors();" styleClass="slds-button slds-button_brand slds-m-top_x-small slds-m-right_x-small" reRender="editCustmr" disabled="{!!isCustomerRelatedOrgConnected}" />
                                                 </div>
                                                 <div class="slds-col paddingtop">
-                                                    <apex:commandButton id="createPM" value="Create Payment Method" status="assign-action-status" rendered="{!canCreatePaymentMethod}" action="{!renderPMpage}" onclick="showModal('PMModal','PMtsBackdrop','deleteMessage','paymentMethod');rerenderPMErrors();message();" oncomplete="{!IF(customer.Processor_Type__c == 'Square','createCardForm();','')}reRenderCollapsibleSVGIcons();message();resetCardOptionsValues();" styleClass="slds-button slds-button_brand slds-m-top_x-small slds-m-right_x-small" reRender="paymentMedthodType, CardElements, paymentMethodErrors, BankAccountElements, readOnlyMessage" disabled="{!!isCustomerRelatedOrgConnected}">
+                                                    <apex:commandButton id="createPM" value="Create Payment Method" status="assign-action-status" rendered="{!canCreatePaymentMethod}" action="{!renderPMpage}" onclick="showModal('PMModal','PMtsBackdrop','deleteMessage','paymentMethod');rerenderPMErrors();message();" oncomplete="createCardForm('{!customer.Processor_Type__c}');reRenderCollapsibleSVGIcons();message();resetCardOptionsValues();" styleClass="slds-button slds-button_brand slds-m-top_x-small slds-m-right_x-small" reRender="pmSection, paymentMedthodType, CardElements, paymentMethodErrors, BankAccountElements, readOnlyMessage" disabled="{!!isCustomerRelatedOrgConnected}">
                                                         <apex:param assignTo="{!newPMType}" value="card" id="pmType" />
                                                         <apex:param assignTo="{!cardPanel}" value="true" id="cardPanel" />
                                                         <apex:param assignTo="{!BankPanel}" value="false" id="bankPanel" />
                                                     </apex:commandButton>
                                                 </div>
                                                 <div class="slds-col paddingtop">
-                                                    <apex:commandButton id="createPayment" status="assign-action-status" rendered="{!canCreatePayment}" value="Charge this Customer" action="{!renderpage}" onclick="showModal('tsModal','tsBackdrop','deleteMessage','payment');rerenderPaymentValues();message();" oncomplete="message();" styleClass="slds-button slds-button_brand slds-m-top_x-small slds-m-right_x-small" reRender="chargeSection,paymentButtonsSection, chargeAmount" disabled="{!OR(!isCustomerRelatedOrgConnected, allPaymentsMethodsList.size == 0)}" />
+                                                    <apex:commandButton id="createPayment" status="assign-action-status" rendered="{!canCreateTransaction}" value="Charge this Customer" action="{!renderpage}" onclick="showModal('tsModal','tsBackdrop','deleteMessage','payment');rerenderPaymentValues();message();" oncomplete="message();" styleClass="slds-button slds-button_brand slds-m-top_x-small slds-m-right_x-small" reRender="chargeSection,paymentButtonsSection, chargeAmount" disabled="{!OR(!isCustomerRelatedOrgConnected, allPaymentsMethodsList.size == 0)}" />
                                                 </div>
                                             </div>
                                         </div>
@@ -745,7 +756,7 @@
                                 </div>
                             </div>
                             <div>
-                                <apex:outputPanel layout="block" styleClass="slds-card__footer slds-m-top_none" style="text-align:left;">
+                                <apex:outputPanel layout="block" styleClass="slds-card__footer slds-m-top_none" style="text-align:left;" rendered="{!customer.Processor_Type__c != 'Authorize.Net'}">
                                     <p>Customer was created on &nbsp;
                                         <apex:outputField value="{!customer.Created_Date_in_Processor__c}" />
                                     </p>
@@ -887,7 +898,7 @@
                                                 <label class="slds-form-element__label" for="chargingPaymentMethod">Payment Method Type</label>
                                                 <div class="slds-select_container">
                                                     <apex:selectList value="{!newPMType}" size="1" styleClass="slds-select" id="chooseType" >
-                                                        <apex:actionSupport event="onchange" action="{!changingPM}" status="assign-action-status" reRender="CardElements, BankAccountElements, paymentMethodErrors, readOnlyMessage" oncomplete="message();reRenderCollapsibleSVGIcons();resetCardOptionsValues();resetBankAccountValues();" />
+                                                        <apex:actionSupport event="onchange" action="{!changingPM}" status="assign-action-status" reRender="CardElements, BankAccountElements, paymentMethodErrors, readOnlyMessage" oncomplete="createCardForm('{!customer.Processor_Type__c}');message();reRenderCollapsibleSVGIcons();resetCardOptionsValues();resetBankAccountValues();" />
                                                         <apex:selectOptions value="{!paymentMethodOptions}"/>
                                                     </apex:selectList>
                                                 </div>
@@ -897,42 +908,9 @@
                                             <apex:outputPanel rendered="{!cardPanel}">
                                                 <div class="slds-form-element">                                                                
                                                     <apex:outputPanel rendered="{!customer.Processor_Type__c == 'Stripe'}">     
-                                                        <!--div id="card-element" style="border: 1px solid rgb(221, 219, 218);margin-top: 1.0rem;"/>     <!-- Add Card Details here  -->
-                                                        <!--div id="card-errors"  style="padding-top:10px; color:red;"/>    <!-- display card errors here  -->
-                                                        <apex:outputPanel styleClass="slds-form-element slds-m-bottom_xx-small slds-m-top_xx-small" layout="block" id="cardHolderNumberSection">
-                                                            <label class="slds-form-element__label" for="cardNumber">Card Number</label>
-                                                            <div class="slds-form-element__control">
-                                                                <apex:inputText styleClass="slds-input" value="{!cardNumber}" id="cardNumber" onkeypress="return validateFloatKeyPress(this,window.event)"/>
-                                                            </div>
-                                                        </apex:outputPanel>
-                                                        <apex:outputPanel >
-                                                            <div class="slds-grid slds-glutters">
-                                                                <div class="slds-col slds-size_1-of-1 slds-medium-size_3-of-3 slds-large-size_1-of-3">
-                                                                    <apex:outputPanel styleClass="slds-form-element slds-m-bottom_xx-small" layout="block">
-                                                                        <label class="slds-form-element__label" for="expiryMonth">Expiry Month</label>
-                                                                        <div class="slds-form-element__control">
-                                                                            <apex:inputText styleClass="slds-input" value="{!cardExpiryMonth}" id="expiryMonth" onkeypress="return validateFloatKeyPress(this,window.event)"/>
-                                                                        </div>
-                                                                    </apex:outputPanel>
-                                                                </div>
-                                                                <div class="slds-col slds-size_1-of-1 slds-medium-size_3-of-3 slds-large-size_1-of-3">
-                                                                    <apex:outputPanel styleClass="slds-form-element slds-m-bottom_xx-small slds-p-left_small" layout="block">
-                                                                        <label class="slds-form-element__label" for="expiryMonth">Expiry Year</label>
-                                                                        <div class="slds-form-element__control">
-                                                                            <apex:inputText styleClass="slds-input" value="{!cardExpiryYear}" id="expiryYear" onkeypress="return validateFloatKeyPress(this,window.event)"/>
-                                                                        </div>
-                                                                    </apex:outputPanel>
-                                                                </div>
-                                                                <div class="slds-col slds-size_1-of-1 slds-medium-size_3-of-3 slds-large-size_1-of-3">
-                                                                    <apex:outputPanel styleClass="slds-form-element slds-m-bottom_xx-small slds-p-left_small" layout="block">
-                                                                        <label class="slds-form-element__label" for="cvc">CVC</label>
-                                                                        <div class="slds-form-element__control">
-                                                                            <apex:inputText styleClass="slds-input" value="{!cardCVC}" id="cvc" onkeypress="return validateFloatKeyPress(this,window.event)"/>
-                                                                        </div>
-                                                                    </apex:outputPanel>
-                                                                </div>
-                                                            </div>
-                                                        </apex:outputPanel>
+                                                        <div id="card-element" style="border: 1px solid rgb(221, 219, 218);margin-top: 1.0rem;"/>     <!-- Add Card Details here  -->
+                                                        <div id="card-errors"  style="padding-top:10px; color:red;"/>    <!-- display card errors here  -->
+                                                       
                                                         <div id="moreoptions">
                                                             <div class="slds-section" id="moreOptionsSectionHeader">
                                                                 <h3 class="slds-section__title ">
@@ -991,38 +969,7 @@
                                                         </div>
                                                     </apex:outputPanel>
                                                     <apex:outputPanel rendered="{!customer.Processor_Type__c == 'Braintree'}">  
-                                                        <apex:outputPanel styleClass="slds-form-element slds-m-bottom_xx-small slds-m-top_xx-small" layout="block" id="braintreeCardholderNameSection">
-                                                            <label class="slds-form-element__label" for="braintreeCardholderName">Cardholder Name</label>
-                                                            <div class="slds-form-element__control">
-                                                                <apex:inputText styleClass="slds-input" value="{!cardHolderName}" id="braintreeCardholderName" />
-                                                            </div>
-                                                        </apex:outputPanel>
-                                                        <apex:outputPanel styleClass="slds-form-element slds-m-bottom_xx-small slds-m-top_xx-small" layout="block" id="braintreeCardNumberSection">
-                                                            <label class="slds-form-element__label" for="braintreeCardNumber">Card Number</label>
-                                                            <div class="slds-form-element__control">
-                                                                <apex:inputText styleClass="slds-input" value="{!cardNumber}" id="braintreeCardNumber" onkeypress="return validateFloatKeyPress(this,window.event)"/>
-                                                            </div>
-                                                        </apex:outputPanel>  
-                                                        <apex:outputPanel >
-                                                            <div class="slds-grid slds-glutters">
-                                                                <div class="slds-col slds-size_1-of-1 slds-medium-size_2-of-2 slds-large-size_1-of-2">
-                                                                    <apex:outputPanel styleClass="slds-form-element slds-m-bottom_xx-small" layout="block">
-                                                                        <label class="slds-form-element__label" for="expiryMonth">Expiry Month</label>
-                                                                        <div class="slds-form-element__control">
-                                                                            <apex:inputText styleClass="slds-input" value="{!cardExpiryMonth}" onkeypress="return validateFloatKeyPress(this,window.event)" id="braintreeExpiryMonth"/>
-                                                                        </div>
-                                                                    </apex:outputPanel>
-                                                                </div>
-                                                                <div class="slds-col slds-size_1-of-1 slds-medium-size_2-of-2 slds-large-size_1-of-2">
-                                                                    <apex:outputPanel styleClass="slds-form-element slds-m-bottom_xx-small slds-p-left_small" layout="block">
-                                                                        <label class="slds-form-element__label" for="expiryMonth">Expiry Year</label>
-                                                                        <div class="slds-form-element__control">
-                                                                            <apex:inputText styleClass="slds-input" value="{!cardExpiryYear}" onkeypress="return validateFloatKeyPress(this,window.event)" id="braintreeExpiryYear"/>
-                                                                        </div>
-                                                                    </apex:outputPanel>
-                                                                </div>
-                                                            </div>
-                                                        </apex:outputPanel>
+                                                        <div id="dropin-container"></div>
                                                     </apex:outputPanel> 
                                                     <apex:outputPanel rendered="{!customer.Processor_Type__c == 'Square'}">
 
@@ -1085,79 +1032,6 @@
                                                                 </apex:outputPanel>
                                                             </div>
                                                         </div>
-                                                        <script type="text/javascript">
-                                                            const appId = '{!JSENCODE(applicationId)}';
-                                                            const locationId = '';
-                                                            var card_info;
-
-                                                            async function createCardForm(){
-                                                                if (!window.Square) {
-                                                                    throw new Error('Square.js failed to load properly');
-                                                                }
-
-                                                                const payments = window.Square.payments(appId, locationId);
-                                                                try {
-                                                                    card_info = await initializeCard(payments);
-                                                                    console.log('card initialization was succesful ::: ');
-                                                                } catch (e) {
-                                                                    console.error('Initializing Card failed', e);
-                                                                    return;
-                                                                }
-                                                            }
-
-                                                            async function generateCardToken(){
-                                                                try{
-                                                                    const token = await tokenize(card_info);
-                                                                }catch(e){
-                                                                    console.log('e ::::: ',e.message);
-                                                                }
-                                                            }
-
-                                                            async function initializeCard(payments) {
-                                                                const card = await payments.card();
-                                                                await card.attach('#card-container'); 
-                                                                return card; 
-                                                            }
-
-                                                            // This function tokenizes a payment method.
-                                                            async function tokenize(paymentMethod) {
-                                                                const tokenResult = await paymentMethod.tokenize();
-                                                                if (tokenResult.status === 'OK') {
-                                                                    j$("[id$=PMTokenValue]").val(tokenResult.token);
-                                                                    var token = j$("[id$=PMTokenValue]").val();
-                                                                    console.log('--token generated--');
-                                                                    if(token!=null) processtoken(token, '');
-                                                                    return tokenResult.token;
-                                                                } else {
-                                                                    let squareErrors = '';
-                                                                    let count = 0;
-                                                                    for(let tr of tokenResult.errors){
-                                                                        squareErrors += ' '+ tr.message + (count++ < tokenResult.errors.length-2 ? ',' : ' and');
-                                                                    }
-                                                                    squareErrors = squareErrors.substr(0,squareErrors.length-3);
-                                                                    console.log('--squareErrors--'+squareErrors);
-                                                                    j$("[id$=squareCardErrors]").val(squareErrors);
-                                                                    var errors = j$("[id$=squareCardErrors]").val();
-                                                                    if(errors!=null) processtoken('', errors);
-                                                                    return;
-                                                                }
-                                                            }
-                                                            
-                                                            function uuidv4() {
-                                                                return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-                                                                    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-                                                                    return v.toString(16);
-                                                                });
-                                                            }
-
-                                                            function setIdempotencyKey(){
-                                                                const idempotency_key = uuidv4();
-                                                                j$("[id$=idempotencyKey]").val(idempotency_key);
-                                                                var idempotencyKey = j$("[id$=idempotencyKey]").val();
-                                                                console.log('--idempotencyKey--'+idempotencyKey);
-                                                                if(idempotencyKey!=null) processKey();
-                                                            }
-                                                        </script>
                                                     </apex:outputPanel>
                                                 </div>
                                             </apex:outputPanel>
@@ -1186,13 +1060,13 @@
                                                         <label class="slds-form-element__label" for="AccountNumber">Account Number</label>
                                                         <div class="slds-form-element__control ">
                                                             <apex:inputText value="{!bankPMAccountNumber}" styleClass="slds-input" id="stripeAccountNumber">
-                                                                <apex:actionSupport event="onchange" action="{!confirmnumber}" reRender="unmatchacc, PaymentCraeteBtn2" oncomplete="stripeInit();"/>
+                                                                <apex:actionSupport event="onchange" action="{!confirmnumber}" reRender="unmatchacc, createBankAccountBtn" />
                                                             </apex:inputText>
                                                         </div>
                                                         <label class="slds-form-element__label" for="AccountNumber">Confirm Account Number</label>
                                                         <div class="slds-form-element__control ">
                                                             <apex:inputText value="{!bankPMConfirmAccountNumber}" styleClass="slds-input" id="confirmAccountNumber">
-                                                                <apex:actionSupport event="onchange" action="{!confirmnumber}" reRender="unmatchacc, PaymentCraeteBtn2" oncomplete="stripeInit();"/>
+                                                                <apex:actionSupport event="onchange" action="{!confirmnumber}" reRender="unmatchacc, createBankAccountBtn" />
                                                             </apex:inputText>
                                                         </div>
                                                         <apex:outputPanel id="unmatchacc">
@@ -1300,25 +1174,25 @@
                                                 <div align="center">
                                                     <apex:outputPanel layout="block" id="paymentMethodErrors" styleClass="slds-m-top_x-small">
                                                         <apex:outputText rendered="{!!isPaymentMethodCreated}" style="color:red">
-                                                            <p class="slds-text-body_regular" style="background-color: white; color: red; padding-right: 5px;">{!PMmessage}</p>
+                                                            <p class="slds-text-body_regular" id="pmMessage" style="background-color: white; color: red; padding-right: 5px;">{!IF(PMmessage != '', PMmessage, IF(OR(editCustomerErrors != NULL, !isPaymentMethodCreated), editCustomerErrors, ''))}</p>
                                                         </apex:outputText>
                                                     </apex:outputPanel>
                                                 </div>
                                             </div>
                                             <apex:inputHidden id="PMTokenValue" value="{!PMTokenValue}" />
                                             <apex:inputHidden id="squareCardErrors" value="{!squareCardErrors}" />
+                                            <apex:actionfunction status="assign-action-status" name="processtoken" reRender="btns, paymentMethodErrors, messageModalPanel2" action="{!createPaymentMethod}" oncomplete="{!if(isPaymentMethodCreated, 'PMshowmsgPannel2();','')}">
+                                                <apex:param name="firstParam" assignTo="{!PMTokenValue}" value="" />
+                                                <apex:param name="secondParam" assignTo="{!squareCardErrors}" value="" />
+                                            </apex:actionfunction>
                                             <div align="center" class="">
                                                 <apex:outputPanel id="btns">
-                                                    <apex:actionfunction status="assign-action-status" name="processtoken" reRender="btns, paymentMethodErrors, messageModalPanel2" action="{!createPaymentMethod}" oncomplete="{!if(isPaymentMethodCreated, 'PMshowmsgPannel2();','')}">
-                                                        <apex:param name="firstParam" assignTo="{!PMTokenValue}" value="" />
-                                                        <apex:param name="secondParam" assignTo="{!squareCardErrors}" value="" />
-                                                    </apex:actionfunction>
-                                                    <apex:commandButton value="Add Card" onclick="generateCardToken();disableAddButtons();" reRender="btns,paymentMethodErrors" styleClass="disableMe-Onlick btns slds-button slds-button_brand slds-m-top_medium" disabled="{!OR((AND(PMTokenValue!=null,ISBLANK(PMTokenValue))), isBreadwinnerReadOnlyMode)}" id="TokenIdbtn" rendered="{!AND(cardPanel, customer.Processor_Type__c == 'Square')}"/>
-                                                    <apex:commandButton value="Add Card" status="assign-action-status" action="{!createPaymentMethod}" reRender="btns, paymentMethodErrors, messageModalPanel2" styleClass="disableMe-Onlick btns slds-button slds-button_brand slds-m-top_medium" disabled="{!isBreadwinnerReadOnlyMode}" rendered="{!AND(cardPanel, customer.Processor_Type__c != 'Square')}" oncomplete="{!if(isPaymentMethodCreated, 'PMshowmsgPannel2();','')}"/>
-                                                    <apex:commandbutton id="PaymentCraeteBtn2" status="assign-action-status" styleClass="btns slds-button slds-button_brand slds-m-top_medium" value="{!if(bankPanel,'Add Bank Account','Add Card')}"  onclick="addPM"  reRender="messageModalPanel2,BankAccountElements, paymentMethodErrors, cardsList, bankAccountsList" oncomplete="{!if(isPaymentMethodCreated, 'PMshowmsgPannel2();','')}" rendered="{!OR(bankPanel)}" action="{!createPaymentMethod}" disabled="{!OR(isBreadwinnerReadOnlyMode, unMatchedAccount)}"/>
-                                                    <apex:commandbutton id="BAnktsOKCancelBtn3" styleClass="btns slds-button slds-button_neutral slds-m-left_xx-small slds-m-top_medium" value="Cancel" onclick="closeModal('PMModal','PMtsBackdrop');resetCardOptionsValues();resetBankAccountValues();" reRender="BankAccountElements, createPMForm, chooseType, moreOptionsOutputPanelSection" style="width:70px;" action="{!renderPMpage}" />
-                                                    <apex:actionFunction name="addPM" reRender=" messageModalPanel2"/>
-                                                    <apex:actionFunction name="updateCustomerDetails" action="{!fetchCustomerRelatedPaymentMethods}" reRender="none"/>
+                                                    <apex:outputPanel rendered="{!AND(cardPanel, customer.Processor_Type__c == 'Braintree')}">
+                                                        <button id="submit-button" type="button" status="assign-action-status" class="slds-button slds-button_brand slds-m-top_medium">Add Card</button>
+                                                    </apex:outputPanel>
+                                                    <apex:commandButton value="Add Card" onclick="{!IF(customer.Processor_Type__c == 'Stripe', 'stripeValidateCard()', 'generateCardToken()')};disableAddButtons();" reRender="btns,paymentMethodErrors" styleClass="disableMe-Onlick btns slds-button slds-button_brand slds-m-top_medium" disabled="{!OR((AND(PMTokenValue!=null,ISBLANK(PMTokenValue))), isBreadwinnerReadOnlyMode)}" id="TokenIdbtn" rendered="{!AND(cardPanel, OR(customer.Processor_Type__c == 'Stripe', customer.Processor_Type__c == 'Square'))}"/>
+                                                    <apex:commandbutton value="Add Bank Account" id="createBankAccountBtn" status="assign-action-status" styleClass="btns slds-button slds-button_brand slds-m-top_medium" reRender="messageModalPanel2,BankAccountElements, paymentMethodErrors, cardsList, bankAccountsList" oncomplete="{!if(isPaymentMethodCreated, 'PMshowmsgPannel2();','')}" rendered="{!OR(bankPanel)}" action="{!createPaymentMethod}" disabled="{!OR(isBreadwinnerReadOnlyMode, unMatchedAccount)}"/>
+                                                    <apex:commandbutton value="Cancel" styleClass="btns slds-button slds-button_neutral slds-m-left_xx-small slds-m-top_medium" onclick="closeModal('PMModal','PMtsBackdrop');resetCardOptionsValues();resetBankAccountValues();" reRender="BankAccountElements, createPMForm, chooseType, moreOptionsOutputPanelSection" style="width:70px;" action="{!renderPMpage}" />
                                                 </apex:outputPanel>
                                             </div>
                                         </apex:outputPanel>
@@ -1429,7 +1303,7 @@
                                                 <apex:actionFunction name="rerenderValues" id="rerenderValues" action="{!renderpage}" rerender="paymentButtonsSection" />
                                                 <apex:outputPanel layout="block" styleClass="slds-text-align_center" id="paymentButtonsSection">
                                                     <apex:commandbutton id="PaymentCreateBtnSquare" status="assign-action-status" styleClass="btns slds-button slds-button_brand slds-m-top_medium" value="Charge {!payMethod.Card_Brand__c} Card {!If(AND(chargeAmount != NULL, chargeAmount > 0), 'for ','')} {!If(AND(chargeAmount != NULL, chargeAmount > 0),ROUND(chargeAmount, 2), null)} {!If(AND(chargeAmount != NULL, chargeAmount > 0), ' '+UPPER(selectedCurrency), '')} " onclick="setIdempotencyKey();" action="{!chargeCustomer}" reRender="messageModalPanel, invalidValues" oncomplete="{!if(isChargeSuccess, 'showmsgPannel();','')}"  rendered="{!AND(customer.Processor_Type__c == 'Square')}"  disabled="{!OR(isBreadwinnerReadOnlyMode, allPaymentsMethodsList.size<=0)}"/>
-                                                    <apex:commandbutton id="PaymentCraeteBtn" status="assign-action-status" styleClass="btns slds-button slds-button_brand slds-m-top_medium" value="Charge {!If(payMethod.Type__c == 'Card', payMethod.Card_Brand__c+' Card', 'Bank Account')} {!If(AND(chargeAmount != NULL, chargeAmount > 0), 'for ','')} {!If(AND(chargeAmount != NULL, chargeAmount > 0),ROUND(chargeAmount, 2), null)} {!If(AND(chargeAmount != NULL, chargeAmount > 0), ' '+UPPER(selectedCurrency), '')} " action="{!chargeCustomer}" reRender="messageModalPanel, invalidValues" oncomplete="{!if(isChargeSuccess, 'showmsgPannel();','')}" rendered="{!AND(customer.Processor_Type__c != 'Square')}" disabled="{!OR(isBreadwinnerReadOnlyMode, allPaymentsMethodsList.size<=0)}"/>
+                                                    <apex:commandbutton id="PaymentCreateBtn" status="assign-action-status" styleClass="btns slds-button slds-button_brand slds-m-top_medium" value="Charge {!If(payMethod.Type__c == 'Card', payMethod.Card_Brand__c+' Card', 'Bank Account')} {!If(AND(chargeAmount != NULL, chargeAmount > 0), 'for ','')} {!If(AND(chargeAmount != NULL, chargeAmount > 0),ROUND(chargeAmount, 2), null)} {!If(AND(chargeAmount != NULL, chargeAmount > 0), ' '+UPPER(selectedCurrency), '')} " action="{!chargeCustomer}" reRender="messageModalPanel, invalidValues" oncomplete="{!if(isChargeSuccess, 'showmsgPannel();','')}" rendered="{!AND(customer.Processor_Type__c != 'Square')}" disabled="{!OR(isBreadwinnerReadOnlyMode, allPaymentsMethodsList.size<=0)}"/>
                                                     <apex:commandbutton id="tsOKCancelBtn" styleClass="btns slds-button slds-button_neutral slds-m-left_xx-small slds-m-top_medium" value="Cancel" onclick="closeModal('tsModal','tsBackdrop');closeModal('messageModal','messageBackdrop');" reRender="chargeAmount, invalidValues, chargingAmount, chargingDescription, PMList, paymentDetailsSection" style="width:70px;" action="{!renderpage}" oncomplete="rerenderPaymentValues();"/>
                                                 </apex:outputPanel>
 
@@ -1464,12 +1338,12 @@
                                                     <apex:outputText rendered="{!isChargeSuccess}">
                                                         The Payment was successfully processed by {!customer.Processor_Type__c}<apex:outputText rendered="{!(customer.Customer_Name__c != NULL)}">, and "{!customer.Customer_Name__c}" was charged 
                                                         <apex:outputText value="{0, number, ###,###,##0}" rendered="{!if((selectedCurrency='bif'||selectedCurrency='clp'||selectedCurrency='djf'||selectedCurrency='gnf'||selectedCurrency='jpy'||selectedCurrency='kmf'||selectedCurrency='krw'||selectedCurrency='mga'||selectedCurrency='pyg'||selectedCurrency='rwf'||selectedCurrency='ugx'||selectedCurrency='vnd'||selectedCurrency='vuv'||selectedCurrency='xaf'||selectedCurrency='xof'||selectedCurrency='xpf'), true,false)}">
-                                                            <apex:param value="{!createdPaymentInfo.Amount__c}" />
+                                                            <apex:param value="{!createdTransactionInfo.Amount__c}" />
                                                         </apex:outputText>
                                                         <apex:outputText value="{0, number, ###,###,##0.00}" rendered="{!if((selectedCurrency='bif'||selectedCurrency='clp'||selectedCurrency='djf'||selectedCurrency='gnf'||selectedCurrency='jpy'||selectedCurrency='kmf'||selectedCurrency='krw'||selectedCurrency='mga'||selectedCurrency='pyg'||selectedCurrency='rwf'||selectedCurrency='ugx'||selectedCurrency='vnd'||selectedCurrency='vuv'||selectedCurrency='xaf'||selectedCurrency='xof'||selectedCurrency='xpf'), false,true)}">
-                                                            <apex:param value="{!createdPaymentInfo.Amount__c}" />
+                                                            <apex:param value="{!createdTransactionInfo.Amount__c}" />
                                                         </apex:outputText>
-                                                        </apex:outputText>. You can see this Payment in Salesforce at <a href="/{!createdPaymentInfo.id}" target="__blank">{!createdPaymentInfo.Name}</a>.
+                                                        </apex:outputText>. You can see this Payment in Salesforce at <a href="/{!createdTransactionInfo.id}" target="__blank">{!createdTransactionInfo.Name}</a>.
                                                     </apex:outputText>
                                                     <apex:outputText rendered="{!!isChargeSuccess}">
                                                         The transaction has failed.
@@ -1477,9 +1351,9 @@
                                                     </apex:outputText>
                                                 </div>
                                                 <div align="center" class="slds-m-top_medium">
-                                                    <apex:commandbutton id="tsOKCancelBtn2" styleClass="btns slds-button slds-button_neutral" value="Okay" onclick="closeModal('tsModal','tsBackdrop');closeModal('messageModal','messageBackdrop');" reRender="chargingAmount, chargingDescription, PMList" style="width:70px;" action="{!renderpage}" rendered="{!isChargeSuccess}" oncomplete="renderPaymentsSection();updatePaymentMethodDetails();"/>
+                                                    <apex:commandbutton id="tsOKCancelBtn2" status="assign-action-status" styleClass="btns slds-button slds-button_neutral" value="Okay" onclick="closeModal('tsModal','tsBackdrop');closeModal('messageModal','messageBackdrop');" reRender="chargingAmount, chargingDescription, PMList" style="width:70px;" action="{!renderpage}" rendered="{!isChargeSuccess}" oncomplete="renderPaymentsSection();updatePaymentMethodDetails();"/>
                                                     <apex:commandbutton id="tsOKCancelBtn3" styleClass="btns slds-button slds-button_neutral" value="Okay" onclick="closeModal('messageModal');showModal('tsModal','tsBackdrop','deleteMessage','payment');" reRender="nothing" style="width:70px;" rendered="{!!isChargeSuccess}"/>
-                                                    <apex:actionFunction name="renderPaymentsSection" reRender="paymentsSection, cardsList, bankAccountsList" />
+                                                    <apex:actionFunction name="renderPaymentsSection" status="assign-action-status" reRender="paymentsSection, cardsList, bankAccountsList" />
                                                 </div>
                                             </div>
                                         </div>
@@ -1514,8 +1388,8 @@
                                                     </apex:outputText>
                                                 </div>
                                                 <div align="center" class="slds-m-top_medium">
-                                                    <apex:commandbutton id="SuccessOkay" styleClass="btns slds-button slds-button_neutral" value="Okay" onclick="closeModal('PMModal','PMtsBackdrop');closeModal('PMmessageModal2','PMPMmessageBackdrop2');" reRender="cardsList, cardDetails, bankAccountsList" style="width:70px;" action="{!renderpage}" oncomplete="reRenderPMSection()"/>
-                                                    <apex:actionFunction name="reRenderPMSection" reRender="accountInfo,createPMForm, paymentsSection, cardsList, bankAccountsList, paymentDetailsSection, BankAccountElements, CardElements, cardDetails, paymentButtonsSection, createPayment, rerenderPaymentmethodValue" oncomplete="resetCardOptionsValues();rerenderPaymentValues();resetBankAccountValues();"/>
+                                                    <apex:commandbutton id="SuccessOkay" status="assign-action-status" styleClass="btns slds-button slds-button_neutral" value="Okay" onclick="closeModal('PMModal','PMtsBackdrop');closeModal('PMmessageModal2','PMPMmessageBackdrop2');" reRender="cardsList, cardDetails, bankAccountsList" style="width:70px;" action="{!renderpage}" oncomplete="reRenderPMSection()"/>
+                                                    <apex:actionFunction name="reRenderPMSection" status="assign-action-status" reRender="accountInfo,createPMForm, paymentsSection, cardsList, bankAccountsList, paymentDetailsSection, BankAccountElements, CardElements, cardDetails, paymentButtonsSection, createPayment, rerenderPaymentmethodValue" oncomplete="resetCardOptionsValues();rerenderPaymentValues();resetBankAccountValues();"/>
                                                     <apex:actionFunction name="rerenderPMSectionFromESC" reRender="cardsList, cardDetails, bankAccountsList" action="{!renderPage}" oncomplete="reRenderPMSection()"/>
                                                 </div>
                                             </div>
@@ -1709,6 +1583,12 @@
                                                 <apex:outputPanel layout="block" styleClass="slds-col slds-large-size_1-of-3 slds-medium-size_1-of-2 slds-size_1-of-1 slds-large-order_6 slds-medium-order_6 slds-order_6">
                                                     <c:AdditionalInfo label="{!customer.Processor_Type__c} Customer Id" fieldValue="{!customer.Processor_Customer_Id__c}" />
                                                 </apex:outputPanel>
+                                                <apex:outputPanel layout="block" styleClass="slds-col slds-large-size_1-of-3 slds-medium-size_1-of-2 slds-size_1-of-1 slds-large-order_7 slds-medium-order_7 slds-order_7">
+                                                    <c:AdditionalInfo label="{!$ObjectType.BWP_Customer__c.fields.createdDate.Label}" record="{!sobj}" fieldAPIName="createdDate"/>   
+                                                </apex:outputPanel>
+                                                <apex:outputPanel layout="block" styleClass="slds-col slds-large-size_1-of-3 slds-medium-size_1-of-2 slds-size_1-of-1 slds-large-order_8 slds-medium-order_8 slds-order_8">
+                                                    <c:AdditionalInfo label="{!$ObjectType.BWP_Customer__c.fields.LastModifiedDate.Label}" record="{!sobj}" fieldAPIName="LastModifiedDate"/>   
+                                                </apex:outputPanel>
                                             </div>
                                         </div>
                                     </div>
@@ -1758,143 +1638,143 @@
                                 </apex:outputPanel>
                             </apex:outputPanel>
                             <!-- Cards Section END -->
-                            <!-- Bank accounts Section starts -->
-                            <apex:outputPanel layout="block" styleClass="slds-m-top_medium slds-m-horizontal_medium">
-                                <div class="slds-media slds-media_center slds-has-flexi-truncate slds-m-bottom_x-small">
-                                    <div class="slds-media__figure">
-                                        <span class="slds-icon_container slds-icon-custom-custom16" title="Payments">
-                                            <svg class="slds-icon slds-icon_medium" aria-hidden="true">
-                                                <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="{!URLFOR($Asset.SLDS, 'assets/icons/custom-sprite/svg/symbols.svg#custom16')}" />
-                                            </svg>
-                                            <span class="slds-assistive-text">Bank Accounts</span>
-                                        </span>
-                                    </div>
-                                    <div class="slds-media__body">
-                                        <h2 class="slds-card__header-title">
-                                            <span class="slds-text-heading_small">Bank Accounts</span>
-                                        </h2>
-                                    </div>
-                                </div>
-                                <apex:outputPanel id="bankAccountsList">
-                                    <apex:outputPanel layout="block" rendered="{!paymentsBankList.size==0}" styleClass="slds-m-top_medium slds-m-horizontal_medium">
-                                        <div class="slds-align_absolute-center slds-border_top slds-border_bottom slds-p-top_small slds-p-bottom_small">
-                                            No Bank Accounts are related to this Customer
+                            <apex:outputPanel rendered="{!customer.Processor_Type__c != 'Square'}">
+                                <!-- Bank accounts Section starts -->    
+                                <apex:outputPanel layout="block" styleClass="slds-m-top_medium slds-m-horizontal_medium">
+                                        <div class="slds-media slds-media_center slds-has-flexi-truncate slds-m-bottom_x-small">
+                                            <div class="slds-media__figure">
+                                                <span class="slds-icon_container slds-icon-custom-custom16" title="Payments">
+                                                    <svg class="slds-icon slds-icon_medium" aria-hidden="true">
+                                                        <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="{!URLFOR($Asset.SLDS, 'assets/icons/custom-sprite/svg/symbols.svg#custom16')}" />
+                                                    </svg>
+                                                    <span class="slds-assistive-text">Bank Accounts</span>
+                                                </span>
+                                            </div>
+                                            <div class="slds-media__body">
+                                                <h2 class="slds-card__header-title">
+                                                    <span class="slds-text-heading_small">Bank Accounts</span>
+                                                </h2>
+                                            </div>
                                         </div>
+                                        <apex:outputPanel id="bankAccountsList">
+                                            <apex:outputPanel layout="block" rendered="{!paymentsBankList.size==0}" styleClass="slds-m-top_medium slds-m-horizontal_medium">
+                                                <div class="slds-align_absolute-center slds-border_top slds-border_bottom slds-p-top_small slds-p-bottom_small">
+                                                    No Bank Accounts are related to this Customer
+                                                </div>
+                                            </apex:outputPanel>
+                                            <apex:outputPanel rendered="{!paymentsBankList.size>0}">
+                                                <apex:DataTable value="{!paymentsBankList}" var="bank" styleclass="slds-table slds-no-row-hover slds-table_bordered slds-table_col-bordered slds-border_right slds-border_bottom slds-border_left myTableRow slds-max-medium-table_stacked-horizontal bankaccounts">
+                                                    <apex:column headerValue="Payment Method #" html-data-label="Payment Method #">
+                                                        <apex:outputLink value="/{!URLFOR(bank.id)}" target="_blank" rendered="{!NOT(ISNULL(bank.id))}">{!bank.Name}</apex:outputLink>
+                                                    </apex:column>
+                                                    <apex:column headerValue="Bank Account Holder Name" html-data-label="Bank Account Holder Name" styleClass="slds-cell-wrap" value="{!bank.Bank_Account_Holder_Name__c}"/>
+                                                    <apex:column headerValue="Bank Name" html-data-label="Bank Name" value="{!bank.Bank_Name__c}" styleClass="slds-cell-wrap"/>
+                                                    <apex:column headerValue="Status" html-data-label="Status" value="{!bank.Card_Status__c}" styleClass="slds-cell-wrap status"/>
+                                                    <apex:column headerValue="Last 4 digits" html-data-label="Last 4 digits">
+                                                        <apex:outputText value="{!bank.Last_4_digits__c}"/>
+                                                    </apex:column>                                            
+                                                    <apex:column headerValue="Routing Number" html-data-label="Routing Number">
+                                                        <apex:outputtext value="{!bank.Routing_Number__c}"/>
+                                                    </apex:column>
+                                                </apex:DataTable>
+                                            </apex:outputPanel>
+                                        </apex:outputPanel>
                                     </apex:outputPanel>
-                                    <apex:outputPanel rendered="{!paymentsBankList.size>0}">
-                                        <apex:DataTable value="{!paymentsBankList}" var="bank" styleclass="slds-table slds-no-row-hover slds-table_bordered slds-table_col-bordered slds-border_right slds-border_bottom slds-border_left myTableRow slds-max-medium-table_stacked-horizontal bankaccounts">
-                                            <apex:column headerValue="Payment Method #" html-data-label="Payment Method #">
-                                                <apex:outputLink value="/{!URLFOR(bank.id)}" target="_blank" rendered="{!NOT(ISNULL(bank.id))}">{!bank.Name}</apex:outputLink>
-                                            </apex:column>
-                                            <apex:column headerValue="Bank Account Holder Name" html-data-label="Bank Account Holder Name" styleClass="slds-cell-wrap" value="{!bank.Bank_Account_Holder_Name__c}"/>
-                                            <apex:column headerValue="Bank Name" html-data-label="Bank Name" value="{!bank.Bank_Name__c}" styleClass="slds-cell-wrap"/>
-                                            <apex:column headerValue="Status" html-data-label="Status" value="{!bank.Card_Status__c}" styleClass="slds-cell-wrap status"/>
-                                            <apex:column headerValue="Last 4 digits" html-data-label="Last 4 digits">
-                                                <apex:outputText value="{!bank.Last_4_digits__c}"/>
-                                            </apex:column>                                            
-                                            <apex:column headerValue="Routing Number" html-data-label="Routing Number">
-                                                <apex:outputtext value="{!bank.Routing_Number__c}"/>
-                                            </apex:column>
-                                        </apex:DataTable>
-                                    </apex:outputPanel>
-                                </apex:outputPanel>
-                            </apex:outputPanel>
-                            <!-- Bank accounts Section ends -->
-                            <!-- Other payment methods Section starts -->
-                            <apex:outputPanel layout="block" styleClass="slds-m-top_medium slds-m-horizontal_medium" rendered="{!paymentsOtherList.size>0}">
-                                <div class="slds-media slds-media_center slds-has-flexi-truncate slds-m-bottom_x-small">
-                                    <div class="slds-media__figure">
-                                        <span class="slds-icon_container slds-icon-custom-custom16" title="Payments">
-                                            <svg class="slds-icon slds-icon_medium" aria-hidden="true">
-                                                <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="{!URLFOR($Asset.SLDS, 'assets/icons/custom-sprite/svg/symbols.svg#custom16')}" />
-                                            </svg>
-                                            <span class="slds-assistive-text">Other Payment Methods</span>
-                                        </span>
-                                    </div>
-                                    <div class="slds-media__body">
-                                        <h2 class="slds-card__header-title">
-                                            <span class="slds-text-heading_small">Other Payment Methods</span>
-                                        </h2>
-                                    </div>
-                                </div>
-                                <apex:outputPanel >
-                                    <apex:DataTable value="{!paymentsOtherList}" var="other" styleclass="slds-table slds-no-row-hover slds-table_bordered slds-table_col-bordered slds-border_right slds-border_bottom slds-border_left myTableRow slds-max-medium-table_stacked-horizontal otherBankaccounts">
-                                        <apex:column headerValue="Payment Method #" html-data-label="Payment Method #">
-                                            <apex:outputLink value="/{!URLFOR(other.id)}" target="_blank" rendered="{!NOT(ISNULL(other.id))}">{!other.Name}</apex:outputLink>
-                                        </apex:column>
-                                        <apex:column headerValue="Type" html-data-label="Type" styleClass="slds-cell-wrap" value="{!other.Type__c}"/>
-                                        <apex:column headerValue="Bank Name" html-data-label="Bank Name" value="{!other.Bank_Name__c}" styleClass="slds-cell-wrap"/>
-                                        <apex:column headerValue="Status" html-data-label="Status" value="{!other.Card_Status__c}" styleClass="slds-cell-wrap status"/>
-                                        <apex:column headerValue="Account Number" html-data-label="Account Number" value="{!other.Account_Number__c}"/>
-                                        <apex:column headerValue="Routing Number" html-data-label="Routing Number">
-                                            <apex:outputtext value="{!other.Routing_Number__c}"/>
-                                        </apex:column>
-                                    </apex:DataTable>
-                                </apex:outputPanel>
-                            </apex:outputPanel>
-                            <!-- Other payment methods Section ends -->
-                            <!-- Payments Section starts -->
-                            <apex:outputPanel layout="block" styleClass="slds-m-top_medium slds-m-horizontal_medium">
-                                <div class="slds-media slds-media_center slds-has-flexi-truncate slds-m-bottom_x-small">
-                                    <div class="slds-media__figure">
-                                        <span class="slds-icon_container slds-icon-custom-custom41" title="Payments">
-                                            <svg class="slds-icon slds-icon_medium" aria-hidden="true">
-                                                <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="{!URLFOR($Asset.SLDS, 'assets/icons/custom-sprite/svg/symbols.svg#custom41')}" />
-                                            </svg>
-                                            <span class="slds-assistive-text">Payments</span>
-                                        </span>
-                                    </div>
-                                    <div class="slds-media__body">
-                                        <h2 class="slds-card__header-title">
-                                            <span class="slds-text-heading_small">Payments</span>
-                                        </h2>
-                                    </div>
-                                </div>
-                                <apex:outputPanel id="paymentsSection">
-                                    <apex:outputPanel layout="block" rendered="{!paymentsList.size==0}" styleClass="slds-m-top_medium slds-m-horizontal_medium">
-                                        <div class="slds-align_absolute-center slds-border_top slds-border_bottom slds-p-top_small slds-p-bottom_small">
-                                            No Payments have been applied to this Customer
+                                    <!-- Bank accounts Section ends -->
+                                    <!-- Other payment methods Section starts -->
+                                    <apex:outputPanel layout="block" styleClass="slds-m-top_medium slds-m-horizontal_medium" rendered="{!paymentsOtherList.size>0}">
+                                        <div class="slds-media slds-media_center slds-has-flexi-truncate slds-m-bottom_x-small">
+                                            <div class="slds-media__figure">
+                                                <span class="slds-icon_container slds-icon-custom-custom16" title="Payments">
+                                                    <svg class="slds-icon slds-icon_medium" aria-hidden="true">
+                                                        <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="{!URLFOR($Asset.SLDS, 'assets/icons/custom-sprite/svg/symbols.svg#custom16')}" />
+                                                    </svg>
+                                                    <span class="slds-assistive-text">Other Payment Methods</span>
+                                                </span>
+                                            </div>
+                                            <div class="slds-media__body">
+                                                <h2 class="slds-card__header-title">
+                                                    <span class="slds-text-heading_small">Other Payment Methods</span>
+                                                </h2>
+                                            </div>
                                         </div>
+                                        <apex:outputPanel >
+                                            <apex:DataTable value="{!paymentsOtherList}" var="other" styleclass="slds-table slds-no-row-hover slds-table_bordered slds-table_col-bordered slds-border_right slds-border_bottom slds-border_left myTableRow slds-max-medium-table_stacked-horizontal otherBankaccounts">
+                                                <apex:column headerValue="Payment Method #" html-data-label="Payment Method #">
+                                                    <apex:outputLink value="/{!URLFOR(other.id)}" target="_blank" rendered="{!NOT(ISNULL(other.id))}">{!other.Name}</apex:outputLink>
+                                                </apex:column>
+                                                <apex:column headerValue="Type" html-data-label="Type" styleClass="slds-cell-wrap" value="{!other.Type__c}"/>
+                                                <apex:column headerValue="Bank Name" html-data-label="Bank Name" value="{!other.Bank_Name__c}" styleClass="slds-cell-wrap"/>
+                                                <apex:column headerValue="Status" html-data-label="Status" value="{!other.Card_Status__c}" styleClass="slds-cell-wrap status"/>
+                                                <apex:column headerValue="Account Number" html-data-label="Account Number" value="{!other.Account_Number__c}"/>
+                                                <apex:column headerValue="Routing Number" html-data-label="Routing Number">
+                                                    <apex:outputtext value="{!other.Routing_Number__c}"/>
+                                                </apex:column>
+                                            </apex:DataTable>
+                                        </apex:outputPanel>
                                     </apex:outputPanel>
-                                    
-                                    <apex:outputPanel rendered="{!paymentsList.size>0}">
-                                        <apex:DataTable value="{!paymentsList}" var="pay" styleclass="slds-table slds-no-row-hover slds-table_bordered slds-table_col-bordered slds-border_right slds-border_bottom slds-border_left slds-max-medium-table_stacked-horizontal slds-cell-buffer_right payments">
-                                            
-                                            <apex:column headerValue="Payment #" html-data-label="Payment #" styleClass="slds-cell-wrap">
-                                                <apex:outputLink value="/{!URLFOR(pay.Id)}" target="_blank" rendered="{!NOT(ISNULL(pay.Id))}">{!pay.Name}</apex:outputLink>
-                                            </apex:column>
-                                            
-                                            <apex:column headerValue="Payment Date" html-data-label="Payment Date" styleClass="slds-cell-wrap status">
-                                                <apex:outputText value="{0, date,dd/MM/yyyy}">
-                                                    <apex:param value="{!pay.Created_Date_in_Processor__c}" />
-                                                </apex:outputText>
-                                            </apex:column>
-
-                                            <apex:column headerValue="Payment Method" html-data-label="Payment Method">
-
-                                                <apex:outputText rendered="{!pay.Source__r.Type__c=='Card'}"> {!pay.Source__r.Card_Brand__c}&nbsp;-&nbsp;{!pay.Source__r.Last_4_digits__c} </apex:outputText>
-                                                <apex:outputText rendered="{!pay.Source__r.Type__c=='BankAccount'}"> {!pay.Source__r.Bank_Name__c}&nbsp;-&nbsp;{!pay.Source__r.Last_4_digits__c} </apex:outputText>
-                                                <apex:outputText rendered="{!AND(pay.Source__r.Type__c!='BankAccount',pay.Source__r.Type__c!='Card')}"> {!pay.Source__r.Type__c}&nbsp;-&nbsp;{!pay.Source__r.Account_Number__c} </apex:outputText>
-
-                                            </apex:column>
-                                            <apex:column headerValue="Status" html-data-label="Status" value="{!pay.Charge_Status__c}" styleClass="slds-cell-wrap status" rendered="{!pay.Payment_Status__c == null}" />
-                                            <apex:column headerValue="Status" html-data-label="Status" value="{!pay.Payment_Status__c}" styleClass="slds-cell-wrap status" rendered="{!pay.Payment_Status__c != null}" />
-                                            <apex:column headerValue="Description" html-data-label="Description" value="{!pay.Description__c}" rendered="{!customer.Processor_Type__c == 'Stripe'}" styleClass="slds-cell-wrap" />
-                                            
-                                            <apex:column headerValue="Amount" html-data-label="Amount" styleClass="slds-text-align_right" headerClass="slds-text-align_right">
-                                                <apex:outputText value="{0, number, ###,###,##0}" rendered="{!if((pay.Currency__c='BIF'||pay.Currency__c='CLP'||pay.Currency__c='DJF'||pay.Currency__c='GNF'||pay.Currency__c='JPY'||pay.Currency__c='KMF'||pay.Currency__c='KRW'||pay.Currency__c='MGA'||pay.Currency__c='PYG'||pay.Currency__c='RWF'||pay.Currency__c='UGX'||pay.Currency__c='VND'||pay.Currency__c='VUV'||pay.Currency__c='XAF'||pay.Currency__c='XOF'||pay.Currency__c='XPF'), true,false)}">
-                                                    <apex:param value="{!pay.Amount__c}" />
-                                                </apex:outputText>
+                                    <!-- Other payment methods Section ends -->
+                                </apex:outputPanel>
+                                <!-- Payments Section starts -->
+                                <apex:outputPanel layout="block" styleClass="slds-m-top_medium slds-m-horizontal_medium">
+                                    <div class="slds-media slds-media_center slds-has-flexi-truncate slds-m-bottom_x-small">
+                                        <div class="slds-media__figure">
+                                            <span class="slds-icon_container slds-icon-custom-custom41" title="Payments">
+                                                <svg class="slds-icon slds-icon_medium" aria-hidden="true">
+                                                    <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="{!URLFOR($Asset.SLDS, 'assets/icons/custom-sprite/svg/symbols.svg#custom41')}" />
+                                                </svg>
+                                                <span class="slds-assistive-text">Payments</span>
+                                            </span>
+                                        </div>
+                                        <div class="slds-media__body">
+                                            <h2 class="slds-card__header-title">
+                                                <span class="slds-text-heading_small">Payments</span>
+                                            </h2>
+                                        </div>
+                                    </div>
+                                    <apex:outputPanel id="paymentsSection">
+                                        <apex:outputPanel layout="block" rendered="{!transactionsList.size==0}" styleClass="slds-m-top_medium slds-m-horizontal_medium">
+                                            <div class="slds-align_absolute-center slds-border_top slds-border_bottom slds-p-top_small slds-p-bottom_small">
+                                                No Payments have been applied to this Customer
+                                            </div>
+                                        </apex:outputPanel>
+                                        
+                                        <apex:outputPanel rendered="{!transactionsList.size>0}">
+                                            <apex:DataTable value="{!transactionsList}" var="pay" styleclass="slds-table slds-no-row-hover slds-table_bordered slds-table_col-bordered slds-border_right slds-border_bottom slds-border_left slds-max-medium-table_stacked-horizontal slds-cell-buffer_right payments">
                                                 
-                                                <apex:outputText value="{0, number, ###,###,##0.00}" rendered="{!if((pay.Currency__c='BIF'||pay.Currency__c='CLP'||pay.Currency__c='DJF'||pay.Currency__c='GNF'||pay.Currency__c='JPY'||pay.Currency__c='KMF'||pay.Currency__c='KRW'||pay.Currency__c='MGA'||pay.Currency__c='PYG'||pay.Currency__c='RWF'||pay.Currency__c='UGX'||pay.Currency__c='VND'||pay.Currency__c='VUV'||pay.Currency__c='XAF'||pay.Currency__c='XOF'||pay.Currency__c='XPF'), false,true)}">
-                                                    <apex:param value="{!pay.Amount__c}" />
-                                                </apex:outputText>
-                                            </apex:column>
-                                        </apex:DataTable>
+                                                <apex:column headerValue="Payment #" html-data-label="Payment #" styleClass="slds-cell-wrap">
+                                                    <apex:outputLink value="/{!URLFOR(pay.RecordId)}" target="_blank" rendered="{!NOT(ISNULL(pay.RecordId))}">{!pay.Name}</apex:outputLink>
+                                                </apex:column>
+                                                
+                                                <apex:column headerValue="Payment Date" html-data-label="Payment Date" styleClass="slds-cell-wrap status">
+                                                    <apex:outputText value="{!pay.PaymentDate}" />
+                                                </apex:column>
+
+                                                <apex:column headerValue="Payment Method" html-data-label="Payment Method">
+
+                                                    <apex:outputText rendered="{!pay.PaymentMethodType=='Card'}"> {!pay.PMCardBrand}&nbsp;-&nbsp;{!pay.PMLast4Digits} </apex:outputText>
+                                                    <apex:outputText rendered="{!pay.PaymentMethodType=='BankAccount'}"> {!pay.PMBankName}&nbsp;-&nbsp;{!pay.PMLast4Digits} </apex:outputText>
+                                                    <apex:outputText rendered="{!AND(pay.PaymentMethodType!='BankAccount',pay.PaymentMethodType!='Card')}"> {!pay.PaymentMethodType}&nbsp;-&nbsp;{!pay.PMAccountNumber} </apex:outputText>
+
+                                                </apex:column>
+                                                <apex:column headerValue="Status" html-data-label="Status" value="{!pay.ChargeStatus}" styleClass="slds-cell-wrap status" rendered="{!pay.PaymentStatus == null}" />
+                                                <apex:column headerValue="Status" html-data-label="Status" value="{!pay.PaymentStatus}" styleClass="slds-cell-wrap status" rendered="{!pay.PaymentStatus != null}" />
+                                                <apex:column headerValue="Description" html-data-label="Description" value="{!pay.Description}" rendered="{!customer.Processor_Type__c == 'Stripe'}" styleClass="slds-cell-wrap" />
+                                                
+                                                <apex:column headerValue="Amount" html-data-label="Amount" styleClass="slds-text-align_right" headerClass="slds-text-align_right">
+                                                    <apex:outputText value="{0, number, ###,###,##0}" rendered="{!NOT(pay.showDecimals)}">
+                                                        <apex:param value="{!pay.Amount}" />
+                                                    </apex:outputText>
+                                                    
+                                                    <apex:outputText value="{0, number, ###,###,##0.00}" rendered="{!pay.showDecimals}">
+                                                        <apex:param value="{!pay.Amount}" />
+                                                    </apex:outputText>
+                                                </apex:column>
+                                            </apex:DataTable>
+                                        </apex:outputPanel>
                                     </apex:outputPanel>
                                 </apex:outputPanel>
-                            </apex:outputPanel>
-                            <!-- Payments Section ends -->
+                                <!-- Payments Section ends -->
                         </apex:outputPanel>
                     </apex:outputPanel>
 

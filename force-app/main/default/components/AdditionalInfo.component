@@ -2,12 +2,15 @@
     <apex:attribute name="label" type="String" description="Field label" default=""/>
     <apex:attribute name="fieldValue" type="String" description="Field Value" default=""/> 
     <apex:attribute name="outputTextStyleCls" type="String" description="Output Text StyleClass value" default=""/>
+    <apex:attribute name="fieldAPIName" type="String" description="To check for field API Name" default=""/>
+    <apex:attribute name="record" type="SObject" description="To Store Customer/Payment Method/Transaction Record value" default=""/>
     
         <div class="slds-form-element slds-border_bottom defaultHeight">
             <label class="slds-form-element__label">{!label}</label>
             <div class="slds-form-element__control">
                 <span class="slds-form-element__static">
-                    <apex:outputText value="{!fieldValue}" style="{!outputTextStyleCls}" />
+                    <apex:outputText value="{!fieldValue}" style="{!outputTextStyleCls}" rendered="{!AND(record == '', fieldAPIName == '')}" />
+                    <apex:outputField value="{!record[fieldAPIName]}" style="{!outputTextStyleCls}" rendered="{!AND(record != '',fieldAPIName != '')}"/>
                 </span>
             </div>
         </div>

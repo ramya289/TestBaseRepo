@@ -1,5 +1,5 @@
 {
-  "edition": "Developer",
+  "edition": "Partner Developer",
   "features": ["EnableSetPasswordInApi"],
   "settings": {
     "lightningExperienceSettings": {

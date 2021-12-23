@@ -155,6 +155,7 @@ public class Customer {
         public PaymentMethod paymentMethods;
         public List<PaymentMethodDetails> paymentMethodDetails;
         public Id accountId;
+        public String paymentMethodId;
     }
 
     public class PaymentMethod {
@@ -216,6 +217,8 @@ public class Customer {
         public List<SquareCard> cards;
     }
     public class SquareAddress{
+        public String first_name;
+        public String last_name;
         public String address_line_1;
         public String address_line_2;
         public String locality; //city
@@ -235,4 +238,72 @@ public class Customer {
         public String card_nonce;
     }
     // End Square response
+    
+    // Response returned from Authorize.Net when fetching historical customers or adding customer to the processor
+    // This is also used to deserialize the incoming JSON request when creating the customer
+    public class AuthNetPayment {
+	    public AuthNetCreditCard creditCard;
+        public AuthNetBankAccount bankAccount;
+	}
+
+	public class AuthNetMessages {
+		public String resultCode;
+		public List<AuthNetMessage> message;
+	}
+	
+    public class AuthNetCustomer{
+        public AuthNetProfile profile;
+	    public AuthNetMessages messages;
+    }
+
+	public class AuthNetPaymentProfiles {
+		public String customerPaymentProfileId;
+		public AuthNetPayment payment;
+		public String originalNetworkTransId;
+		public Decimal originalAuthAmount;
+		public AuthNetBillTo billTo;
+		public String customerType;
+	}
+
+	public class AuthNetMessage {
+		public String code;
+		public String text;
+	}
+
+	public class AuthNetBillTo {
+		public String phoneNumber;
+		public String firstName;
+		public String lastName;
+		public String address;
+		public String city;
+		public String state;
+		public String zip;
+		public String country;
+	}
+
+	public class AuthNetCreditCard {
+		public String cardNumber;
+		public String expirationDate;
+		public String cardType;
+		public String issuerNumber;
+	}
+	
+    public class AuthNetBankAccount{
+        public String accountType;
+        public String routingNumber;
+	    public String accountNumber;
+        public String nameOnAccount;
+        public String bankName;
+	    public String echeckType;
+    }
+
+	public class AuthNetProfile {
+		public List<AuthNetPaymentProfiles> paymentProfiles;
+		public String profileType;
+		public String customerProfileId;
+		public String merchantCustomerId;
+		public String description;
+		public String email;
+	}
+    // End Authorize.Net response
 }

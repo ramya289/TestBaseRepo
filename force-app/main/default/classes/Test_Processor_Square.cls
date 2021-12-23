@@ -9,8 +9,8 @@ private class Test_Processor_Square {
         Profile prof = [SELECT Id FROM Profile WHERE Name = 'Standard User' LIMIT 1 ];
         User user = new User(Alias = 'TestUser', Email = 'testuser@testorg.com', EmailEncodingKey = 'UTF-8', LastName = 'Testing', LanguageLocaleKey = 'en_US', LocaleSidKey = 'en_US', ProfileId = prof.Id, TimeZoneSidKey = 'America/Los_Angeles', UserName = uniqueUserName);
         insert user;
-        String adminPSName = 'Breadwinner_Payments_Admin_User';
-        List<PermissionSet> pset = [SELECT Id FROM PermissionSet WHERE Name = 'Breadwinner_Payments_Admin_User'];
+        String adminPSName = BreadwinnerUtil.ADMIN_PS_NAME;
+        List<PermissionSet> pset = [SELECT Id FROM PermissionSet WHERE Name = :BreadwinnerUtil.ADMIN_PS_NAME];
         insert new PermissionSetAssignment(AssigneeId = user.id, PermissionSetId = pset[0].Id);
     }
     @IsTest
@@ -87,7 +87,10 @@ private class Test_Processor_Square {
                 ps.fetchCustomers('');
             } catch (Exception ex){}
             try{
-                ps.fetchPayments('');
+                ps.fetchTransactions('');
+            } catch (Exception ex){}
+            try{
+                ps.createCheckoutURL('');
             } catch (Exception ex){}
         }
     }
@@ -410,7 +413,7 @@ private class Test_Processor_Square {
     }
     
     @IsTest
-    static void fetchPayments_When_Success() {
+    static void fetchTransactions_When_Success() {
         User adminUser =  [SELECT Id FROM User WHERE Alias = 'TestUser' LIMIT 1];
         System.runAs(adminUser){
             BreadwinnerUtil.AppConfig apcWrapper = UnitTests.getProcessorConfigWrapper(ProcessorUtil.PAT_SQUARE);
@@ -425,7 +428,7 @@ private class Test_Processor_Square {
             
             Test.setMock(HttpCalloutMock.class, httpMock);
             
-            ProcessorUtil.ResponseObject response =  Processor_Square.fetchPayments(apcWrapper, JSON.serializePretty(fetchRequest));
+            ProcessorUtil.ResponseObject response =  Processor_Square.fetchTransactions(apcWrapper, JSON.serializePretty(fetchRequest));
             System.debug('response: ' + response);
             
             Test.stopTest();
@@ -433,7 +436,7 @@ private class Test_Processor_Square {
     }
     
     @IsTest
-    static void fetchPayments_When_Failure() {
+    static void fetchTransactions_When_Failure() {
         User adminUser =  [SELECT Id FROM User WHERE Alias = 'TestUser' LIMIT 1];
         System.runAs(adminUser){
             BreadwinnerUtil.AppConfig apcWrapper = UnitTests.getProcessorConfigWrapper(ProcessorUtil.PAT_SQUARE);
@@ -448,7 +451,56 @@ private class Test_Processor_Square {
             httpMock.statusCode = 400;
             Test.setMock(HttpCalloutMock.class, httpMock);
             
-            ProcessorUtil.ResponseObject response =  Processor_Square.fetchPayments(apcWrapper, JSON.serializePretty(fetchRequest));
+            ProcessorUtil.ResponseObject response =  Processor_Square.fetchTransactions(apcWrapper, JSON.serializePretty(fetchRequest));
+            System.debug('response: ' + response);
+            
+            Test.stopTest();
+        }
+    }
+
+    @IsTest
+    static void createCheckoutURL_When_Success() {
+        User adminUser =  [SELECT Id FROM User WHERE Alias = 'TestUser' LIMIT 1];
+        System.runAs(adminUser){
+            BreadwinnerUtil.AppConfig apcWrapper = UnitTests.getProcessorConfigWrapper(ProcessorUtil.PAT_SQUARE);
+            
+            Test.startTest();
+            Map<String, Object> checkoutMap = new Map<String, Object>();
+            checkoutMap.put('ask_for_shipping_address', true);
+            checkoutMap.put('customer_id', 'abc12345');
+            checkoutMap.put('location_id', 'abc12345');
+            checkoutMap.put('merchant_support_email', 'testmt@test.com');
+            checkoutMap.put('buyer_email', 'testbuyer@test.com');
+
+            Map<String,Object> shipping = new Map<String,Object>();
+                shipping.put('first_name', 'Sannith Reddy');
+                shipping.put('last_name', 'Nevuri');
+                shipping.put('email', 'testshipping@test.com');
+                shipping.put('address_line_1', 'address_line_1');
+                shipping.put('address_line_2', 'address_line_2');
+                shipping.put('locality', 'NY');
+                shipping.put('administrative_district_level_1','Texas');
+                shipping.put('country', 'US');
+                shipping.put('postal_code', '12345');
+            checkoutMap.put('shipping', shipping);
+
+            Map<String,Object> line_item = new Map<String,Object>();
+                line_item.put('quantity', '5');
+                line_item.put('unit_price', '100');
+                line_item.put('item_currency', 'USD');
+                line_item.put('name', 'Ball');
+                line_item.put('note', 'To play cricket');
+            List<Object> line_items = new List<Object>();
+                line_items.add(line_item);    	
+            checkoutMap.put('line_items', line_items);
+            Map<String, Object> requestJSONMap = new Map<String, Object>();
+            requestJSONMap.put('checkout', new List<Object>{checkoutMap});
+                    
+            UnitTests.MockHttpResponse httpMock = new UnitTests.MockHttpResponse();
+            httpMock.response = '{"checkout":{"id":"CBASEIdKLdVKFzXqmOuY4JsbRN0","checkout_page_url":"https://connect.squareupsandbox.com/v2/checkout?c=CBASEIdKLdVKFzXqmOuY4JsbRN0\u0026l=L562DM0KHSY9B","ask_for_shipping_address":true,"merchant_support_email":"testmt@test.com","pre_populate_buyer_email":"testbuyer@test.com","order":{"id":"7LVFLEHWAx6DvdMjTfDq8vH6Wg4F","location_id":"L562DM0KHSY9B","reference_id":"null","source":{"name":"Sandbox for sq0idp-m0EwPLnKnMT6zfU_vq6YRA"},"customer_id":"XXXXXXX","line_items":[{"uid":"ZkezNBa2cT5YTGN1HvJx8C","name":"Ball","quantity":"5","note":"To play cricket","item_type":"ITEM","base_price_money":{"amount":100,"currency":"USD"},"variation_total_price_money":{"amount":500,"currency":"USD"},"gross_sales_money":{"amount":500,"currency":"USD"},"total_tax_money":{"amount":0,"currency":"USD"},"total_discount_money":{"amount":0,"currency":"USD"},"total_money":{"amount":500,"currency":"USD"}},{"uid":"lADIOT37fsAwoYyP3NqbjD","name":"Laptop","quantity":"1","note":"For gaming","item_type":"ITEM","base_price_money":{"amount":75000,"currency":"USD"},"variation_total_price_money":{"amount":75000,"currency":"USD"},"gross_sales_money":{"amount":75000,"currency":"USD"},"total_tax_money":{"amount":0,"currency":"USD"},"total_discount_money":{"amount":0,"currency":"USD"},"total_money":{"amount":75000,"currency":"USD"}}],"net_amounts":{"total_money":{"amount":75500,"currency":"USD"},"tax_money":{"amount":0,"currency":"USD"},"discount_money":{"amount":0,"currency":"USD"},"tip_money":{"amount":0,"currency":"USD"},"service_charge_money":{"amount":0,"currency":"USD"}},"created_at":"2021-10-08T13:12:50.223Z","updated_at":"2021-10-08T13:12:50.223Z","state":"OPEN","version":1,"total_money":{"amount":75500,"currency":"USD"},"total_tax_money":{"amount":0,"currency":"USD"},"total_discount_money":{"amount":0,"currency":"USD"},"total_tip_money":{"amount":0,"currency":"USD"},"total_service_charge_money":{"amount":0,"currency":"USD"}},"created_at":"2021-10-08T13:12:50Z"}}';
+            Test.setMock(HttpCalloutMock.class, httpMock);
+            
+            ProcessorUtil.ResponseObject response =  Processor_Square.createCheckoutURL(apcWrapper, JSON.serializePretty(requestJSONMap));
             System.debug('response: ' + response);
             
             Test.stopTest();
@@ -456,44 +508,28 @@ private class Test_Processor_Square {
     }
     
     @IsTest
-    static void historicalCustomerSync_When_Success() {
+    static void createCheckoutURL_When_Failure() {
         User adminUser =  [SELECT Id FROM User WHERE Alias = 'TestUser' LIMIT 1];
         System.runAs(adminUser){
-            BreadwinnerUtil.AppConfig apcWrapper = UnitTests.getProcessorConfigWrapper(ProcessorUtil.PAT_SQUARE);
-            
-            Test.startTest();
-            
+            BreadwinnerUtil.AppConfig apcWrapper = UnitTests.getProcessorConfigWrapper(ProcessorUtil.PAT_SQUARE);            
+            Test.startTest();            
+            Map<String, Object> checkoutMap = new Map<String, Object>();
+            checkoutMap.put('ask_for_shipping_address', true);
+            checkoutMap.put('customer_id', 'abc12345');
+            Map<String, Object> requestJSONMap = new Map<String, Object>();
+            requestJSONMap.put('checkout', new List<Object>{checkoutMap});
             UnitTests.MockHttpResponse httpMock = new UnitTests.MockHttpResponse();
-            httpMock.response = '{"customers":[{"id":"SWGYZ9TY7D6BSBSE4P6HAXP5WC","created_at":"2020-08-21T12:32:09.729Z","updated_at":"2020-08-21T12:32:10Z","cards":[{"id":"ccof:s2ubjSqliLxt0JRz3GB","card_brand":"VISA","last_4":"5858","exp_month":8,"exp_year":2022,"cardholder_name": "Amelia Earhart","billing_address":{"address_line_1":"500 Electric Ave","address_line_2":"Suite 600","locality":"New York","administrative_district_level_1":"NY","postal_code":"10003","country":"US"}}],"given_name":"Acme Start","email_address":"acme@gmail.com", "address":{"address_line_1":"500 Electric Ave","address_line_2":"Suite 600","locality":"New York","administrative_district_level_1":"NY","postal_code":"10003","country":"US"}}],"cursor":"C=="}';
-            Test.setMock(HttpCalloutMock.class, httpMock);
-            HistoricalSyncBatch historicalSync = new HistoricalSyncBatch('Customer');
-            
-            Database.executeBatch(historicalSync, 1);
-            
-            Test.stopTest();
-        }
-    }
-    
-    @IsTest
-    static void historicalCustomerSync_When_Failure() {
-        User adminUser =  [SELECT Id FROM User WHERE Alias = 'TestUser' LIMIT 1];
-        System.runAs(adminUser){
-            BreadwinnerUtil.AppConfig apcWrapper = UnitTests.getProcessorConfigWrapper(ProcessorUtil.PAT_SQUARE);
-            
-            Test.startTest();
-            
-            UnitTests.MockHttpResponse httpMock = new UnitTests.MockHttpResponse();
-            httpMock.response = '{"errors":[{"code":"INVALID_ENUM_VALUE","detail":"`Dec` is not a valid enum value for `sort_order`.","field":"sort_order","category":"INVALID_REQUEST_ERROR"}]}';
+            httpMock.response = '{"errors":[{"category":"INVALID_REQUEST_ERROR","code":"VALUE_TOO_LOW","detail":"`order.total_money.amount` must be greater than 1.","field":"order.total_money.amount"}]}';
             httpMock.statusCode = 400;
             Test.setMock(HttpCalloutMock.class, httpMock);
             
-            HistoricalSyncBatch historicalSync = new HistoricalSyncBatch('Customer');
-            Database.executeBatch(historicalSync, 1);
+            ProcessorUtil.ResponseObject response =  Processor_Square.createCheckoutURL(apcWrapper, JSON.serializePretty(requestJSONMap));
+            System.debug('response: ' + response);
             
             Test.stopTest();
         }
     }
-    
+        
     @IsTest
     static void historicalPaymentSync_When_Success() {
         User adminUser =  [SELECT Id FROM User WHERE Alias = 'TestUser' LIMIT 1];
@@ -528,45 +564,6 @@ private class Test_Processor_Square {
             HistoricalSyncBatch historicalSync = new HistoricalSyncBatch('Payment');
             
             Database.executeBatch(historicalSync, 1);
-            
-            Test.stopTest();
-        }
-    }
-    
-    @IsTest
-    static void hourlySync_When_Success() {
-        User adminUser =  [SELECT Id FROM User WHERE Alias = 'TestUser' LIMIT 1];
-        System.runAs(adminUser){
-            BWP_Processor_Config__c apc = UnitTests.createPayConfig(ProcessorUtil.PAT_SQUARE);
-            apc.Customer_Match_Type__c = ProcessorUtil.CMT_CONTACT;
-            BreadwinnerUtil.isBreadwinnerTransaction = true;
-            update apc;
-            Test.startTest();
-            
-            UnitTests.MockHttpResponse httpMock = new UnitTests.MockHttpResponse();
-            httpMock.response = '{"customers":[{"id":"SWGYZ9TY7D6BSBSE4P6HAXP5WC","created_at":"2020-08-21T12:32:09.729Z","updated_at":"2020-08-21T12:32:10Z","cards":[{"id":"ccof:s2ubjSqliLxt0JRz3GB","card_brand":"VISA","last_4":"5858","exp_month":8,"exp_year":2022,"cardholder_name": "Amelia Earhart","billing_address":{"address_line_1":"500 Electric Ave","address_line_2":"Suite 600","locality":"New York","administrative_district_level_1":"NY","postal_code":"10003","country":"US"}}],"given_name":"Acme Start","email_address":"acme@gmail.com", "address":{"address_line_1":"500 Electric Ave","address_line_2":"Suite 600","locality":"New York","administrative_district_level_1":"NY","postal_code":"10003","country":"US"}, "preferences":{"email_unsubscribed":false},"groups":[{"id":"ML63YCDEY6SCD.REACHABLE","name":"Reachable"},{"id":"ML63YCDEY6SCD.CARDS_ON_FILE","name":"Cards on File"}]}]}';
-            Test.setMock(HttpCalloutMock.class, httpMock);
-            HourlySyncBatch hourlySync = new HourlySyncBatch('Customer');
-            Database.executeBatch(hourlySync, 1);
-            
-            Test.stopTest();
-        }
-    }
-    
-    @IsTest
-    static void hourlySync_When_Failure() {
-        User adminUser =  [SELECT Id FROM User WHERE Alias = 'TestUser' LIMIT 1];
-        System.runAs(adminUser){
-            BreadwinnerUtil.AppConfig apcWrapper = UnitTests.getProcessorConfigWrapper(ProcessorUtil.PAT_SQUARE);
-            
-            Test.startTest();
-            
-            UnitTests.MockHttpResponse httpMock = new UnitTests.MockHttpResponse();
-            httpMock.response = '{"errors":[{"code":"BAD_REQUEST","detail":"begin_time must be in RFC 3339 format","category":"INVALID_REQUEST_ERROR"}]}';
-            httpMock.statusCode = 400;
-            Test.setMock(HttpCalloutMock.class, httpMock);
-            HourlySyncBatch hourlySync = new HourlySyncBatch('Customer');
-            Database.executeBatch(hourlySync, 1);
             
             Test.stopTest();
         }
@@ -616,7 +613,7 @@ private class Test_Processor_Square {
     }
     
     @IsTest
-    static void syncPayments() {
+    static void syncTransactions() {
         User adminUser =  [SELECT Id FROM User WHERE Alias = 'TestUser' LIMIT 1];
         System.runAs(adminUser){
             BWP_Processor_Config__c apc = UnitTests.createPayConfig(ProcessorUtil.PAT_SQUARE);
@@ -629,7 +626,7 @@ private class Test_Processor_Square {
             );
             insert bwpCust;
             
-            //Create a Charge.BraintreeCharge object that will get passed into syncPayments as part of a map
+            //Create a Charge.BraintreeCharge object that will get passed into syncTransactions as part of a map
             Charge.Customer chargeCust = new Charge.Customer();
             chargeCust.id = bwpCust.Processor_Customer_Id__c;
             
@@ -654,7 +651,7 @@ private class Test_Processor_Square {
                             ProcessorUtil.PAT_SQUARE => squareChargeMap
                                 };
                                     
-                                    List<ProcessorUtil.PaymentWrapper> response = Processor_Square.syncPayments(processorIdToPaymentMap, apcWrapper);
+                                    List<ProcessorUtil.TransactionWrapper> response = Processor_Square.syncTransactions(processorIdToPaymentMap, apcWrapper);
             
             // TODO: Verify the payment was added
             // Integer paymentCount = [SELECT COUNT() FROM BWP_Payment__c WHERE Customer__c = :bwpCust.Id];
@@ -704,7 +701,7 @@ private class Test_Processor_Square {
         }
     }
     @IsTest
-    static void constructSquarePayment() {
+    static void constructSquareTransaction() {
         User adminUser =  [SELECT Id FROM User WHERE Alias = 'TestUser' LIMIT 1];
         System.runAs(adminUser){
             BreadwinnerUtil.AppConfig apcWrapper = UnitTests.getProcessorConfigWrapper(ProcessorUtil.PAT_SQUARE);
@@ -733,7 +730,7 @@ private class Test_Processor_Square {
             sqCharge.billing_address = addr;
             sqCharge.created_at = '2020-08-21T12:32:09.729Z';
             
-            Processor_Square.constructSquarePayment(new BWP_Payment__c(), sqCharge, apcWrapper);
+            Processor_Square.constructSquareTransaction(new BWP_Transaction__c(), sqCharge, apcWrapper);
         }
     }
     

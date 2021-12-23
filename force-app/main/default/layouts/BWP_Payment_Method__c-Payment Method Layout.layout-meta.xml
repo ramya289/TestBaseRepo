@@ -69,7 +69,11 @@
             </layoutItems>
             <layoutItems>
                 <behavior>Edit</behavior>
-                <field>Account__c</field>
+                <field>Salesforce_Account__c</field>
+            </layoutItems>
+            <layoutItems>
+                <behavior>Edit</behavior>
+                <field>Salesforce_Contact__c</field>
             </layoutItems>
         </layoutColumns>
         <layoutColumns>
@@ -172,10 +176,9 @@
         <fields>Amount_Refunded__c</fields>
         <fields>Application_Fee__c</fields>
         <fields>Currency__c</fields>
-        <fields>Payment_Status__c</fields>
+        <fields>Status__c</fields>
         <fields>Receipt_Number__c</fields>
-        <fields>Is_Live_Payment__c</fields>
-        <relatedList>BWP_Payment__c.Source__c</relatedList>
+        <relatedList>BWP_Transaction__c.Source__c</relatedList>
     </relatedLists>
     <showEmailCheckbox>false</showEmailCheckbox>
     <showHighlightsPanel>false</showHighlightsPanel>

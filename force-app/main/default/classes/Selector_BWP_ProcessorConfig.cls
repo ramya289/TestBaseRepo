@@ -15,6 +15,7 @@ public with sharing class Selector_BWP_ProcessorConfig extends QuerySelector {
                     BWP_Processor_Config__c.Refresh_Token__c,
                     BWP_Processor_Config__c.Access_Token_Expiry_Date__c,
                     BWP_Processor_Config__c.Account_Name__c,
+                    BWP_Processor_Config__c.Card_Creation_Key__c,
                     BWP_Processor_Config__c.Customer_Match_Config__c,
                     BWP_Processor_Config__c.Customer_Match_Type__c,
                     BWP_Processor_Config__c.Customer_Sync_Config__c,

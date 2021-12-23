@@ -6,8 +6,8 @@ private class Test_Processor_PayPal {
         Profile prof = [SELECT Id FROM Profile WHERE Name = 'Standard User' LIMIT 1 ];
         User user = new User(Alias = 'TestUser', Email = 'testuser@testorg.com', EmailEncodingKey = 'UTF-8', LastName = 'Testing', LanguageLocaleKey = 'en_US', LocaleSidKey = 'en_US', ProfileId = prof.Id, TimeZoneSidKey = 'America/Los_Angeles', UserName = uniqueUserName);
         insert user;
-        String adminPSName = 'Breadwinner_Payments_Admin_User';
-        List<PermissionSet> pset = [SELECT Id FROM PermissionSet WHERE Name = 'Breadwinner_Payments_Admin_User'];
+        String adminPSName = BreadwinnerUtil.ADMIN_PS_NAME;
+        List<PermissionSet> pset = [SELECT Id FROM PermissionSet WHERE Name = :BreadwinnerUtil.ADMIN_PS_NAME];
         insert new PermissionSetAssignment(AssigneeId = user.id, PermissionSetId = pset[0].Id);
     }
     @IsTest
@@ -83,12 +83,12 @@ private class Test_Processor_PayPal {
             ps.fetchCustomers('');
         } catch (Exception ex){}
         try{
-            ps.fetchPayments('');
+            ps.fetchTransactions('');
         } catch (Exception ex){}
         
     }
     @IsTest
-    static void fetchPayments_When_Success() {
+    static void fetchTransactions_When_Success() {
         Payment_Config__mdt apc = UnitTests.createAppConfig(1, ProcessorUtil.PAT_PAYPAL)[0];
         BreadwinnerUtil.AppConfig apcWrapper = BreadwinnerUtil.getAppConfigWrapper(apc);
         Test.startTest();
@@ -105,14 +105,14 @@ private class Test_Processor_PayPal {
         
         Test.setMock(HttpCalloutMock.class, httpMock);
         
-        ProcessorUtil.ResponseObject response =  Processor_PayPal.fetchPayments(apcWrapper, JSON.serializePretty(fetchRequest));
+        ProcessorUtil.ResponseObject response =  Processor_PayPal.fetchTransactions(apcWrapper, JSON.serializePretty(fetchRequest));
         System.debug('response: ' + response);
         
         Test.stopTest();
     }
     
     @IsTest
-    static void fetchPayments_When_Failure() {
+    static void fetchTransactions_When_Failure() {
         Payment_Config__mdt apc = UnitTests.createAppConfig(1, ProcessorUtil.PAT_PAYPAL)[0];
         BreadwinnerUtil.AppConfig apcWrapper = BreadwinnerUtil.getAppConfigWrapper(apc);
         
@@ -126,75 +126,11 @@ private class Test_Processor_PayPal {
         httpMock.statusCode = 400;
         Test.setMock(HttpCalloutMock.class, httpMock);
         
-        ProcessorUtil.ResponseObject response =  Processor_PayPal.fetchPayments(apcWrapper, JSON.serializePretty(fetchRequest));
+        ProcessorUtil.ResponseObject response =  Processor_PayPal.fetchTransactions(apcWrapper, JSON.serializePretty(fetchRequest));
         System.debug('response: ' + response);
         
         Test.stopTest();
     }
     
-    @IsTest
-    static void historicalSync_When_Success() {
-        List<Payment_Config__mdt> apcs = UnitTests.createAppConfig(1, ProcessorUtil.PAT_PAYPAL);
-        Test.startTest();
-        
-        UnitTests.MockHttpResponse httpMock = new UnitTests.MockHttpResponse();
-        httpMock.response = '{"transaction_details":[{"transaction_info":{"paypal_account_id":"D42UKH3SM7GLW","transaction_id":"60U965010N787725U","transaction_event_code":"T0001","transaction_initiation_date":"2020-10-15T09:20:14+0000","transaction_updated_date":"2020-10-15T09:20:14+0000","transaction_amount":{"currency_code":"USD","value":"1.87"},"transaction_status":"S","transaction_subject":"You have a payout!","transaction_note":"You have received a payout! Thanks for using our service!","ending_balance":{"currency_code":"USD","value":"5939.90"},"available_balance":{"currency_code":"USD","value":"5939.90"},"custom_field":"201403140001","protection_eligibility":"02"},"payer_info":{"account_id":"D42UKH3SM7GLW","email_address":"sb-mrlyn3212482@business.example.com","address_status":"N","payer_status":"Y","payer_name":{"alternate_full_name":"John Doe Test Store"},"country_code":"US"},"shipping_info":{"name":"John, Doe"}},{"transaction_info":{"paypal_account_id":"D42UKH3SM7GLW","transaction_id":"5FL977279A849764V","transaction_event_code":"T0001","transaction_initiation_date":"2020-10-15T12:04:15+0000","transaction_updated_date":"2020-10-15T12:04:15+0000","transaction_amount":{"currency_code":"USD","value":"1.87"},"transaction_status":"S","transaction_subject":"You have a payout!","transaction_note":"You have received a payout! Thanks for using our service!","ending_balance":{"currency_code":"USD","value":"5960.47"},"available_balance":{"currency_code":"USD","value":"5960.47"},"custom_field":"201403140001","protection_eligibility":"02"},"payer_info":{"account_id":"D42UKH3SM7GLW","email_address":"sb-mrlyn3212482@business.example.com","address_status":"N","payer_status":"Y","payer_name":{"alternate_full_name":"John Does Test Store"},"country_code":"US"},"shipping_info":{"name":"John, Doe"}}],"account_number":"XPYWY78WX7HNG","start_date":"2020-10-11T11:15:04+0000","end_date":"2020-11-10T11:15:04+0000","last_refreshed_datetime":"2020-12-10T09:59:59+0000","page":1,"total_items":2,"total_pages":1}';
-        Test.setMock(HttpCalloutMock.class, httpMock);
-        HistoricalSyncBatch historicalSync = new HistoricalSyncBatch('Payment');
-        
-        Database.executeBatch(historicalSync, 1);
-        
-        Test.stopTest();
-    }
-    
-    @IsTest
-    static void historicalSync_When_Failure() {
-        List<Payment_Config__mdt> apcs = UnitTests.createAppConfig(1, ProcessorUtil.PAT_PAYPAL);
-        
-        Test.startTest();
-        
-        UnitTests.MockHttpResponse httpMock = new UnitTests.MockHttpResponse();
-        httpMock.response = '{"name":"INVALID_REQUEST","message":"Invalid request - see details.","debug_id":"633f738a5da84","details":[{"field":"end_date","value":"2020-10-06T09:38:07.410Z","location":"query","issue":"Date range is greater than 31 days"}],"links":[]}';
-        httpMock.statusCode = 400;
-        Test.setMock(HttpCalloutMock.class, httpMock);
-        
-        HistoricalSyncBatch historicalSync = new HistoricalSyncBatch('Payment');
-        Database.executeBatch(historicalSync, 1);
-        
-        Test.stopTest();
-    }
-    
-    @IsTest
-    static void hourlySync_When_Success() {
-        List<Payment_Config__mdt> apcs = UnitTests.createAppConfig(1, ProcessorUtil.PAT_PAYPAL);
-        
-        Test.startTest();
-        
-        UnitTests.MockHttpResponse httpMock = new UnitTests.MockHttpResponse();
-        httpMock.response = '{"transaction_details":[{"transaction_info":{"paypal_account_id":"D42UKH3SM7GLW","transaction_id":"60U965010N787725U","transaction_event_code":"T0001","transaction_initiation_date":"2020-10-15T09:20:14+0000","transaction_updated_date":"2020-10-15T09:20:14+0000","transaction_amount":{"currency_code":"USD","value":"1.87"},"transaction_status":"S","transaction_subject":"You have a payout!","transaction_note":"You have received a payout! Thanks for using our service!","ending_balance":{"currency_code":"USD","value":"5939.90"},"available_balance":{"currency_code":"USD","value":"5939.90"},"custom_field":"201403140001","protection_eligibility":"02"},"payer_info":{"account_id":"D42UKH3SM7GLW","email_address":"sb-mrlyn3212482@business.example.com","address_status":"N","payer_status":"Y","payer_name":{"alternate_full_name":"John Doe Test Store"},"country_code":"US"},"shipping_info":{"name":"John, Doe"}},{"transaction_info":{"paypal_account_id":"D42UKH3SM7GLW","transaction_id":"5FL977279A849764V","transaction_event_code":"T0001","transaction_initiation_date":"2020-10-15T12:04:15+0000","transaction_updated_date":"2020-10-15T12:04:15+0000","transaction_amount":{"currency_code":"USD","value":"1.87"},"transaction_status":"S","transaction_subject":"You have a payout!","transaction_note":"You have received a payout! Thanks for using our service!","ending_balance":{"currency_code":"USD","value":"5960.47"},"available_balance":{"currency_code":"USD","value":"5960.47"},"custom_field":"201403140001","protection_eligibility":"02"},"payer_info":{"account_id":"D42UKH3SM7GLW","email_address":"sb-mrlyn3212482@business.example.com","address_status":"N","payer_status":"Y","payer_name":{"alternate_full_name":"John Does Test Store"},"country_code":"US"},"shipping_info":{"name":"John, Doe"}}],"account_number":"XPYWY78WX7HNG","start_date":"2020-10-11T11:15:04+0000","end_date":"2020-11-10T11:15:04+0000","last_refreshed_datetime":"2020-12-10T09:59:59+0000","page":1,"total_items":2,"total_pages":1}';
-        Test.setMock(HttpCalloutMock.class, httpMock);
-        
-        HourlySyncBatch hourlySync = new HourlySyncBatch('Payment');
-        Database.executeBatch(hourlySync, 1);
-        
-        Test.stopTest();
-    }
-    
-    @IsTest
-    static void hourlySync_When_Failure() {
-        List<Payment_Config__mdt> apcs = UnitTests.createAppConfig(1, ProcessorUtil.PAT_PAYPAL);
-        
-        Test.startTest();
-        
-        UnitTests.MockHttpResponse httpMock = new UnitTests.MockHttpResponse();
-        httpMock.response = '{"name":"INVALID_REQUEST","message":"Invalid request - see details.","debug_id":"633f738a5da84","details":[{"field":"end_date","value":"2020-10-06T09:38:07.410Z","location":"query","issue":"Date range is greater than 31 days"}],"links":[]}';
-        httpMock.statusCode = 400; 
-        Test.setMock(HttpCalloutMock.class, httpMock);
-        
-        HourlySyncBatch hourlySync = new HourlySyncBatch('Payment');
-        Database.executeBatch(hourlySync, 1);
-        
-        Test.stopTest();
-    }
     } */
 }

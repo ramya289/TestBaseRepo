@@ -1,7 +1,7 @@
 /*
 * Created By  :  Surender & Suchimitha (Dhruvsoft) 
 * Description :  This class is to run historical customer sync. It also includes "Sources(Payment Methods)" for each customer. 
-* Functionalities : All customers & respective payment methods, and payments will be fetched and linked accordingly.
+* Functionalities : All customers & respective payment methods, and transactions will be fetched and linked accordingly.
 */
 
 public with sharing class HistoricalSyncBatch implements Database.Batchable<BreadwinnerUtil.AppConfig>, Database.AllowsCallouts, Database.Stateful, Schedulable {
@@ -12,6 +12,9 @@ public with sharing class HistoricalSyncBatch implements Database.Batchable<Brea
     public Boolean runThisSyncOnly;
     public Integer requestRecordsCount;
     public String errors;
+    public Map<String, Set<String>> authNetCustomerIdsMap = new Map<String, Set<String>>(); // Holds Processor specific Customer Ids with key as processor Id, and the Ids can be sent to Processor_Batch to get Customer details.
+    public Map<String, Set<String>> authNetBatchIdsMap = new Map<String, Set<String>>(); // Holds Processor specific Transaction Batch Ids with key as processor Id, these can be sent to Processor_Batch to get Transaction details in each Batch
+
     //Constructor with BreadwinnerUtil.AppConfig input. This input will have updated BreadwinnerUtil.AppConfig data during runtime. It also can be used to run for specific BreadwinnerUtil.AppConfig.
     public HistoricalSyncBatch(String objectName, List<BreadwinnerUtil.AppConfig> appconfigs) {
         if(BreadwinnerUtil.getBWSetting().Active__c){
@@ -52,7 +55,6 @@ public with sharing class HistoricalSyncBatch implements Database.Batchable<Brea
         // Request fields
         Map<String, Object> request = new Map<String, Object>();
         request.put(ProcessorUtil.API_VERSION, ProcessorUtil.VER_1);
-        request.put(ProcessorUtil.API_VERSION, ProcessorUtil.VER_1);
         request.put(ProcessorUtil.API_PROCESSOR_ID, apC.accountId);
         
         // Response fields
@@ -62,7 +64,7 @@ public with sharing class HistoricalSyncBatch implements Database.Batchable<Brea
 
         if(runningObjectName.containsIgnoreCase(BreadwinnerUtil.OBJ_SYNC_CUSTOMER)){
             try{
-                request.put(ProcessorUtil.API_ACTION, ProcessorUtil.ACT_FETCH_CUSTOMERS);
+                request.put(ProcessorUtil.API_ACTION, ProcessorUtil.ACT_FETCH_CUSTOMERS_ALL);
                 if(apc.paymentProcessorType == ProcessorUtil.PAT_STRIPE){
                     Processor_Stripe.FetchRequest fetchRequest = new Processor_Stripe.FetchRequest();
                     if(apC.lastCustomerId != NULL){
@@ -72,7 +74,7 @@ public with sharing class HistoricalSyncBatch implements Database.Batchable<Brea
                     request.put(ProcessorUtil.API_REQUEST_JSON, JSON.serializePretty(fetchRequest));
                 }
                 else if(apc.PaymentProcessorType == ProcessorUtil.PAT_BRAINTREE){
-                    String requestJSON = Processor_Braintree.getRequestBody('fetchAllCustomers', (String.isNotBlank(apC.lastCustomerId) ? (apC.lastCustomerId) : NULL));
+                    String requestJSON = Processor_Braintree.getRequestBody(ProcessorUtil.ACT_FETCH_CUSTOMERS_ALL, (String.isNotBlank(apC.lastCustomerId) ? (apC.lastCustomerId) : NULL));
                     request.put(ProcessorUtil.API_REQUEST_JSON, requestJSON);
                 }
                 else if(apc.PaymentProcessorType == ProcessorUtil.PAT_SQUARE){
@@ -82,6 +84,10 @@ public with sharing class HistoricalSyncBatch implements Database.Batchable<Brea
                     }
                     fetchRequest.square_limit = '50';
                     request.put(ProcessorUtil.API_REQUEST_JSON, JSON.serializePretty(fetchRequest));
+                }
+                else if(apc.PaymentProcessorType == ProcessorUtil.PAT_AUTHORIZE_NET){
+                    String requestJSON = Processor_Authorize_Net.getRequestBody(ProcessorUtil.ACT_FETCH_CUSTOMERS_ALL, '', apc, '');
+                    request.put(ProcessorUtil.API_REQUEST_JSON, requestJSON);
                 }
                 response = BreadwinnerPaymentsAPI.call(request);
                 if(apiErrors != null){
@@ -105,6 +111,10 @@ public with sharing class HistoricalSyncBatch implements Database.Batchable<Brea
                         else if(apc.PaymentProcessorType == ProcessorUtil.PAT_SQUARE){
                             processCustomerResponse_Square(response, apc, requestRecordsCount);
                         }
+                        else if(apc.PaymentProcessorType == ProcessorUtil.PAT_AUTHORIZE_NET){
+                            // Requesting for list of Customer Ids (this request will only return customer Ids, not the full details of customers)
+                            processCustomerResponse_AuthNet(response, apc, authNetCustomerIdsMap);
+                        }
                     }
                 }
             }
@@ -116,7 +126,7 @@ public with sharing class HistoricalSyncBatch implements Database.Batchable<Brea
         }
         else if (runningObjectName.containsIgnoreCase(BreadwinnerUtil.OBJ_SYNC_PAYMENT)) {
             try{
-                request.put(ProcessorUtil.API_ACTION, ProcessorUtil.ACT_FETCH_PAYMENTS);
+                request.put(ProcessorUtil.API_ACTION, ProcessorUtil.ACT_FETCH_TRANSACTIONS_ALL);
                 if(apc.paymentProcessorType == ProcessorUtil.PAT_STRIPE){
                     Processor_Stripe.FetchRequest fetchRequest = new Processor_Stripe.FetchRequest();
                     if(apC.lastPaymentId != NULL){
@@ -126,7 +136,7 @@ public with sharing class HistoricalSyncBatch implements Database.Batchable<Brea
                     request.put(ProcessorUtil.API_REQUEST_JSON, JSON.serializePretty(fetchRequest));
                 }
                 else if(apc.PaymentProcessorType == ProcessorUtil.PAT_BRAINTREE){
-                    String requestJSON = Processor_Braintree.getRequestBody('fetchAllPayments', (String.isNotBlank(apC.lastPaymentId) ? (apC.lastPaymentId) : NULL));
+                    String requestJSON = Processor_Braintree.getRequestBody(ProcessorUtil.ACT_FETCH_TRANSACTIONS_ALL, (String.isNotBlank(apC.lastPaymentId) ? (apC.lastPaymentId) : NULL));
                     request.put(ProcessorUtil.API_REQUEST_JSON, requestJSON);
                 }
                 else if(apc.PaymentProcessorType == ProcessorUtil.PAT_SQUARE){
@@ -149,6 +159,19 @@ public with sharing class HistoricalSyncBatch implements Database.Batchable<Brea
                     fetchRequest.end_date = json.serialize(System.now()).remove('"');
                     request.put(ProcessorUtil.API_REQUEST_JSON, JSON.serializePretty(fetchRequest));
                 }*/
+                else if(apc.PaymentProcessorType == ProcessorUtil.PAT_AUTHORIZE_NET){
+                    String rawAccessToken = '';
+                    if(!Test.isRunningTest())
+                        rawAccessToken = CryptoUtil.decryptSecrets(apc).accessToken;
+                    String firstSettlementDate = json.serialize(System.now().addDays(-30)).remove('"'); 
+                    String lastSettlementDate = json.serialize(System.now()).remove('"');
+                    if(apc.startDate == null && apc.endDate == null){
+                        apc.startDate = DateTime.valueOf(firstSettlementDate.replace('T',' '));
+                        apc.endDate = DateTime.valueOf(lastSettlementDate.replace('T',' '));
+                    }
+                    String requestJSON = '{"getSettledBatchListRequest":{"merchantAuthentication":{"accessToken":"'+rawAccessToken+'"},"firstSettlementDate":"'+firstSettlementDate+'","lastSettlementDate":"'+lastSettlementDate+'"}}';
+                    request.put(ProcessorUtil.API_REQUEST_JSON, requestJSON);
+                }
                 response = BreadwinnerPaymentsAPI.call(request);
                 if(apiErrors != null){
                     for (ProcessorUtil.Error error : apiErrors){
@@ -175,10 +198,13 @@ public with sharing class HistoricalSyncBatch implements Database.Batchable<Brea
                         /*if(apc.PaymentProcessorType == ProcessorUtil.PAT_PAYPAL){
                             processPaymentResponse_PayPal(response, apc, requestRecordsCount);
                         } */
+                        if(apc.PaymentProcessorType == ProcessorUtil.PAT_AUTHORIZE_NET){
+                            processPaymentResponse_AuthNet(response, apc, authNetBatchIdsMap);
+                        }
                     }
                 }
             } catch(Exception ex) {
-                System.debug('Exception occurred while fetching payments from '+apc.paymentProcessorType+'.'+ex.getStackTraceString()+'See '+ex.getLineNumber()+'\n'+ex.getmessage());
+                System.debug('Exception occurred while fetching transactions from '+apc.paymentProcessorType+'.'+ex.getStackTraceString()+'See '+ex.getLineNumber()+'\n'+ex.getmessage());
                 apc.requireNextPaymentSyncRun = false;
                 exceptionInExecute = ex;
             }
@@ -188,10 +214,33 @@ public with sharing class HistoricalSyncBatch implements Database.Batchable<Brea
     
     public void finish(Database.BatchableContext BC) {
         system.debug('finish: '+exceptionInExecute);
+        
+        for(BreadwinnerUtil.AppConfig config : appConfigUpdateList){
+            if(config.PaymentProcessorType == ProcessorUtil.PAT_AUTHORIZE_NET && ((runningObjectName.containsIgnoreCase(BreadwinnerUtil.OBJ_SYNC_CUSTOMER) && !authNetCustomerIdsMap.isEmpty()) || (runningObjectName.containsIgnoreCase(BreadwinnerUtil.OBJ_SYNC_PAYMENT) && !authNetBatchIdsMap.isEmpty()))){
+                // For Customer Sync, Calling this batch to get each Customer details, and running with batch size as 40 to avoid hitting any limits
+                // The batch will loop through each customer id to get the full details
+                
+                // For Payment/Transaction Sync, calling Processor_Batch, sending list of Batch Ids
+                List<String> authNetIds = new List<String>();
+                if(runningObjectName.containsIgnoreCase(BreadwinnerUtil.OBJ_SYNC_CUSTOMER)){
+                    authNetIds.addAll(authNetCustomerIdsMap.get(config.name));
+                } else if(runningObjectName.containsIgnoreCase(BreadwinnerUtil.OBJ_SYNC_PAYMENT) && authNetBatchIdsMap.containsKey(config.Name)){
+                    authNetIds.addAll(authNetBatchIdsMap.get(config.Name));
+                }
+                Processor_Batch processorBatch = new Processor_Batch(authNetIds, config, runningObjectName);
+                processorBatch.runThisSyncOnly = runThisSyncOnly;
+                Database.executeBatch(processorBatch, 40);
+            }
+        }
+        
         if(exceptionInExecute!=NULL) {
             APICallHandler.userInteractionLogPush(TRUE, 'Historical Sync', 'ERROR' , 'Historical Sync Exception in execute : ' + exceptionInExecute.getMessage() + ' Stack Trace : ' + exceptionInExecute.getStackTraceString());
         }
-        
+        postSyncUpdates(appConfigUpdateList, runningObjectName, requestRecordsCount, runThisSyncOnly, false);
+    }
+    
+    // Added this method for reusability, this will update Processor Config after Customer/Payment Sync is completed
+    public static void postSyncUpdates(List<BreadwinnerUtil.AppConfig> appConfigUpdateList, String runningObjectName, Integer requestRecordsCount, Boolean runThisSyncOnly, Boolean isSyncCompleted){
         if(BreadwinnerUtil.getBWSetting().Active__c && BreadwinnerUtil.isProcessorConnected()) {
             Map<Id,BWP_Processor_Config__c> appConfigMap = new Map<Id,BWP_Processor_Config__c>();
             
@@ -206,21 +255,21 @@ public with sharing class HistoricalSyncBatch implements Database.Batchable<Brea
             
             //List to save app config records to database.
             List<BWP_Processor_Config__c> appConfigNeedToUpdate = new List<BWP_Processor_Config__c>();
-            
             for(BreadwinnerUtil.AppConfig appConfigWrapper : appConfigUpdateList) {
+                // Below If condition will check for ProcessorType, If ProcessorType is other than Authorize.Net, the processor Config will be updated automatically
+                // For Authorize.net, before updating the Processor Config checking for isauthNetCustomerSyncDone to make sure that the Authorize.Net Customer sync is completed
+                
                 //system.debug('appConfigWrapper.RecordId-----'+appConfigWrapper.RecordId);
                 Boolean recordExists = ((String.isNotBlank(appConfigWrapper.RecordId) && (appConfigWrapper.RecordId != NULL)) ? (appConfigMap.containsKey(appConfigWrapper.RecordId) ? true : false) : false);
                 BWP_Processor_Config__c appConfigCompleteRecord = recordExists ? appConfigMap.get(appConfigWrapper.RecordId) : new BWP_Processor_Config__c();
-                
-                if(appConfigWrapper.requireNextPaymentSyncRun && appConfigWrapper.PaymentProcessorType == ProcessorUtil.PAT_PAYPAL && (appConfigWrapper.endDate < appConfigWrapper.startDate)){
-//                    appConfigCompleteRecord.Start_Date__c = appConfigWrapper.startDate;
-//                    appConfigCompleteRecord.End_Date__c = appConfigWrapper.endDate;
+                if(appConfigWrapper.requireNextPaymentSyncRun && appConfigWrapper.PaymentProcessorType == ProcessorUtil.PAT_AUTHORIZE_NET && (appConfigWrapper.startDate < appConfigWrapper.endDate)){
+                    appConfigCompleteRecord.Start_Date__c = appConfigWrapper.startDate;
+                    appConfigCompleteRecord.End_Date__c = appConfigWrapper.endDate;
                 }
                 else{
-//                    appConfigCompleteRecord.Start_Date__c = null;
-//                    appConfigCompleteRecord.End_Date__c = null;
+                    appConfigCompleteRecord.Start_Date__c = null;
+                    appConfigCompleteRecord.End_Date__c = null;
                 }
-
                 if(runningObjectName.containsIgnoreCase(BreadwinnerUtil.OBJ_SYNC_CUSTOMER)){
                     System.debug('Customer Sync running at '+System.now());
                     if(appConfigWrapper.requireNextCustomerSyncRun && !appConfigWrapper.needToReconnect) { //if more records
@@ -234,12 +283,15 @@ public with sharing class HistoricalSyncBatch implements Database.Batchable<Brea
                         appConfigWrapper.isHistoricalCustomerSyncDone = true;
                         APICallHandler.userInteractionLogPush(TRUE, 'Historical Sync', 'FINISHED' , 'Object Name: Customer, Syncing Processor: '+appConfigWrapper.paymentProcessorType+' ('+appConfigWrapper.accountName+'), CurrentPage Parsed Records: '+requestRecordsCount);
                     }
-                    appConfigCompleteRecord.Historical_Customer_Sync_Last_Run__c = System.now();
+                    if(appConfigWrapper.PaymentProcessorType != ProcessorUtil.PAT_AUTHORIZE_NET || (appConfigWrapper.PaymentProcessorType == ProcessorUtil.PAT_AUTHORIZE_NET && isSyncCompleted)){
+                        appConfigCompleteRecord.Historical_Customer_Sync_Last_Run__c = System.now();
+                    }
                     appConfigCompleteRecord.Need_To_Reconnect__c = appConfigWrapper.needToReconnect;
                     appConfigNeedToUpdate.add(appConfigCompleteRecord);
                 }
                 else if(runningObjectName.containsIgnoreCase(BreadwinnerUtil.OBJ_SYNC_PAYMENT)){
                     System.debug('Payment Sync running at '+System.now());
+                    System.debug('--appConfigWrapper---'+appConfigWrapper);
                     if(appConfigWrapper.requireNextPaymentSyncRun && !appConfigWrapper.needToReconnect) { //if more records
                         appConfigWrapper.isHistoricalPaymentSyncDone = false;
                         appConfigNeedToRun.add(appConfigWrapper);
@@ -249,12 +301,14 @@ public with sharing class HistoricalSyncBatch implements Database.Batchable<Brea
                         appConfigWrapper.isHistoricalPaymentSyncDone = true;
                         APICallHandler.userInteractionLogPush(TRUE, 'Historical Sync', 'FINISHED' , 'Object Name: Payment, Syncing Processor: '+appConfigWrapper.paymentProcessorType+' ('+appConfigWrapper.accountName+'), CurrentPage Parsed Records: '+requestRecordsCount);
                     }
-                    appConfigCompleteRecord.Historical_Payment_Sync_Last_Run__c = System.now();
+                    if(appConfigWrapper.PaymentProcessorType != ProcessorUtil.PAT_AUTHORIZE_NET || (appConfigWrapper.PaymentProcessorType == ProcessorUtil.PAT_AUTHORIZE_NET && isSyncCompleted)){
+                        appConfigCompleteRecord.Historical_Payment_Sync_Last_Run__c = System.now();
+                    }
                     appConfigCompleteRecord.Need_To_Reconnect__c = appConfigWrapper.needToReconnect;
                     appConfigNeedToUpdate.add(appConfigCompleteRecord);
                 }
             }
-			BreadwinnerUtil.isBreadwinnerTransaction = true;
+            BreadwinnerUtil.isBreadwinnerTransaction = true;
             SecurityUtil.databaseUpsert(appConfigNeedToUpdate);
             
             if(!appConfigNeedToRun.isEmpty()) {
@@ -343,7 +397,17 @@ public with sharing class HistoricalSyncBatch implements Database.Batchable<Brea
                 Processor_Square.syncCustomers(processorTypeToRecordsMap, apC, True);
         }
     }
-    
+    private static void processCustomerResponse_AuthNet(Map<String, Object> response, BreadwinnerUtil.AppConfig apc, Map<String, Set<String>> authNetCustomerIdsMap){
+        String respBody = (String) response.get(ProcessorUtil.RESP_JSON);
+        respBody = respBody.trim().replace('\uFEFF', '');
+        Map<String, Object> bodyMap = (Map<String, Object>)JSON.deserializeUntyped(respBody);
+        List<Object> idsList = (List<Object>)bodyMap.get('ids');
+        Set<String> authNetIds = new Set<String>();
+        for(Object a: idsList){
+            authNetIds.add(String.valueOf(a));
+        }
+        authNetCustomerIdsMap.put(apc.name, authNetIds);
+    }
     public static void processPaymentResponse_Stripe(Map<String, Object> response, BreadwinnerUtil.AppConfig apc, Integer requestRecordsCount){
         Map<String, Charge.StripeCharge> stripePaymentMapById = new Map<String, Charge.StripeCharge>();
         Map<String, Object> processorTypeToRecordsMap = new Map<String, Object>();
@@ -363,7 +427,7 @@ public with sharing class HistoricalSyncBatch implements Database.Batchable<Brea
             requestRecordsCount = stripePaymentMapById.size() > 0 ? stripePaymentMapById.size() : 0;
             processorTypeToRecordsMap.put(ProcessorUtil.PAT_STRIPE, stripePaymentMapById);
             if(requestRecordsCount > 0) {
-                Processor_Stripe.syncPayments(processorTypeToRecordsMap, apC);
+                Processor_Stripe.syncTransactions(processorTypeToRecordsMap, apC);
             }
         }
     }
@@ -386,7 +450,7 @@ public with sharing class HistoricalSyncBatch implements Database.Batchable<Brea
             processorTypeToRecordsMap.put(ProcessorUtil.PAT_BRAINTREE, braintreePaymentMapById);
             requestRecordsCount = braintreePaymentMapById.size() > 0 ? braintreePaymentMapById.size() : 0;
             if(requestRecordsCount > 0) {
-                Processor_Braintree.syncPayments(processorTypeToRecordsMap, apC);
+                Processor_Braintree.syncTransactions(processorTypeToRecordsMap, apC);
             }
         }
         System.debug('--requestRecordsCount--'+requestRecordsCount);
@@ -410,7 +474,7 @@ public with sharing class HistoricalSyncBatch implements Database.Batchable<Brea
             requestRecordsCount = squarePaymentMapById.size() > 0 ? squarePaymentMapById.size() : 0;
             processorTypeToRecordsMap.put(ProcessorUtil.PAT_SQUARE, squarePaymentMapById);
             if(requestRecordsCount > 0) {
-                Processor_Square.syncPayments(processorTypeToRecordsMap, apC);
+                Processor_Square.syncTransactions(processorTypeToRecordsMap, apC);
             }
         }
     }
@@ -427,7 +491,7 @@ public with sharing class HistoricalSyncBatch implements Database.Batchable<Brea
             apc.lastPaymentId = responseData.lastPage;
             apc.requireNextPaymentSyncRun = true;
         }
-       if(apc.currentRunningClassContext =='HistoricalSyncBatch'){
+       if(apc.currentRunningClassContext == BreadwinnerUtil.CNTX_HIST_SYNC){
             Date orgStartDate = Date.today().addMonths(-2);
             DateTime finalDate = DateTime.newInstance(orgStartDate,Time.newInstance(0,0,0,0));
             if(finalDate < responseData.startDate){
@@ -455,11 +519,41 @@ public with sharing class HistoricalSyncBatch implements Database.Batchable<Brea
             requestRecordsCount = paypalPaymentMapById.size() > 0 ? paypalPaymentMapById.size() : 0;
             processorTypeToRecordsMap.put(ProcessorUtil.PAT_PAYPAL, paypalPaymentMapById);
             if(requestRecordsCount > 0) {
-                Processor_PayPal.syncPayments(processorTypeToRecordsMap, apC);
+                Processor_PayPal.syncTransactions(processorTypeToRecordsMap, apC);
             }
         }
     }
    */
+    private static void processPaymentResponse_AuthNet(Map<String, Object> response, BreadwinnerUtil.AppConfig apc, Map<String, Set<String>> authNetBatchIdsMap){
+        String responseJSON = (String) response.get(ProcessorUtil.RESP_JSON);
+        String respBody = responseJSON.trim().replace('\uFEFF', '');
+        JSONParser parser = JSON.createParser(respBody);
+        Map<String, Object> processorTypeToRecordsMap = new Map<String, Object>();
+        Map<String, Charge.AuthNetBatchList> authNetBatchResp =  new Map<String, Charge.AuthNetBatchList>();
+        Charge.AuthNetBatchResp batchResp = (Charge.AuthNetBatchResp) parser.readValueAs(Charge.AuthNetBatchResp.Class);
+        String code = batchResp.messages.message[0].code; // I00001 = 'Successful', I00004 = 'No records found'
+        Date orgStartDate = Date.today().addYears(-2);  // Setting final date to two years in past from today's date, as Authoize.net is storing only two year's of records in the Processor
+        DateTime finalDate = DateTime.newInstance(orgStartDate,Time.newInstance(0,0,0,0));
+        if(code == 'I00001'){
+            for(Charge.AuthNetBatchList batchDetails : batchResp.batchList){
+                authNetBatchResp.put(batchDetails.batchId, batchDetails);
+            }
+        } 
+        // checking below condition to get two year's records
+        if(finalDate < apc.startDate){
+            apc.endDate = apc.startDate;
+            apc.startdate = apc.startDate.addMonths(-1);
+            apc.requireNextPaymentSyncRun = True;
+        }
+        else{
+            apc.requireNextPaymentSyncRun = False;
+        }
+        if(!authNetBatchResp.isEmpty()){
+            authNetBatchIdsMap.put(apc.name, authNetBatchResp.keySet());
+            processorTypeToRecordsMap.put(ProcessorUtil.PAT_AUTHORIZE_NET, authNetBatchResp);
+            Processor_Authorize_Net.syncBatchRecords(apc, processorTypeToRecordsMap);
+        }
+    }
     /* Schedulable - execute */
     public void execute(SchedulableContext sc) {
         if(BreadwinnerUtil.isAdministrator()) {
@@ -487,7 +581,6 @@ public with sharing class HistoricalSyncBatch implements Database.Batchable<Brea
                 HistoricalSyncBatch historicalSync = new HistoricalSyncBatch(runningSyncName);
                 historicalSync.runThisSyncOnly = String.isNotBlank(syncName) ? true : false;
                 Database.executeBatch(historicalSync, 1); //At a time only one company should be run. Don't make it other than 1.
-                APICallHandler.userInteractionLogPush(FALSE, 'Historical Sync', 'Success' , 'Historical '+syncName+'Sync Restarted');
             }
         }
         catch(exception e){

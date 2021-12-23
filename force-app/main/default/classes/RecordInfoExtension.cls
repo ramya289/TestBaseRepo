@@ -2,7 +2,7 @@ public with sharing class RecordInfoExtension{
 
     private static Selector_BWP_Customer selectorCustomer = new Selector_BWP_Customer();
     private static Selector_BWP_Payment_Method selectorPaymentMethod = new Selector_BWP_Payment_Method();
-    private static Selector_BWP_Payment selectorPayment = new Selector_BWP_Payment();
+    private static Selector_BWP_Transaction selectorTransaction = new Selector_BWP_Transaction();
 
     public BWP_Processor_Config__c config                               {get; set;}
     public ID recordId                                                 {get; set;}
@@ -12,7 +12,7 @@ public with sharing class RecordInfoExtension{
     
     public BWP_Customer__c customer                              {get; set;}
     public BWP_Payment_Method__c paymethod                       {get; set;}
-    public BWP_Payment__c payment                                {get; set;}    
+    public BWP_Transaction__c transactionInfo                        {get; set;}    
     public Decimal firstDeposit                                  {get; set;}
     public Decimal secondDeposit                                 {get; set;}
     public String defaultSourceBrand                             {get; set;}
@@ -22,7 +22,7 @@ public with sharing class RecordInfoExtension{
     public List<BWP_Payment_Method__c> paymentsOtherList         {get; set;}
     
     
-    public List<BWP_Payment__c> paymentsList                     {get; set;} 
+    public List<TransactionWrapper> transactionsList                     {get; set;} 
     public Map<String, BWP_Payment_Method__c > paymentMethodsMap;
     public Decimal chargeAmount                                        {get; set;}
     public String chargingDescription                                  {get; set;}
@@ -40,7 +40,7 @@ public with sharing class RecordInfoExtension{
     public Boolean cardPanel                                        {get; set;}
     public boolean bankPanel                                        {get; set;}
     
-    public BWP_Payment__c createdPaymentInfo                        {get; set;}
+    public BWP_Transaction__c createdTransactionInfo                        {get; set;}
     
     
     public string bankPMAccountHolderName                                {get; set;}
@@ -82,7 +82,7 @@ public with sharing class RecordInfoExtension{
     public decimal chargeTaxAmount                                                   {get; set;}
     public Boolean chargeIsTaxExempt                                                 {get; set;}
     public Boolean canCreatePaymentMethod                                            {get; set;}
-    public Boolean canCreatePayment                                                  {get; set;}
+    public Boolean canCreateTransaction                                                  {get; set;}
     public Boolean hasMultiplePmTypes                                                {get; set;}
 
     public Boolean canUpdateCustomer                                                 {get; set;}
@@ -94,12 +94,12 @@ public with sharing class RecordInfoExtension{
     public Boolean bankPMIndividualName                                  				 {get; set;}
     public String squareCardErrors										     		 {get; set;}
     public String idempotencyKey													 {get; set;}
-    public String applicationId														 {get; set;}
 
     public Boolean isBankAuthAccepted                                                {get; set;}
     public String authorizeBankMessage                                               {get; set;}
     public String customermatchType                                                  {get; set;}
-    public Boolean showShippingAddress                                               {get;set;}
+    public Boolean showShippingAddress                                               {get; set;}
+    public String cardCreationKey                                                    {get; set;}
     // This is used so we can dump debug statements to the screen into a hidden field
     // since we can't get debug info from the RC package.
     public String debugTextArea {get; set;}
@@ -115,8 +115,8 @@ public with sharing class RecordInfoExtension{
             bwSetting =  BreadwinnerUtil.getBWSetting();
             isBreadwinnerReadOnlyMode = bwSetting.Read_Only_Mode__c;
             Boolean isMultiProcessorEnabled =  bwSetting.Multi_Processor_Enabled__c;
-            paymentsList=new List<BWP_Payment__c>();
-            createdPaymentInfo = new BWP_Payment__c();
+            transactionsList =new List<TransactionWrapper>();
+            createdTransactionInfo = new BWP_Transaction__c();
             paymentsCardList = new List<BWP_Payment_Method__c>();
             paymentsBankList = new List<BWP_Payment_Method__c>();
             paymentsOtherList = new List<BWP_Payment_Method__c>();
@@ -164,7 +164,7 @@ public with sharing class RecordInfoExtension{
             editCustomerErrors = '';
             verifyACHErrors = '';
             canCreatePaymentMethod = false;
-            canCreatePayment = false;
+            canCreateTransaction = false;
             hasMultiplePmTypes = false;
             canUpdateCustomer = false;
             showShippingAddress = false;
@@ -201,7 +201,7 @@ public with sharing class RecordInfoExtension{
                 String customFields = '';
                 if(sObjName ==appNameSpace+'BWP_Customer__c'){customFields = ' ,Salesforce_Account__r.Name, Salesforce_Contact__r.Name FROM BWP_Customer__c WHERE Id=:recordId LIMIT 1';}
                 else if(sObjName ==appNameSpace+'BWP_Payment_Method__c'){customFields = ',Customer__r.Processor_Customer_Id__c,Customer__r.Name,Customer__r.Email__c,Customer__r.Customer_Name__c, Customer__r.First_Name__c, Customer__r.Last_Name__c FROM BWP_Payment_Method__c WHERE Id=:recordId LIMIT 1';}
-                else if( sObjName ==appNameSpace+'BWP_Payment__c'){customFields = ',Customer__r.Name,Customer__r.Customer_Name__c,Customer__r.Email__c,Source__r.Card_Brand__c,Source__r.Last_4_digits__c,Source__r.Type__c,Source__r.Bank_Account_Holder_Name__c,Source__r.Bank_Name__c,Source__r.Account_Number__c FROM BWP_Payment__c WHERE Id=:recordId LIMIT 1';}
+                else if( sObjName ==appNameSpace+'BWP_Transaction__c'){customFields = ',Customer__r.Name,Customer__r.Customer_Name__c,Customer__r.Email__c,Source__r.Card_Brand__c,Source__r.Last_4_digits__c,Source__r.Type__c,Source__r.Bank_Account_Holder_Name__c,Source__r.Bank_Name__c,Source__r.Account_Number__c FROM BWP_Transaction__c WHERE Id=:recordId LIMIT 1';}
 
                 pmQuery = 'SELECT '+((xfields.size()>0)?(String.join(xfields, ', ')):'') + customFields;
                 system.debug('pmQuery: ' + pmQuery);
@@ -217,15 +217,14 @@ public with sharing class RecordInfoExtension{
                     processorCustomerId = customer.Processor_Customer_Id__c;
                     paymethod = new BWP_Payment_Method__c();
                     canCreatePaymentMethod = canCreatePaymentMethod(customer.Processor_Type__c);
-                    canCreatePayment = canCreatePayment(customer.Processor_Type__c);
-                    hasMultiplePmTypes = hasMultiplePmTypes(customer.Processor_Type__c);
+                    canCreateTransaction = canCreateTransaction(customer.Processor_Type__c);
+                    hasMultiplePmTypes = RecordCreationExtension.hasMultiplePmTypes(customer.Processor_Type__c);
                     canUpdateCustomer = canUpdateCustomer(customer.Processor_Type__c);
                     showShippingAddress = (String.isNotBlank(customer.Shipping_Street_Address_1__c) || String.isNotBlank(customer.Shipping_Street_Address_2__c) || String.isNotBlank(customer.Shipping_State__c) || String.isNotBlank(customer.Shipping_City__c) || String.isNotBlank(customer.Shipping_Country__c) || String.isNotBlank(customer.Shipping_Postal_Code__c)) ? True : False;
                     fetchCustomerRelatedPaymentMethods();
                     updateSelectedPaymentMethodDetails();
-                    authorizeBankMessage = authorizeBankMessage(customer);
-                    if (schema.SobjectType.BWP_Payment__c.isAccessible()) {
-
+                    authorizeBankMessage = RecordCreationExtension.authorizeBankMessage(customer);
+                    if (schema.SobjectType.BWP_Transaction__c.isAccessible()) {
                         List<String> relatedList = new List<String>{
                             'Source__r.Name',
                             'Source__r.Type__c',
@@ -234,10 +233,8 @@ public with sharing class RecordInfoExtension{
                             'Source__r.Card_Brand__c',
                             'Source__r.Last_4_digits__c'
                         };
-                        List<BWP_Payment__c> payList = selectorPayment.selectByCustomerId(new Set<String>{recordId},relatedList,1000);
-                        for (BWP_Payment__c pay: payList) {
-                            paymentsList.add(pay);
-                        }
+                        List<BWP_Transaction__c> trxnsList = selectorTransaction.selectByCustomerId(new Set<String>{recordId},relatedList,1000);
+                        transactionsList = getTransactionWrapperRecords(trxnsList);
                     }
                     for (BWP_Payment_Method__c card: paymentsCardList) {
                         allPaymentsMethodsList.add(new SelectOption(card.Id, card.Card_Brand__c + '   ' + '••••' + card.Last_4_digits__c + ' ' + card.Expiry_Month__c + ' / ' + card.Expiry_Year__c));
@@ -254,10 +251,13 @@ public with sharing class RecordInfoExtension{
                     if(!isCustomerRelatedOrgConnected)
                         ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.ERROR, ' Please connect to a '+customer.Processor_Type__c+' Account ('+customer.Processor_Org_Name__c+') from the Setup section of Breadwinner Payments Tab.'));
 
+                    cardCreationKey = config.Payment_Processor_Type__c ==  ProcessorUtil.PAT_SQUARE ? Processor_Square.getClientId(config.Live_Mode__c == True ? 'live' : 'test') : '';
+                    if(config.Payment_Processor_Type__c ==  ProcessorUtil.PAT_STRIPE ||  config.Payment_Processor_Type__c ==  ProcessorUtil.PAT_BRAINTREE)
+                        cardCreationKey =  String.isNotBlank(config.Card_Creation_Key__c) ? config.Card_Creation_Key__c : '';
                 }
                 if(sObjName == appNameSpace+'BWP_Payment_Method__c'){
                     paymethod = (BWP_Payment_Method__c) sobj;
-                    canCreatePayment = canCreatePayment(paymethod.Processor_Type__c);
+                    canCreateTransaction = canCreateTransaction(paymethod.Processor_Type__c);
                     if(string.isNotBlank(paymethod.Card_Brand__c)){
                         String cardBrand = '';
                         cardBrand = (paymethod.Card_Brand__c.replaceAll( '\\s+', ''));
@@ -266,42 +266,40 @@ public with sharing class RecordInfoExtension{
                         }
                         logoPath += cardBrand.toLowerCase()+'.png';
                     } 
+                    List<BWP_Transaction__c> trxnList = selectorTransaction.selectBySourceId(new Set<String>{recordId}, 1000);
+                    transactionsList = getTransactionWrapperRecords(trxnList);
                     APICallHandler.userInteractionLogPush(true, 'page visit', 'Payment Method Page' , 'Visited Payment Method view page');  
                     if(!isCustomerRelatedOrgConnected)
                         ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.ERROR, ' Please connect to a related '+paymethod.Processor_Type__c+' Account from the Setup section of Breadwinner Payments Tab.'));
                 }
-                if(sObjName == appNameSpace+'BWP_Payment__c'){
-                    payment = (BWP_Payment__c)sobj;
-                    if(string.isNotBlank(payment.Source__r.Card_Brand__c)){
+                if(sObjName == appNameSpace+'BWP_Transaction__c'){
+                    transactionInfo = (BWP_Transaction__c)sobj;
+                    if(string.isNotBlank(transactionInfo.Source__r.Card_Brand__c)){
                         String cardBrand = '';
-                        cardBrand = (payment.Source__r.Card_Brand__c.replaceAll( '\\s+', ''));
+                        cardBrand = (transactionInfo.Source__r.Card_Brand__c.replaceAll( '\\s+', ''));
                         if(cardBrand.contains('_')){
                             cardBrand = (cardBrand.replaceAll( '_', ''));
                         }
                         logoPath += cardBrand.toLowerCase()+'.png';
                     }
-                    datetime paymenttime = payment.createdDate;
+                    datetime paymenttime = transactionInfo.createdDate;
                     datetime addMinToPaymentTime = paymenttime.addMinutes(1);
                     system.debug('paymenttime-----'+paymenttime);
                     system.debug('addMinToPaymentTime-----'+addMinToPaymentTime);
                     system.debug('system.now()----'+system.now());
-                    if(String.isNotBlank(payment.Currency__c)){
+                    if(String.isNotBlank(transactionInfo.Currency__c)){
                         for(String zerodecimalcurreny: zeroDecimalCurrenciesList){
-                            if(zerodecimalcurreny == (payment.Currency__c).toLowerCase()){
+                            if(zerodecimalcurreny == (transactionInfo.Currency__c).toLowerCase()){
                                 isZeroDecimalCurrency = true;
                             }
                         }
                     }
-                    if(System.Now() < addMinToPaymentTime && payment.Created_Via__c == BreadwinnerUtil.CNTX_BW){
+                    if(System.Now() < addMinToPaymentTime && transactionInfo.Created_Via__c == BreadwinnerUtil.CNTX_BW){
                         ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.CONFIRM,' The charge was successfully applied.'));
                     }
-                    APICallHandler.userInteractionLogPush(true, 'page visit', 'Payment Page' , 'Visited Payment view page');
+                    APICallHandler.userInteractionLogPush(true, 'page visit', 'Transaction Page' , 'Visited Transaction view page');
                     //if(!isCustomerRelatedOrgConnected)
                     // ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.ERROR, ' Please connect to a related '+payment.Processor_Type__c+' Account from the Setup section of Breadwinner Payments Tab.'));
-                }
-                
-                for(BWP_Payment__c pay : selectorPayment.selectBySourceId(new Set<String>{recordId}, 1000)){
-                    paymentsList.add(pay);
                 }
             }
         }
@@ -325,7 +323,7 @@ public with sharing class RecordInfoExtension{
                 paymentsOtherList.add(pay);
             }
             paymentMethodsMap.put(pay.Id, pay);
-            system.debug('payment----'+pay.Processor_Id__c);
+            system.debug('transaction----'+pay.Processor_Id__c);
             if (customer != NULL && String.isNotBlank(customer.Default_Source__c)) {
                 if (customer.Default_Source__c == pay.Processor_Id__c) {
                     defaultSourceNumber = pay.Last_4_digits__c != null ? String.Valueof(pay.Last_4_digits__c) : pay.Account_Number__c;
@@ -340,9 +338,8 @@ public with sharing class RecordInfoExtension{
                             logoPath += cardBrand.toLowerCase()+'.png';
                     }
                     selectedPaymentMethod = String.isNotBlank(selectedPaymentMethod) ? selectedPaymentMethod : ((pay.Type__c == ProcessorUtil.PM_BANK ? (pay.Card_Status__c == 'Verified' ? pay.Id : null) : pay.Id));
-                        system.debug('selectedPaymentMethod----'+selectedPaymentMethod);
                     defaultPaymentMethod = String.isNotBlank(defaultPaymentMethod) ? defaultPaymentMethod : ((pay.Type__c == ProcessorUtil.PM_BANK ? (pay.Card_Status__c == 'Verified' ? pay.Id : null) : pay.Id));
-                        }
+                }
             }
         }
 
@@ -378,6 +375,8 @@ public with sharing class RecordInfoExtension{
             request.put(ProcessorUtil.API_ACTION, ProcessorUtil.ACT_CHARGE_PROCESSOR);
             request.put(ProcessorUtil.API_VERSION, ProcessorUtil.VER_1);
             request.put(ProcessorUtil.API_PROCESSOR_ID, config.Provider_ID__c);
+            BWP_Payment_Method__c paymethod = sObjName == appNameSpace+'BWP_Customer__c' && selectedPaymentMethod!=null ? paymentMethodsMap.get(selectedPaymentMethod) :paymethod;
+            RecordCreationExtension.chargeInfo chargeInfo = new RecordCreationExtension.chargeInfo(paymethod.Processor_Customer_Id__c, paymethod.Processor_Id__c, paymethod.Type__c, chargeAmount, selectedCurrency, chargingDescription, chargeIsTaxExempt, chargeTaxAmount, idempotencyKey);
             if(chargeAmount <= 0){
                 chargeMessage = 'Amount must be greater than 0';   
             }
@@ -386,20 +385,20 @@ public with sharing class RecordInfoExtension{
                     if(chargingDescription.length()<=1000 ){
                         chargeMessage = chargingDescription.length()>1000? ' Invalid string: Description must be at most 1000 characters': ' Please provide valid Amount';
                     }
-                    response = chargeCustomer_Stripe(request);
+                    response = RecordCreationExtension.chargeCustomer_Stripe(request, chargeInfo);
                 }
                 else if(config.Payment_Processor_Type__c == ProcessorUtil.PAT_BRAINTREE){
-                    response = chargeCustomer_Braintree(request);
+                    response = RecordCreationExtension.chargeCustomer_Braintree(request, chargeInfo);
                 }
                 else if(config.Payment_Processor_Type__c == ProcessorUtil.PAT_SQUARE){
-                    response = chargeCustomer_Square(request);
+                    response = RecordCreationExtension.chargeCustomer_Square(request, chargeInfo);
                 }
             }
-
+            isChargeSuccess = ProcessorUtil.isValidResponse(response);
             if(isChargeSuccess){
-                List<ProcessorUtil.PaymentWrapper> paymentResp = (List<ProcessorUtil.PaymentWrapper>) response.get(ProcessorUtil.PAYMENT_RESP);
-                createdPaymentInfo = selectorPayment.selectByProcessorId(new Set<String>{paymentResp[0].processorId}, null)[0];
-                APICallHandler.userInteractionLogPush(false, 'Payment Created', 'Customer Layout', 'A new '+config.Payment_Processor_Type__c+' Payment is created from Breadwinner Payments');
+                List<ProcessorUtil.TransactionWrapper> transactionResp = (List<ProcessorUtil.TransactionWrapper>) response.get(ProcessorUtil.PAYMENT_RESP);
+                createdTransactionInfo = selectorTransaction.selectByProcessorId(new Set<String>{transactionResp[0].processorId}, null)[0];
+                APICallHandler.userInteractionLogPush(false, 'Payment Created', 'Customer Layout', 'A new '+config.Payment_Processor_Type__c+' Transaction is created from Breadwinner Payments');
                 chargeMessage = '';
             }
             else{
@@ -407,91 +406,11 @@ public with sharing class RecordInfoExtension{
             }
         }catch(Exception ex){
             chargeMessage = ex.getmessage();
-            System.debug('Exception occurred while creating Payment in '+config.Payment_Processor_Type__c+'.'+ex.getStackTraceString()+'\n'+ex.getmessage());
+            System.debug('Exception occurred while creating Transaction in '+config.Payment_Processor_Type__c+'.'+ex.getStackTraceString()+'\n'+ex.getmessage());
             APICallHandler.userInteractionLogPush(false, 'Create Payment', 'ERROR', 'Exception: '+ex.getMessage());
         }
     }
-    private Map<String,Object> chargeCustomer_Stripe(Map<String,Object> request){
-        BWP_Payment_Method__c paymethod = sObjName == appNameSpace+'BWP_Customer__c' && selectedPaymentMethod!=null ? paymentMethodsMap.get(selectedPaymentMethod) :paymethod;
-        Charge.StripeCharge ch = new Charge.StripeCharge();
-        ch.amount = chargeAmount > 0 ? chargeAmount : 0;
-        ch.customer = paymethod.Processor_Customer_Id__c;
-        ch.stripe_currency = String.isNotBlank(selectedCurrency) ? selectedCurrency : '';//'usd';
-        ch.description = chargingDescription;
-        ch.paymentMethod = paymethod.Processor_Id__c;
-        ch.paymentMethodType = String.isNotBlank(paymethod.Type__c) ? (paymethod.Type__c == ProcessorUtil.PM_CARD ? ProcessorUtil.PM_CARD : (paymethod.Type__c != ProcessorUtil.PM_BANK ? ProcessorUtil.PM_ACH_CREDIT : ProcessorUtil.PM_BANK)) : '';
-        system.debug('ch.stripe_currency'+ch.stripe_currency);
-
-        Map<String, List<Charge.StripeCharge>> chargeMap = new Map<String, List<Charge.StripeCharge>>();
-        chargeMap.put('charge', new List<Charge.StripeCharge>{ch});
-
-        request.put(ProcessorUtil.API_REQUEST_JSON, JSON.serializePretty(chargeMap));
-
-        request.put(ProcessorUtil.API_TIMEOUT, '20000');
-        System.debug('ChargeCustomer request: ' + request);
-        Map<String, Object> response =  BreadwinnerPaymentsAPI.call(request);
-        System.debug('ChargeCustomer response: ' + response);
-        
-        isChargeSuccess = ProcessorUtil.isValidResponse(response);
-        
-        return response;
-    }
-    private Map<String,Object> chargeCustomer_Braintree(Map<String,Object> request){
-        BWP_Payment_Method__c paymethod = sObjName == appNameSpace+'BWP_Customer__c' && selectedPaymentMethod!=null ? paymentMethodsMap.get(selectedPaymentMethod) :paymethod;
-        Charge.BraintreeCharge ch = new Charge.BraintreeCharge();
-        Charge.Amount amount = new Charge.Amount();
-        amount.value = String.valueOf(chargeAmount);
-        ch.amount = amount;
-        Charge.Customer customer = new Charge.Customer();
-        customer.id = paymethod.Processor_Customer_Id__c;
-        ch.customer = customer;
-        Charge.PaymentMethod paymentMethod = new Charge.PaymentMethod();
-        paymentMethod.id = paymethod.Processor_Id__c;
-        ch.paymentMethod = paymentMethod;
-        Charge.TransactionTaxInput transactionTaxInput = new Charge.TransactionTaxInput();
-        Charge.Amount taxAmount = new Charge.Amount();
-        taxAmount.value = String.valueOf(chargeTaxAmount);
-        transactionTaxInput.taxAmount =  taxAmount;
-        transactionTaxInput.taxExempt = chargeIsTaxExempt;
-        ch.transactionTaxInput = transactionTaxInput;
-        Map<String, List<Charge.BraintreeCharge>> chargeMap = new Map<String, List<Charge.BraintreeCharge>>();
-        chargeMap.put('charge', new List<Charge.BraintreeCharge>{ch});
-
-
-        request.put(ProcessorUtil.API_REQUEST_JSON, JSON.serializePretty(chargeMap));
-
-        System.debug('ChargeCustomer request: ' + request);
-        Map<String, Object> response =  BreadwinnerPaymentsAPI.call(request);
-        System.debug('ChargeCustomer response: ' + response);
-        
-        isChargeSuccess = ProcessorUtil.isValidResponse(response);
-        
-        return response;
-    }
-    private Map<String,Object> chargeCustomer_Square(Map<String,Object> request){
-        BWP_Payment_Method__c paymethod = sObjName == appNameSpace+'BWP_Customer__c' && selectedPaymentMethod!=null ? paymentMethodsMap.get(selectedPaymentMethod) :paymethod;
-        Charge.SquareCharge ch = new Charge.SquareCharge();
-        Charge.Money money = new Charge.Money();
-        money.amount =  chargeAmount > 0 ? chargeAmount*100 : 0;
-        money.square_currency = String.isNotBlank(selectedCurrency) ? selectedCurrency.toUppercase() : '';
-        ch.amount_money = money;
-        ch.customer_id = paymethod.Processor_Customer_Id__c;
-        ch.source_id = paymethod.Processor_Id__c;
-        ch.idempotency_key = idempotencyKey;
-        Map<String, List<Charge.SquareCharge>> chargeMap = new Map<String, List<Charge.SquareCharge>>();
-        chargeMap.put('charge', new List<Charge.SquareCharge>{ch});
-
-        request.put(ProcessorUtil.API_REQUEST_JSON, JSON.serializePretty(chargeMap));
-
-        request.put(ProcessorUtil.API_TIMEOUT, '20000');
-        System.debug('ChargeCustomer request: ' + request);
-        Map<String, Object> response =  BreadwinnerPaymentsAPI.call(request);
-        System.debug('ChargeCustomer response: ' + response);
-        
-        isChargeSuccess = ProcessorUtil.isValidResponse(response);
-        
-        return response;
-    }
+    
     public void updateCustomer(){
         editCustomerErrors ='';
         isEditSuccess = false;
@@ -606,22 +525,9 @@ public with sharing class RecordInfoExtension{
         verifyACHErrors ='';
         isVerifySuccess = false;
         try{
-            Customer.verifyBankAccount verify = new Customer.verifyBankAccount();
-            verify.customerId = paymethod.Processor_Customer_Id__c;
-            verify.bankId = paymethod.Processor_Id__c;
-            verify.firstDeposit = firstDeposit;
-            verify.secondDeposit = secondDeposit;
-            Map<String, List<Customer.verifyBankAccount>> verifyMap = new Map<String, List<Customer.verifyBankAccount>>();
-            verifyMap.put('verify', new List<Customer.verifyBankAccount>{verify});
-
-            Map<String,Object> request = new Map<String,Object>();
-            request.put(ProcessorUtil.API_ACTION,ProcessorUtil.ACT_VERIFY_BANKACCOUNT);
-            request.put(ProcessorUtil.API_VERSION, ProcessorUtil.VER_1);
-            request.put(ProcessorUtil.API_PROCESSOR_ID, config.Provider_ID__c);
-            request.put(ProcessorUtil.API_REQUEST_JSON, JSON.serializePretty(verifyMap));
-            System.debug('Stripe VerifyBank Account request: ' + request);
-            Map<String, Object> response =  BreadwinnerPaymentsAPI.call(request);
-            System.debug('Stripe VerifyBank Account response: ' + response);
+            RecordCreationExtension.verifyInfo verifyInfo = new RecordCreationExtension.verifyInfo(paymethod.Processor_Customer_Id__c, paymethod.Processor_Id__c, firstDeposit, secondDeposit);
+           
+            Map<String, Object> response = RecordCreationExtension.verifyBank(config.Provider_ID__c, verifyInfo);
 
             List<ProcessorUtil.Error> apiErrors = (List<ProcessorUtil.Error>) response.get(ProcessorUtil.RESP_API_ERRORS);
             List<ProcessorUtil.Error> processingErrors = (List<ProcessorUtil.Error>) response.get(ProcessorUtil.RESP_PROC_ERRORS);
@@ -691,7 +597,7 @@ public with sharing class RecordInfoExtension{
             system.debug('selectedPaymentMethod-------' + selectedPaymentMethod);
 
             if (isChargeSuccess || isPaymentMethodCreated) {
-                paymentsList = new List<BWP_Payment__c>();
+                transactionsList = new List<TransactionWrapper>();
                 paymentsCardList = new List<BWP_Payment_Method__c>();
                 paymentsBankList = new List<BWP_Payment_Method__c>();
                 paymentsOtherList = new List<BWP_Payment_Method__c>();
@@ -705,12 +611,8 @@ public with sharing class RecordInfoExtension{
                         'Source__r.Card_Brand__c',
                         'Source__r.Last_4_digits__c'
                     };
-                    List<BWP_Payment__c> payList = selectorPayment.selectByCustomerId(new Set<String>{recordId}, relatedFields, 1000);
-
-                    for (BWP_Payment__c pay : payList) {
-                        paymentsList.add(pay);
-                    }
-
+                    List<BWP_Transaction__c> trxnList = selectorTransaction.selectByCustomerId(new Set<String>{recordId}, relatedFields, 1000);
+                    transactionsList = getTransactionWrapperRecords(trxnList); 
                     List<BWP_Payment_Method__c> pmList = selectorPaymentMethod.selectByCustomerId(new Set<Id>{recordId}, new List<String>{}, 1000);
                     for (BWP_Payment_Method__c pay : pmList) {
 
@@ -736,9 +638,8 @@ public with sharing class RecordInfoExtension{
 
                 }
                 else if (sObjName == appNameSpace + 'BWP_Payment_Method__c') {
-                    for (BWP_Payment__c pay : selectorPayment.selectBySourceId(new Set<String>{recordId}, 1000)) {
-                        paymentsList.add(pay);
-                    }
+                    List<BWP_Transaction__c> trxnList = selectorTransaction.selectBySourceId(new Set<String>{recordId}, 1000);
+                    transactionsList = getTransactionWrapperRecords(trxnList);
                 }
                 isChargeSuccess = false;
             }
@@ -766,29 +667,34 @@ public with sharing class RecordInfoExtension{
         bankPMIndividualOwnerLastName='';
     }
     public void renderPMpage(){
-        if(config.Payment_Processor_Type__c ==  ProcessorUtil.PAT_SQUARE){
-            applicationId = Processor_Square.getClientId(config.Live_Mode__c == True ? 'live' : 'test');
-        }
-        bankPMRoutingNumber = '';bankPMAccountNumber='';bankPMConfirmAccountNumber='';bankPMAccountHolderName='';bankPMBusinessOwnerName='';bankPMIndividualOwnerFirstName='';bankPMIndividualOwnerLastName='';bankPMCountry = 'US'; bankPMCurrency = 'USD';PMmessage=''; newPMType='card';unMatchedAccount=false;isChargeSuccess=false;
+        bankPMRoutingNumber = '';bankPMAccountNumber='';bankPMConfirmAccountNumber='';bankPMAccountHolderName='';bankPMBusinessOwnerName='';bankPMIndividualOwnerFirstName='';bankPMIndividualOwnerLastName='';bankPMCountry = 'US'; bankPMCurrency = 'USD';PMmessage=''; editCustomerErrors='';newPMType='card';unMatchedAccount=false;isChargeSuccess=false;
     }
     public void createPaymentMethod(){
         isPaymentMethodCreated = false;
         try{            
             Map<String,Object> request = new Map<String,Object>();
             Map<String,Object> response = new Map<String,Object>();
-            request.put(ProcessorUtil.API_ACTION, (newPMType == ProcessorUtil.PM_CARD ? ProcessorUtil.ACT_CREATE_CARD_TOKEN : ProcessorUtil.ACT_CREATE_BANK_TOKEN));
+            request.put(ProcessorUtil.API_ACTION, (newPMType == ProcessorUtil.PM_CARD ? (config.Payment_Processor_Type__c != ProcessorUtil.PAT_BRAINTREE ? ProcessorUtil.ACT_UPDATE_CUSTOMER : ProcessorUtil.ACT_CREATE_CARD_TOKEN) : ProcessorUtil.ACT_CREATE_BANK_TOKEN));
             request.put(ProcessorUtil.API_VERSION, ProcessorUtil.VER_1);
             request.put(ProcessorUtil.API_PROCESSOR_ID, config.Provider_ID__c);
+            RecordCreationExtension.cardInfo cInfo;
+            RecordCreationExtension.bankAccountInfo bankInfo;
+            if(newPMType == ProcessorUtil.PM_CARD){
+                RecordCreationExtension.cardAddress cAddress = new RecordCreationExtension.cardAddress(cardStreetLine1, cardStreetLine2, cardCity, cardState, cardCountry, cardPostalCode);
+                cInfo = new RecordCreationExtension.cardInfo(processorCustomerId, cardNumber, cardExpiryMonth, cardExpiryYear, cardCVC, cardHolderName, PMTokenValue, cAddress);
+            }
+            if(newPMType == ProcessorUtil.PM_BANK){
+                List<BWP_Customer__c> customerList = selectorCustomer.selectByProcessorCustomerId(new Set<String>{processorCustomerId}, 1);
+                String company = customerList.size()> 0 ? customerList[0].Company__c : '';
+                String accountType = config.Payment_Processor_Type__c == ProcessorUtil.PAT_STRIPE ? bankPMAccountHolderType : bankPMBankAccountType;
+                bankInfo = new RecordCreationExtension.bankAccountInfo(processorCustomerId, bankPMCountry, bankPMCurrency, bankPMAccountHolderName, accountType, bankPMAccountNumber, bankPMRoutingNumber, bankPMBusinessOwnerName, bankPMIndividualOwnerFirstName, bankPMIndividualOwnerLastName, company);
+            }
             if(config.Payment_Processor_Type__c == ProcessorUtil.PAT_STRIPE){
                 if(newPMType == ProcessorUtil.PM_CARD){
-                    PMmessage = validateCard(cardNumber, cardExpiryMonth, cardExpiryYear);
-                    if(String.isNotBlank(PMmessage)){
-                        return;
-                    }
-                    response = createCard_Stripe(request, processorCustomerId);
+                    response = RecordCreationExtension.createCard_Stripe(request, cInfo);
                 }
                 else if(newPMType == ProcessorUtil.PM_BANK){
-                    PMmessage = validateBankAccount(config.Payment_Processor_Type__c, bankPMAccountHolderName, bankPMRoutingNumber, bankPMAccountNumber);
+                    PMmessage = RecordCreationExtension.validateBankAccount(config.Payment_Processor_Type__c, bankPMAccountHolderName, bankPMRoutingNumber, bankPMAccountNumber);
                     if(String.isNotBlank(PMmessage)){
                         return;
                     }
@@ -797,34 +703,30 @@ public with sharing class RecordInfoExtension{
                         return;
                     }
                     if(!isBankAuthAccepted){
-                        PMmessage = bankAuthMessage();
+                        PMmessage = RecordCreationExtension.bankAuthMessage();
                         return;
                     }
-                    response = createBankAccount_Stripe(request, processorCustomerId);
+                    response = RecordCreationExtension.createBankAccount_Stripe(request, bankInfo);
                 }
             }
             else if(config.Payment_Processor_Type__c == ProcessorUtil.PAT_BRAINTREE){
-                if(newPMType == ProcessorUtil.PM_CARD){
-                    PMmessage = validateCard(cardNumber, cardExpiryMonth, cardExpiryYear);
-                    if(String.isNotBlank(PMmessage)){
-                        return;
-                    }
-                    response = createCard_Braintree(request, processorCustomerId);
+                if(newPMType == ProcessorUtil.PM_CARD && String.isNotBlank(PMTokenValue)){
+                    response = RecordCreationExtension.createCard_Braintree(request, cInfo);
                 }
                 else if(newPMType == ProcessorUtil.PM_BANK){
-                    PMmessage = validateBankAccount(config.Payment_Processor_Type__c, '', bankPMRoutingNumber, bankPMAccountNumber);
+                    PMmessage = RecordCreationExtension.validateBankAccount(config.Payment_Processor_Type__c, '', bankPMRoutingNumber, bankPMAccountNumber);
                     if(String.isNotBlank(PMmessage)){
                         return;
                     }
-                    PMmessage = validateBraintreeOwner(bankPMAccountHolderType, bankPMBusinessOwnerName, bankPMIndividualOwnerFirstName,  bankPMIndividualOwnerLastName);
+                    PMmessage = RecordCreationExtension.validateBraintreeOwner(bankPMAccountHolderType, bankPMBusinessOwnerName, bankPMIndividualOwnerFirstName,  bankPMIndividualOwnerLastName);
                     if(String.isNotBlank(PMmessage)){
                         return;
                     }
                     if(!isBankAuthAccepted){
-                        PMmessage = bankAuthMessage();
+                        PMmessage = RecordCreationExtension.bankAuthMessage();
                         return;
                     }
-                    response = createBankAccount_Braintree(request, processorCustomerId);
+                    response = RecordCreationExtension.createBankAccount_Braintree(request, bankInfo);
                 }
             }
             else if(config.Payment_Processor_Type__c == ProcessorUtil.PAT_SQUARE){
@@ -833,22 +735,25 @@ public with sharing class RecordInfoExtension{
                     return;
                 }
                 if(String.isBlank(squareCardErrors) && String.isNotBlank(PMTokenValue))
-                    response = createCard_Square(request, processorCustomerId);
+                    response = RecordCreationExtension.createCard_Square(request, cInfo);
             }
+            isPaymentMethodCreated = ProcessorUtil.isValidResponse(response);
             if(isPaymentMethodCreated){
                 List<ProcessorUtil.CustomerWrapper> custMethod = (List<ProcessorUtil.CustomerWrapper>) response.get(ProcessorUtil.CUST_RESP);
                 customer.Default_Source__c = custMethod[0].defaultSource;
-                List<ProcessorUtil.PaymentMethodWrapper> payMethod = (List<ProcessorUtil.PaymentMethodWrapper>) response.get(ProcessorUtil.PAYMETHOD_RESP);
-                defaultSourceNumber = (payMethod[0].last4digits != NULL) ? payMethod[0].last4digits : payMethod[0].accountNumber;
-                defaultSourceBrand = string.isNotBlank(payMethod[0].cardBrand) ? payMethod[0].cardBrand : 'others';
-                if (defaultSourceBrand != 'others') {
-                    String cardBrand = '';
-                    cardBrand = (defaultSourceBrand.replaceAll( '\\s+', ''));
-                    if(cardBrand.contains('_')){
-                        cardBrand = (cardBrand.replaceAll( '_', ''));
+                if(String.isNotBlank(customer.Default_Source__c)){
+                    BWP_Payment_Method__c payMethod = selectorPaymentMethod.selectByProcessorId(customer.Default_Source__c, 1)[0];
+                    defaultSourceNumber = (payMethod.Last_4_digits__c != NULL) ? payMethod.Last_4_digits__c : payMethod.Account_Number__c;
+                    defaultSourceBrand = string.isNotBlank(payMethod.Card_Brand__c) ? payMethod.Card_Brand__c : 'others';
+                    if (defaultSourceBrand != 'others') {
+                        String cardBrand = '';
+                        cardBrand = (defaultSourceBrand.replaceAll( '\\s+', ''));
+                        if(cardBrand.contains('_')){
+                            cardBrand = (cardBrand.replaceAll( '_', ''));
+                        }
+                        if(!logoPath.contains('.png'))
+                            logoPath += cardBrand.toLowerCase()+'.png';
                     }
-                    if(!logoPath.contains('.png'))
-                        logoPath += cardBrand.toLowerCase()+'.png';
                 }
                 APICallHandler.userInteractionLogPush(false, 'Payment Method Created', 'Customer Layout', 'A new '+config.Payment_Processor_Type__c+' Payment Method is created from Breadwinner Payments');
             }
@@ -863,159 +768,7 @@ public with sharing class RecordInfoExtension{
             //ApexPages.addMessage(new ApexPages.Message(ApexPages.severity.ERROR, ' '+ex.getmessage()));
         }
     }
-    public Map<String,Object> createCard_Stripe(Map<String,Object> request, String processorCustomerId){
-        Customer.StripeCustomer customer = new Customer.StripeCustomer();
-        customer.id = processorCustomerId;
-        List<Customer.Source> datalist = new list<Customer.Source>();
-        Customer.Source data = new Customer.Source();
-        data.cardNumber = cardNumber;
-        data.exp_month = cardExpiryMonth;
-        data.exp_year = cardExpiryYear;
-        data.cvc = cardCVC;
-        data.name = cardHolderName;
-        data.address_line1 = cardStreetLine1;
-        data.address_line2 = cardStreetLine2;
-        data.address_city = cardCity;
-        data.address_state = cardState;
-        data.address_zip = cardPostalCode;
-        data.address_country = cardCountry;
-        datalist.add(data);
-        Customer.Sources data2 = new  Customer.Sources();
-        data2.data = datalist;
-        customer.Sources = data2;
-
-        Map<String, List<Customer.StripeCustomer>> customerMap = new Map<String, List<Customer.StripeCustomer>>();
-        customerMap.put('customer', new List<Customer.StripeCustomer>{customer});
-
-        request.put(ProcessorUtil.API_REQUEST_JSON, JSON.serializePretty(customerMap));
-
-        Map<String, Object> response =  BreadwinnerPaymentsAPI.call(request);
-        System.debug('Payment Method response: ' + response);
-        
-        isPaymentMethodCreated = ProcessorUtil.isValidResponse(response);
-        
-        return response;
-    }
-    public Map<String,Object> createCard_Braintree(Map<String,Object> request, String processorCustomerId){
-        Customer.BraintreeCustomer customer = new Customer.BraintreeCustomer();
-        customer.id = processorCustomerId;
-        List<Customer.PaymentMethodDetails> datalist = new  list<Customer.PaymentMethodDetails>();
-        Customer.PaymentMethodDetails cardDetails = new Customer.PaymentMethodDetails();
-        cardDetails.cardNumber = cardNumber;
-        cardDetails.expirationMonth = String.valueOf(Integer.valueOf(cardExpiryMonth));
-        cardDetails.expirationYear = cardExpiryYear;
-        cardDetails.cardholderName = cardHolderName;
-        datalist.add(cardDetails);
-        customer.paymentMethodDetails = datalist;
-        Map<String, List<Customer.BraintreeCustomer>> customerMap = new Map<String, List<Customer.BraintreeCustomer>>();
-        customerMap.put('customer', new List<Customer.BraintreeCustomer>{customer});
-
-        request.put(ProcessorUtil.API_REQUEST_JSON, JSON.serializePretty(customerMap));
-
-        Map<String, Object> response =  BreadwinnerPaymentsAPI.call(request);
-        System.debug('Payment Method response: ' + response);
-        
-        isPaymentMethodCreated = ProcessorUtil.isValidResponse(response);
-        
-        return response;
-    }
-    public Map<String,Object> createCard_Square(Map<String,Object> request, String processorCustomerId){
-        Customer.SquareCustomer customer = new Customer.SquareCustomer();
-        customer.id = processorCustomerId;
-        List<Customer.SquareCard> cards = new List<Customer.SquareCard>();
-        Customer.SquareCard card = new Customer.SquareCard();
-        card.card_nonce = PMTokenValue;
-        card.cardholder_name = cardHolderName;
-
-        Customer.SquareAddress address = new Customer.SquareAddress();
-        address.address_line_1 = cardStreetLine1;
-        address.address_line_2 = cardStreetLine2;
-        address.locality = cardCity;
-        address.administrative_district_level_1 = cardState;
-        address.postal_code = cardPostalCode;
-        address.country = cardCountry;
-        card.billing_address = address;
-
-        cards.add(card);
-        customer.cards = cards;
-        Map<String, Object> requestMap = new Map<String, Object>();
-
-        requestMap.put('customer', new List<Customer.SquareCustomer>{customer});
-        request.put(ProcessorUtil.API_REQUEST_JSON, JSON.serializePretty(requestMap));
-        request.put(ProcessorUtil.API_ACTION, ProcessorUtil.ACT_CREATE_CARD_TOKEN);
-        Map<String, Object> response =  BreadwinnerPaymentsAPI.call(request);
-        System.debug('Payment Method response: ' + response);
-        
-        isPaymentMethodCreated = ProcessorUtil.isValidResponse(response);
-        
-        return response;
-    }
-
     
-    public Map<String,Object> createBankAccount_Stripe(Map<String,Object> request, String processorCustomerId){
-        Customer.StripeCustomer customer = new Customer.StripeCustomer();
-        customer.id = processorCustomerId;
-        List<Customer.Source> datalist = new  list<Customer.Source>();
-        Customer.Source data = new Customer.Source();
-        data.country = bankPMCountry;
-        data.stripe_currency = bankPMCurrency;
-        data.account_holder_name = bankPMAccountHolderName ;
-        data.account_holder_type = bankPMAccountHolderType ;
-        data.account_number = bankPMAccountNumber;
-        data.routing_number = bankPMRoutingNumber;
-        datalist.add(data);
-        Customer.Sources data2= new  Customer.Sources();
-        data2.data = datalist;
-        customer.Sources = data2;
-        Map<String, List<Customer.StripeCustomer>> customerMap = new Map<String, List<Customer.StripeCustomer>>();
-        customerMap.put('customer', new List<Customer.StripeCustomer>{customer});
-
-        request.put(ProcessorUtil.API_REQUEST_JSON, JSON.serializePretty(customerMap));
-
-        Map<String, Object> response =  BreadwinnerPaymentsAPI.call(request);
-        System.debug('Payment Method response: ' + response);
-        
-        isPaymentMethodCreated = ProcessorUtil.isValidResponse(response);
-        
-        return response;
-    }
-    public Map<String,Object> createBankAccount_Braintree(Map<String,Object> request, String processorCustomerId){
-        Customer.BraintreeCustomer customer = new Customer.BraintreeCustomer();
-        customer.id = processorCustomerId;
-        List<BWP_Customer__c> customerList = selectorCustomer.selectByProcessorCustomerId(new Set<String>{processorCustomerId}, 1);
-        String company = customerList.size()> 0 ? customerList[0].Company__c : '';
-        customer.company = company;
-        List<Customer.PaymentMethodDetails> datalist = new  list<Customer.PaymentMethodDetails>();
-        Customer.PaymentMethodDetails cardDetails = new Customer.PaymentMethodDetails();
-        cardDetails.accountNumber = bankPMAccountNumber.replaceAll('(\\s+)', '');
-        cardDetails.routingNumber = bankPMRoutingNumber.replaceAll('(\\s+)', '');
-        cardDetails.accountType = bankPMBankAccountType.toUppercase();
-        if(String.isNotBlank(bankPMBusinessOwnerName)){
-            Customer.BusinessOwner businessOwnerName = new Customer.BusinessOwner();
-            businessOwnerName.businessName = bankPMBusinessOwnerName;
-            cardDetails.businessOwner = businessOwnerName;
-        }
-        if(String.isNotBlank(bankPMIndividualOwnerFirstName) && String.isNotBlank(bankPMIndividualOwnerLastName)){
-            Customer.IndividualOwner individualOwnerName = new Customer.IndividualOwner();
-            individualOwnerName.firstName = bankPMIndividualOwnerFirstName;
-            individualOwnerName.lastName = bankPMIndividualOwnerLastName;
-            cardDetails.individualOwner = individualOwnerName;
-        }
-        datalist.add(cardDetails);
-        customer.paymentMethodDetails = datalist;
-        Map<String, List<Customer.BraintreeCustomer>> customerMap = new Map<String, List<Customer.BraintreeCustomer>>();
-        customerMap.put('customer', new List<Customer.BraintreeCustomer>{customer});
-        
-        request.put(ProcessorUtil.API_REQUEST_JSON, JSON.serializePretty(customerMap));
-
-        Map<String, Object> response =  BreadwinnerPaymentsAPI.call(request);
-        System.debug('Payment Method response: ' + response);
-        
-        isPaymentMethodCreated = ProcessorUtil.isValidResponse(response);
-        
-        return response;
-    }
-
     public void processResponseFailure(Map<String,Object> response){
         List<ProcessorUtil.Error> apiErrors = (List<ProcessorUtil.Error>) response.get(ProcessorUtil.RESP_API_ERRORS);
         List<ProcessorUtil.Error> processingErrors = (List<ProcessorUtil.Error>) response.get(ProcessorUtil.RESP_PROC_ERRORS);
@@ -1060,92 +813,59 @@ public with sharing class RecordInfoExtension{
         return listOfCurrencies;
     }
 
-    public static List<SelectOption> PaymentMethodOptions                                           {
-        get{
-            List<SelectOption> options = new List<SelectOption>();
-            options.add(new SelectOption(ProcessorUtil.PM_Card,'Card'));
-            options.add(new SelectOption(ProcessorUtil.PM_Bank,'Bank Account'));
-            return options;
-        }
-        private set;
+    public List<SelectOption> getPaymentMethodOptions(){
+        return RecordCreationExtension.paymentMethodOptions;
     }
     public Boolean canCreatePaymentMethod(String processorType){
         return Schema.SObjectType.BWP_Payment_Method__c.isCreateable() & ProcessorUtil.processorsThatAllowPaymentMethods.contains(processorType);
     }
-    public Boolean canCreatePayment(String processorType){
-        return Schema.SObjectType.BWP_Payment__c.isCreateable() & ProcessorUtil.processorsThatAllowPayments.contains(processorType);
-    }
-    public static Boolean hasMultiplePmTypes(String processorType){
-        return Schema.SObjectType.BWP_Payment__c.isCreateable() & ProcessorUtil.processorsWithMultiplePmTypes.contains(processorType);
+    public Boolean canCreateTransaction(String processorType){
+        return Schema.SObjectType.BWP_Transaction__c.isCreateable() & ProcessorUtil.processorsThatAllowPayments.contains(processorType);
     }
     public Boolean canUpdateCustomer(String processorType){
         return Schema.SObjectType.BWP_Customer__c.isUpdateable() & ProcessorUtil.processorsThatAllowCustomerUpdate.contains(processorType);
     }
-    public static String bankAuthMessage(){
-        return 'Please click the \" I accept \" checkbox as proof of authorization';
+    public class TransactionWrapper {
+        public Id RecordId                          {get; set;}
+        public String Name                          {get; set;}
+        public String PaymentDate                   {get; set;}
+        public String PaymentMethodType             {get; set;}
+        public String PMCardBrand                   {get; set;}
+        public String PMLast4Digits                 {get; set;}
+        public String PMBankName                    {get; set;}
+        public String PMAccountNumber               {get; set;}
+        public String ChargeStatus                  {get; set;}
+        public String PaymentStatus                 {get; set;}
+        public String Description                   {get; set;}
+        public String ChargeCurrency                {get; set;}
+        public Decimal Amount                       {get; set;}
+        public Boolean showDecimals                 {get; set;}
     }
-    public static String authorizeBankMessage(BWP_Customer__c customer){
-        String message;
-        if(customer.Processor_Type__c == 'Stripe'){
-            message = 'By clicking "Add Bank Account", I authorize "'+customer.Processor_Type__c+'", on behalf of "'+UserInfo.getOrganizationName()+'" (i) to verify my bank account information using bank information and consumer reports and (ii) to debit my bank account.';
-        }
-        if(customer.Processor_Type__c == 'Braintree'){
-            message = 'By clicking "Add Bank Account", I authorize "'+customer.Processor_Type__c+'", on behalf of "'+((String.isNotBlank(customer.Company__c) || customer.Company__c != null ) ? customer.Company__c : UserInfo.getOrganizationName())+'" (i) to verify my bank account information using bank information and consumer reports and (ii) to debit my bank account.';
-        }
-        return message;
-    }
-    public static String validateCard(String cardNumber, String cardExpiryMonth, String cardExpiryYear){
-        List<String> errorsList = new List<String>();
-        String errorMessage = '';
-        if (String.isBlank(cardNumber)){
-            errorsList.add('card number');
-        }
-        if (String.isBlank(cardExpiryMonth)){
-            errorsList.add('expiration month');
-        }
-        if (String.isBlank(cardExpiryYear)) {
-            errorsList.add('expiration year');
-        }
-        errorMessage = errorMessage(errorsList);
-        return errorMessage;
-    }
-    public static String validateBankAccount(String processorType, String accountHolderName, String routingNumber, String accountNumber){
-        List<String> errorsList = new List<String>();
-        String errorMessage = '';
-        if(processorType == ProcessorUtil.PAT_STRIPE){
-            if (String.isBlank(accountHolderName))
-                errorsList.add('Account holder name'); 
-        }
-        if (String.isBlank(routingNumber))
-            errorsList.add('Routing number');
-        if (String.isBlank(accountNumber))
-            errorsList.add('Bank Account Number');
-        errorMessage = errorMessage(errorsList);
-        return errorMessage;
-    }
-    public static string validateBraintreeOwner(String accountHolderType, String businessOwnerName, String individualOwnerFirstName, String individualOwnerLastName){
-        String errorMessage = '';
-        if(accountHolderType == 'business' && String.isBlank(businessOwnerName)){
-            errorMessage = 'Please specify Business Name';
-        }
-        if(accountHolderType == 'individual' && (String.isBlank(individualOwnerFirstName) || String.isBlank(individualOwnerLastName))){
-            errorMessage = 'Please specify both First Name and Last Name';
-        }
-        return errorMessage;
-    }
-    public static String errorMessage(List<String> errorsList){
-        String missingParams = '';
-        String errorMessage = '';
-        if (errorsList.size() > 0){
-            for (String err : errorsList){
-                missingParams += err + ', ';
+    public List<TransactionWrapper> getTransactionWrapperRecords(List<BWP_Transaction__c> trxnList){
+        if(trxnList == null) return new List<TransactionWrapper>();
+        List<String> zeroDecimalCurrenciesList = BreadwinnerUtil.getZeroDecimalStripeCurrencies();
+        List<TransactionWrapper> transactionsList = new List<TransactionWrapper>();
+        for(BWP_Transaction__c trxn: trxnList){
+            TransactionWrapper txn = new TransactionWrapper();
+            txn.RecordId = trxn.Id;
+            txn.Name = trxn.Name;
+            txn.PaymentDate = trxn.Created_Date_in_Processor__c.date().format();
+            if(sObjName == appNameSpace+'BWP_Customer__c'){
+                txn.PaymentMethodType = trxn.Source__r.Type__c;
+                txn.PMCardBrand = trxn.Source__r.Card_Brand__c;
+                txn.PMLast4Digits = trxn.Source__r.Last_4_digits__c;
+                txn.PMBankName = trxn.Source__r.Bank_Name__c;
+                txn.PMAccountNumber = trxn.Source__r.Account_Number__c;
             }
+            txn.ChargeStatus = trxn.Charge_Status__c;
+            txn.PaymentStatus = trxn.Status__c;
+            txn.Description = trxn.Description__c;
+            txn.ChargeCurrency = trxn.Currency__c;
+            if(zeroDecimalCurrenciesList.contains((trxn.Currency__c).toLowerCase())) txn.showDecimals = false;
+            else txn.showDecimals = true;
+            txn.Amount = trxn.Amount__c;
+            transactionsList.add(txn);
         }
-        if(String.isNotBlank(missingparams)){
-            string params = missingparams.endsWith(', ') ? missingparams.removeEnd(', ') : missingparams;
-            errorMessage = 'Please enter valid '+params+'.';
-        }
-        return errorMessage;
+        return transactionsList;
     }
-    
 }

@@ -5,23 +5,32 @@ Description - This class contains reusable methods.
 public with sharing class BreadwinnerUtil{
 
     // It is used to store the Package Version number. We will update this for every release until we find a way to automate values. Existing way is not supporting in the 2GP.
-    public static final String PKG_VER_NO = '1.5';
+    public static final String PKG_VER_NO = '2.5';
 
     public static final String OBJ_SYNC_CUSTOMER = 'Customer';
     public static final String OBJ_SYNC_PAYMENT = 'Payment';
+    @namespaceAccessible public static final String OBJ_SYNC_PRODUCT = 'Product';
+    @namespaceAccessible public static final String OBJ_SYNC_PRICE = 'Price';
 
     // Current Running Context Variables
     public static final String CNTX_HIST_SYNC = 'HistoricalSyncBatch';
 	public static final String CNTX_HOUR_SYNC = 'HourlySyncBatch';
-	public static final String CNTX_BWAPI = 'BWAPI';
+	public static final String CNTX_BWAPI = 'Breadwinner API';
 	public static final String CNTX_BW = 'Breadwinner';
+    @namespaceAccessible public static final String CNTX_BB_HIST_SYNC = 'BillingHistoricalSyncBatch';
 
     public static final String SYNC_CNTX_HOURLY = 'BreadwinnerPaymentsHourlySync';
     public static final String SYNC_CNTX_WEEKLY = 'BreadwinnerPaymentsWeeklySync';
     public static final String SYNC_CNTX_MONITOR = 'MonitorBreadwinnerPayments';
     public static final String SYNC_CNTX_ALL = 'BreadwinnerPayments';
 
-    public static final String SB_PACKAGE_NAME = 'Stripe Billing';
+    //Permission Sets Name
+    public static final String ADMIN_PS_NAME = 'Breadwinner_Payments_Admin_User';
+    public static final String OPERATION_PS_NAME = 'Breadwinner_Payments_Operations';
+    public static final String STANDARD_PS_NAME = 'Breadwinner_Payments_Standard_User';
+    public static final String READONLY_PS_NAME = 'Breadwinner_Payments_Read_Only';
+
+    public static final String BB_EXT_PACKAGE_NAME = 'Breadwinner Billing';
 
     @namespaceAccessible
     public static Boolean isBreadwinnerTransaction {
@@ -33,19 +42,20 @@ public with sharing class BreadwinnerUtil{
         } 
         set;
     }
-    
+
     private static Selector_BWP_ProcessorConfig selectorProcessorConfig = new Selector_BWP_ProcessorConfig();
 
     public static String namespace {
         get {
             if (namespace == null) {
                 namespace = '';
-                Schema.DescribeSObjectResult os = Schema.SObjectType.BWP_Payment__c;
+                Schema.DescribeSObjectResult os = Schema.SObjectType.BWP_Transaction__c;
                 String[] split = os.getName().split('__');
                 if (split.size() > 2) {
                     namespace = split[0];
                 }
             }
+            System.debug('namespace: '+namespace);
             return namespace;
         }
         set;
@@ -65,7 +75,7 @@ public with sharing class BreadwinnerUtil{
     @namespaceAccessible
     public static BWP_Processor_Config__c getProcessorConfig(String processorId){
         List<BWP_Processor_Config__c> processorConfig = selectorProcessorConfig.selectByProcessorId(new Set<String>{processorId});
-        return processorConfig.size()>0 ? processorConfig[0] : null;
+        return processorConfig.size()>0 ? processorConfig[0] : new BWP_Processor_Config__c();
     }
     
     public static String namespaceApi = String.isNotBlank(namespace) ? namespace+'__' : '';
@@ -111,14 +121,56 @@ public with sharing class BreadwinnerUtil{
         }
         else return new Organization();
     }
+
+    public static Boolean isSandbox(){
+        Organization orgInfo = orgInfo();
+        return orgInfo.IsSandbox;
+    }
+
+    public static Boolean isSandboxRefresh(){
+        Breadwinner_Settings__c bwSetting = getBWSetting();
+        return (isSandbox() && (UserInfo.getOrganizationId() != bwSetting.Salesforce_Org_Id__c));
+    }
+
+    public static void deleteConfigsWhenSandboxRefresh(){
+        if(isSandboxRefresh()){
+            try{
+                List<Breadwinner_Settings__c> bwSettingList = Breadwinner_Settings__c.getall().values();
+                List<BWP_Processor_Config__c> processorConfigList = BreadwinnerUtil.processorConfigList;
+                isBreadwinnerTransaction = true;
+                SecurityUtil.dmlDelete(processorConfigList);
+                SecurityUtil.dmlDelete(bwSettingList);
+                abortAllBreadwinnerPaymentsJobs();
+            }
+            catch(Exception e){
+                System.debug('Exception'+e.getMessage());
+                APICallHandler.userInteractionLogPush(TRUE, 'Delete Config', 'ERROR' , 'Error occured while deleting Processor Configs and Custom Settings on Sandbox refresh. '+e.getStackTraceString());
+            }
+        }
+    }
+
+    public static void abortAllBreadwinnerPaymentsJobs(){
+        for(CronTrigger ct : BreadwinnerUtil.getCronTrigger(BreadwinnerUtil.SYNC_CNTX_ALL)){
+            System.abortJob(ct.id);
+        }
+    }
     
     public static Breadwinner_Settings__c getBWSetting(){
-        return Breadwinner_Settings__c.getAll().values().size() > 0 ? Breadwinner_Settings__c.getAll().values().get(0) : new Breadwinner_Settings__c(Name='Breadwinner', Active__c = true, Read_Only_Mode__c = true, Plan_Name__c='Basic', Plan_Code__c='20', Status__c='trial', Date_of_Expiration__c = System.now()+365);
+        return Breadwinner_Settings__c.getAll().values().size() > 0 ? Breadwinner_Settings__c.getAll().values().get(0) : new Breadwinner_Settings__c(Name=CNTX_BW);
+    }
+    
+    public static Boolean isBreadwinnerInstalled(){
+        if(Schema.SobjectType.PackageLicense.isAccessible()){
+            return([SELECT NamespacePrefix, Id, IsProvisioned, CreatedDate FROM PackageLicense WHERE NamespacePrefix=:nameSpace LIMIT 1].size()>0);
+        }
+        else {
+            return FALSE;
+        }
     }
 
     /* These methods are related to End point */
     public static String getSupportURL() {
-        return 'https://support.breadwinnerhq.com';
+        return isBreadwinnerInstalled() ? 'https://support.breadwinnerhq.com' : 'https://support-staging.breadwinnerhq.com';
     }
 
     public static String getSupportEndpointBaseURL() {
@@ -136,49 +188,58 @@ public with sharing class BreadwinnerUtil{
     }
 
     public static Boolean isBWOperationsPSAssigned(){
-        return [SELECT Id FROM PermissionSetAssignment WHERE AssigneeId = :Userinfo.getUserId() AND PermissionSet.Name='Breadwinner_Payments_Operations'].size()>0? true:false;
+        return [SELECT Id FROM PermissionSetAssignment WHERE AssigneeId = :Userinfo.getUserId() AND PermissionSet.Name=:BreadwinnerUtil.OPERATION_PS_NAME].size()>0? true:false;
     }
 
     public static Boolean isBWAdminPSAssigned(){
-        return [SELECT Id FROM PermissionSetAssignment WHERE AssigneeId = :Userinfo.getUserId() AND PermissionSet.Name='Breadwinner_Payments_Admin_User'].size()>0? true:false;
+        return [SELECT Id FROM PermissionSetAssignment WHERE AssigneeId = :Userinfo.getUserId() AND PermissionSet.Name=:BreadwinnerUtil.ADMIN_PS_NAME].size()>0? true:false;
     }
 
     public static Boolean canPerformBreadwinnerOperations(){
         return (isBreadwinnerAdministrator() || isBWOperationsPSAssigned());
     }
     
+    @namespaceAccessible
     public class AppConfig {
-        public Id recordId                          {get;set;}
-        public String name                          {get;set;}
-        public String accountName                   {get;set;}
-        public Boolean needToReconnect              {get;set;}
-        public String accountId                     {get;set;}
-        public Datetime lastHistoricalCustomerSyncDateTime {get;set;}
-        public Datetime lastHistoricalPaymentSyncDateTime  {get;set;}
-        public String lastPaymentId                 {get;set;}
-        public String lastCustomerId                {get;set;}
-        public String accessToken                   {get;set;}
-        public String refreshToken                  {get;set;}
-        public Boolean livemode                     {get;set;}
-        public Boolean requireNextCustomerSyncRun   {get;set;}
-        public Boolean requireNextPaymentSyncRun    {get;set;}
-        public Boolean isCustomerMatchComplete      {get;set;}
-        public String customerMatchType             {get;set;}
-        public Datetime hourlyCustomerSyncLastRun   {get;set;}
-        public Datetime hourlyPaymentSyncLastRun    {get;set;}
-        public String defaultCurrency               {get;set;}
-        public Boolean isHistoricalCustomerSyncDone {get;set;}
-        public Boolean isHistoricalPaymentSyncDone  {get;set;}
-        public Boolean isHourlyCustomerSyncDone     {get;set;}
-        public Boolean isHourlyPaymentSyncDone      {get;set;}
-        public String currentRunningClassContext    {get;set;}
-        public String PaymentProcessorType          {get;set;}
-        public String customerSyncConfig            {get;set;}
-        public String customerMatchConfig           {get;set;}
-        public Datetime startDate                   {get;set;}
-        public Datetime endDate                     {get;set;}
-        public Boolean isEncryptionRotationRequired    {get;set;}
-        public Boolean isAlreadyDecrypted           {get;set;}
+        @namespaceAccessible public Id recordId                          {get;set;}
+        @namespaceAccessible public String name                          {get;set;}
+        @namespaceAccessible public String accountName                   {get;set;}
+        @namespaceAccessible public Boolean needToReconnect              {get;set;}
+        @namespaceAccessible public String accountId                     {get;set;}
+        @namespaceAccessible public Datetime lastHistoricalCustomerSyncDateTime {get;set;}
+        @namespaceAccessible public Datetime lastHistoricalPaymentSyncDateTime  {get;set;}
+        @namespaceAccessible public Datetime lastHistoricalProductSyncDateTime  {get;set;}
+        @namespaceAccessible public String lastCustomerId                {get;set;}
+        @namespaceAccessible public String lastPaymentId                 {get;set;}
+        @namespaceAccessible public String lastProductId                 {get;set;}
+        @namespaceAccessible public String lastPriceId                   {get;set;}
+        @namespaceAccessible public String accessToken                   {get;set;}
+        @namespaceAccessible public String refreshToken                  {get;set;}
+        @namespaceAccessible public Boolean livemode                     {get;set;}
+        @namespaceAccessible public Boolean requireNextCustomerSyncRun   {get;set;}
+        @namespaceAccessible public Boolean requireNextPaymentSyncRun    {get;set;}
+        @namespaceAccessible public Boolean requireNextProductSyncRun    {get;set;}
+        @namespaceAccessible public Boolean requireNextPriceSyncRun      {get;set;}
+        @namespaceAccessible public Boolean isCustomerMatchComplete      {get;set;}
+        @namespaceAccessible public String customerMatchType             {get;set;}
+        @namespaceAccessible public Datetime hourlyCustomerSyncLastRun   {get;set;}
+        @namespaceAccessible public Datetime hourlyPaymentSyncLastRun    {get;set;}
+        @namespaceAccessible public Datetime hourlyProductSyncLastRun    {get;set;}
+        @namespaceAccessible public String defaultCurrency               {get;set;}
+        @namespaceAccessible public Boolean isHistoricalCustomerSyncDone {get;set;}
+        @namespaceAccessible public Boolean isHistoricalPaymentSyncDone  {get;set;}
+        @namespaceAccessible public Boolean isHistoricalProductSyncDone  {get;set;}
+        @namespaceAccessible public Boolean isHourlyCustomerSyncDone     {get;set;}
+        @namespaceAccessible public Boolean isHourlyPaymentSyncDone      {get;set;}
+        @namespaceAccessible public Boolean isHourlyProductSyncDone      {get;set;}
+        @namespaceAccessible public String currentRunningClassContext    {get;set;}
+        @namespaceAccessible public String PaymentProcessorType          {get;set;}
+        @namespaceAccessible public String customerSyncConfig            {get;set;}
+        @namespaceAccessible public String customerMatchConfig           {get;set;}
+        @namespaceAccessible public Datetime startDate                   {get;set;}
+        @namespaceAccessible public Datetime endDate                     {get;set;}
+        @namespaceAccessible public Boolean isEncryptionRotationRequired    {get;set;}
+        @namespaceAccessible public Boolean isAlreadyDecrypted           {get;set;}
     }
     
     @namespaceAccessible
@@ -212,10 +273,9 @@ public with sharing class BreadwinnerUtil{
             ac.PaymentProcessorType = appC.Payment_Processor_Type__c;
             ac.customerSyncConfig = appC.Customer_Sync_Config__c;
             ac.customerMatchConfig = appC.Customer_Match_Config__c;
-//TODO: Add back in once new payment_config is created
-//            ac.startDate = appC.Start_Date__c;
-//            ac.endDate = appC.End_Date__c;
-            if(ac.PaymentProcessorType == ProcessorUtil.PAT_PAYPAL && (ac.endDate < ac.startDate)){
+            ac.startDate = appC.Start_Date__c;
+            ac.endDate = appC.End_Date__c;
+            if(ac.PaymentProcessorType == ProcessorUtil.PAT_AUTHORIZE_NET && (ac.startDate < ac.endDate)){
                 ac.requireNextPaymentSyncRun = true;
             }
         }
@@ -230,8 +290,8 @@ public with sharing class BreadwinnerUtil{
     public static String findNextSyncName(String currentRunningObjectName){
         String nextRunningObjectName;
         if(String.isNotBlank(currentRunningObjectName)){
-            if(currentRunningObjectName == 'Customer'){
-                nextRunningObjectName = 'Payment';
+            if(currentRunningObjectName == BreadwinnerUtil.OBJ_SYNC_CUSTOMER){
+                nextRunningObjectName = BreadwinnerUtil.OBJ_SYNC_PAYMENT;
             }
         }
         return nextRunningObjectName;
@@ -239,7 +299,7 @@ public with sharing class BreadwinnerUtil{
 
     @namespaceAccessible
     public static Boolean isBreadwinnerActive() {
-        Breadwinner_Settings__c bwSetting = Breadwinner_Settings__c.getall().values().size() > 0 ? Breadwinner_Settings__c.getall().values().get(0) : new Breadwinner_Settings__c(Name='Breadwinner');
+        Breadwinner_Settings__c bwSetting = Breadwinner_Settings__c.getall().values().size() > 0 ? Breadwinner_Settings__c.getall().values().get(0) : new Breadwinner_Settings__c(Name=CNTX_BW);
         return bwSetting.Active__c;
     }
 
@@ -494,7 +554,7 @@ public with sharing class BreadwinnerUtil{
     }
 
     public static String getBaseEndpointURL() {
-        Breadwinner_Settings__c bwSetting = Breadwinner_Settings__c.getAll().values().size() > 0 ? Breadwinner_Settings__c.getAll().values().get(0) : new Breadwinner_Settings__c(Name='Breadwinner');
+        Breadwinner_Settings__c bwSetting = Breadwinner_Settings__c.getAll().values().size() > 0 ? Breadwinner_Settings__c.getAll().values().get(0) : new Breadwinner_Settings__c(Name=CNTX_BW);
         String BW_API_BaseURL = getBW_API_BaseURL();
         return String.isBlank(bwSetting.Support_URL__c)? BW_API_BaseURL : bwSetting.Support_URL__c;
     }
@@ -503,6 +563,19 @@ public with sharing class BreadwinnerUtil{
     }
 
     public static String getCreatedViaValue(String currentRunningContext){
+        // This will be used to know from where the record has been created, possible values are: Breadwinner, Breadwinner API, Regular Sync, Historical Sync
+        List<String> bwPages  = new List<String>{'CreateCustomer','CreatePaymentMethod','CreateTransaction','CustomerOperations','CustomerRecordInfo','PaymentMethodRecordInfo','TransactionRecordInfo'};
+        if (currentRunningContext == CNTX_BWAPI){
+            String callingPage = ApexPages.currentPage()?.getUrl();
+            if(String.isNotBlank(callingPage)){
+                for(String pg : bwPages){
+                    if(callingPage.containsIgnoreCase(pg)){
+                        return CNTX_BW;
+                    }
+                }
+                return CNTX_BWAPI;
+            }
+        }
         return (currentRunningContext == BreadwinnerUtil.CNTX_HIST_SYNC ? 'Historical Sync' : (currentRunningContext == BreadwinnerUtil.CNTX_HOUR_SYNC ? 'Regular Sync' : (currentRunningContext == BreadwinnerUtil.CNTX_BWAPI ? 'Breadwinner API' : BreadwinnerUtil.CNTX_BW)));
     }
     
@@ -510,7 +583,7 @@ public with sharing class BreadwinnerUtil{
     public static void upsertAppConfig(BWP_Processor_Config__c config){
         BreadwinnerUtil.isBreadwinnerTransaction = true;
         SecurityUtil.dmlUpsert(config);
-        APICallHandler.userInteractionLogPush(false, 'App Config', 'Connected' , 'Connected' + config.Payment_Processor_Type__c + 'Info:' + config.account_Name__c);
+        APICallHandler.userInteractionLogPush(false, 'App Config', 'Connected' , 'Connected to' + config.Payment_Processor_Type__c + 'Processor, Name:' + config.account_Name__c);
     }
 
     public static List<CronTrigger> getCronTrigger(String name){
@@ -521,15 +594,15 @@ public with sharing class BreadwinnerUtil{
     public class ProcessorException extends Exception{}
     public class UnsupportedProcessorException extends Exception{}
 
-    public static Boolean isStripeBillingInstalled(){
-        Boolean isSBInstalled = FALSE;
+    public static Boolean isBreadwinnerBillingInstalled(){
+        Boolean isBBInstalled = FALSE;
         try{
             HttpRequest req = new HttpRequest();
             req.setHeader('Authorization', 'Bearer ' + UserInfo.getSessionID());
             req.setHeader('Content-Type', 'application/json');
             String SFdomainUrl=URL.getSalesforceBaseUrl().toExternalForm();
             String query='Select+SubscriberPackage.NamespacePrefix,SubscriberPackage.Name+FROM+InstalledSubscriberPackage';
-            String endpoint = SFdomainUrl+'/services/data/v52.0/tooling/query/?q='+query;
+            String endpoint = SFdomainUrl+'/services/data/v53.0/tooling/query/?q='+query;
             req.setEndpoint(endpoint);
             req.setMethod('GET');
             req.setTimeout(120000);
@@ -545,26 +618,26 @@ public with sharing class BreadwinnerUtil{
                 System.debug('rc ::: '+rc);                
                 for(Record rec: rc.records){                
                     String packageName = rec.SubscriberPackage.Name;
-                    if(packageName != NULL && packageName == SB_PACKAGE_NAME){
-                        isSBInstalled = TRUE;
+                    if(packageName != NULL && packageName == BB_EXT_PACKAGE_NAME){
+                        isBBInstalled = TRUE;
                     }
                 }
-                System.debug('isSBInstalled ::: '+isSBInstalled);
+                System.debug('isBBInstalled ::: '+isBBInstalled);
             }
         }catch(Exception ex) {
             System.debug('Error occured while checking Stripe Billing package: '+ex.getStackTraceString());
-            APICallHandler.userInteractionLogPush(TRUE, 'Packages', 'ERROR' , 'Error occured while checking Stripe Billing package: '+ex.getStackTraceString());
+            APICallHandler.userInteractionLogPush(TRUE, 'Packages', 'ERROR' , 'Error occured while checking Breadwinner Billing package: '+ex.getStackTraceString());
         }
-        return isSBInstalled;
+        return isBBInstalled;
     }
-    public class Records{
-        public List<Record> records;
+    private class Records{
+        private List<Record> records;
     }
-    public class Record{
-        public SubscriberPackage subscriberPackage;
+    private class Record{
+        private SubscriberPackage subscriberPackage;
     }
-    public class SubscriberPackage{ 
-        public String Name;
-        public String NamespacePrefix;
+    private class SubscriberPackage{ 
+        private String Name;
+        private String NamespacePrefix;
     }
 }

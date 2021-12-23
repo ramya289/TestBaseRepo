@@ -57,7 +57,7 @@ public with sharing class CustomerOperationsController {
         Map<String,String> pageParams = ApexPages.currentPage().getParameters();
         selectedProcessorId = String.isNotBlank(pageParams.get('processorId')) ? pageParams.get('processorId') : '';
         selectedMatchType = String.isNotBlank(pageParams.get('customerMatchType')) ? pageParams.get('customerMatchType') : '';
-        appConfig = BreadwinnerUtil.processorConfigList.size()>0 ? ((String.isNotBlank(selectedProcessorId)) ? (BreadwinnerUtil.getProcessorConfig(selectedProcessorId)) : BreadwinnerUtil.processorConfigList[0]) : new BWP_Processor_Config__c();
+        appConfig = ((String.isNotBlank(selectedProcessorId)) ? (BreadwinnerUtil.getProcessorConfig(selectedProcessorId)) : BreadwinnerUtil.processorConfigList[0]);
         appC = BreadwinnerUtil.getProcessorConfigWrapper(appConfig);
         isCustomerMatchSettingConfigured = (String.isBlank(appC.CustomerMatchConfig) || (String.isNotBlank(appC.CustomerMatchConfig) && appC.CustomerMatchConfig.contains('NO_VALID_PAYMENTS')) ? TRUE : FALSE);
         jsonUserSelectedActions = '';
@@ -549,7 +549,7 @@ public with sharing class CustomerOperationsController {
                 }
             }
             if(missedSCTotalCount > 0) {
-                exceptionMessage = 'Breadwinner was unable to create '+missedSCTotalCount+' Customers in the last page. Please check if there are any Validation Rules or Triggers on '+selectedMatchType;
+                exceptionMessage = 'Breadwinner was unable to create '+ missedSCTotalCount+' Customer'+(missedSCTotalCount >1 ?  's' : '') +' in the last page. Please check if there are any Validation Rules or Triggers on '+selectedMatchType;
                 List<String> tempList = new List<String>();
                 tempList.addAll(failedRecordsIdList);
                 tempList.addAll(processorCustIdList);
@@ -583,9 +583,8 @@ public with sharing class CustomerOperationsController {
     }
     
     public void checkIsHistoricalSyncBatchRunning() {
-        try {  
-            Integer enqueuedJobs = [SELECT COUNT() FROM AsyncApexJob WHERE JobType='BatchApex' AND Status IN ('Processing','Preparing','Queued','Holding') AND ApexClass.Name= 'HistoricalSyncBatch' LIMIT 100];
-            if(enqueuedJobs > 0) {
+        try { 
+            if(BreadwinnerUtil.isBatchRunning(BreadwinnerUtil.CNTX_HIST_SYNC)) {
                 isBackgroundjobRunning = True;
                 noRecordsInProcessor = False;
             }
@@ -598,7 +597,7 @@ public with sharing class CustomerOperationsController {
     public void restartHistoricalSync() {
         try {
             if(isAdministrator && !BreadwinnerUtil.isBatchRunning(BreadwinnerUtil.CNTX_HIST_SYNC)) {
-                Database.executeBatch(new HistoricalSyncBatch('Customer'), 1);
+                Database.executeBatch(new HistoricalSyncBatch(BreadwinnerUtil.OBJ_SYNC_CUSTOMER), 1);
             }
             ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.INFO, ' A background job to import your BWP Customers is in progress, please try again later.' ));
             restartSync = false;
@@ -613,7 +612,7 @@ public with sharing class CustomerOperationsController {
         Integer requestRecordsCount = 0;
         Map<String, Object> request = new Map<String, Object>();
         request.put(ProcessorUtil.API_PROCESSOR_ID, apcWrap.accountId);
-        request.put(ProcessorUtil.API_ACTION, ProcessorUtil.ACT_FETCH_CUSTOMERS);
+        request.put(ProcessorUtil.API_ACTION, ProcessorUtil.ACT_FETCH_CUSTOMERS_ALL);
         request.put(ProcessorUtil.API_VERSION, ProcessorUtil.VER_1);
         Map<String, Object> response = new Map<String, Object>();
         if(apcWrap.PaymentProcessorType == ProcessorUtil.PAT_STRIPE){
@@ -629,7 +628,7 @@ public with sharing class CustomerOperationsController {
             }
         }
         else if(apcWrap.PaymentProcessorType == ProcessorUtil.PAT_BRAINTREE){
-            String requestJSON = Processor_Braintree.getRequestBody('fetchAllCustomers', '');
+            String requestJSON = Processor_Braintree.getRequestBody(ProcessorUtil.ACT_FETCH_CUSTOMERS_ALL, '');
             request.put(ProcessorUtil.API_REQUEST_JSON, requestJSON);
             response = BreadwinnerPaymentsAPI.call(request); 
             if(response.get(ProcessorUtil.RESP_JSON) != NULL){

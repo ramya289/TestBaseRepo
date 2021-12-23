@@ -6,8 +6,8 @@ private class Test_SecurityUtil {
         Profile prof = [SELECT Id FROM Profile WHERE Name = 'Standard User' LIMIT 1 ];
         User user = new User(Alias = 'TestUser', Email = 'testuser@testorg.com', EmailEncodingKey = 'UTF-8', LastName = 'Testing', LanguageLocaleKey = 'en_US', LocaleSidKey = 'en_US', ProfileId = prof.Id, TimeZoneSidKey = 'America/Los_Angeles', UserName = uniqueUserName);
         insert user;
-        String adminPSName = 'Breadwinner_Payments_Admin_User';
-        List<PermissionSet> pset = [SELECT Id FROM PermissionSet WHERE Name = 'Breadwinner_Payments_Admin_User'];
+        String adminPSName = BreadwinnerUtil.ADMIN_PS_NAME;
+        List<PermissionSet> pset = [SELECT Id FROM PermissionSet WHERE Name = :BreadwinnerUtil.ADMIN_PS_NAME];
         insert new PermissionSetAssignment(AssigneeId = user.id, PermissionSetId = pset[0].Id);
     }
     @IsTest
@@ -284,7 +284,8 @@ private class Test_SecurityUtil {
     }
 
     private static User createReadOnlyUser(){
-        Profile p = [SELECT Id FROM Profile WHERE Name='Read Only' OR Name='ReadOnly'];
+        // Salesforce orgs created in Spring ’21 and later don’t have the Read Only standard profile. So, we can use the Minimum Access standard profile as a least-privilege profile base.
+        Profile p = [SELECT Id FROM Profile WHERE Name='Read Only' OR Name='ReadOnly' OR Name='Minimum Access - Salesforce' LIMIT 1];
 
         User newUser = new User(Alias = 'reado',
                 Email='readonly@testorg.com',
@@ -294,7 +295,7 @@ private class Test_SecurityUtil {
                 LocaleSidKey='en_US',
                 ProfileId = p.Id,
                 TimeZoneSidKey='America/Los_Angeles',
-                Username='readOnlyUuser@testorg.com'
+                Username='readOnlyUser@testorg.com'
         );
         insert newUser;
 

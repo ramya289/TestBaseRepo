@@ -9,8 +9,8 @@ private class Test_Processor_Braintree {
         Profile prof = [SELECT Id FROM Profile WHERE Name = 'Standard User' LIMIT 1 ];
         User user = new User(Alias = 'TestUser', Email = 'testuser@testorg.com', EmailEncodingKey = 'UTF-8', LastName = 'Testing', LanguageLocaleKey = 'en_US', LocaleSidKey = 'en_US', ProfileId = prof.Id, TimeZoneSidKey = 'America/Los_Angeles', UserName = uniqueUserName);
         insert user;
-        String adminPSName = 'Breadwinner_Payments_Admin_User';
-        List<PermissionSet> pset = [SELECT Id FROM PermissionSet WHERE Name = 'Breadwinner_Payments_Admin_User'];
+        String adminPSName = BreadwinnerUtil.ADMIN_PS_NAME;
+        List<PermissionSet> pset = [SELECT Id FROM PermissionSet WHERE Name = :BreadwinnerUtil.ADMIN_PS_NAME];
         insert new PermissionSetAssignment(AssigneeId = user.id, PermissionSetId = pset[0].Id);
     }
     @IsTest
@@ -44,7 +44,7 @@ private class Test_Processor_Braintree {
                 pb.fetchCustomers('');
             } catch (Exception ex){}
             try{
-                pb.fetchPayments('');
+                pb.fetchTransactions('');
             } catch (Exception ex){}
         }
     }
@@ -526,7 +526,7 @@ private class Test_Processor_Braintree {
     }
     
     @IsTest
-    static void fetchPayments_When_Success() {
+    static void fetchTransactions_When_Success() {
         
         BreadwinnerUtil.AppConfig apcWrapper = UnitTests.getProcessorConfigWrapper(ProcessorUtil.PAT_BRAINTREE);
         Test.startTest();
@@ -546,13 +546,13 @@ private class Test_Processor_Braintree {
             '}';
         
         Test.setMock(HttpCalloutMock.class, httpMock);
-        ProcessorUtil.ResponseObject response = Processor_Braintree.fetchPayments(apcWrapper, '');
+        ProcessorUtil.ResponseObject response = Processor_Braintree.fetchTransactions(apcWrapper, '');
         
         Test.stopTest();
     }
     
     @IsTest
-    static void fetchPayments_When_Failure() {
+    static void fetchTransactions_When_Failure() {
         //User adminUser =  [SELECT Id FROM User WHERE Alias = 'TestUser' LIMIT 1];
         //System.runAs(adminUser){
         BreadwinnerUtil.AppConfig apcWrapper = UnitTests.getProcessorConfigWrapper(ProcessorUtil.PAT_BRAINTREE);
@@ -574,7 +574,7 @@ private class Test_Processor_Braintree {
             '}';
         
         Test.setMock(HttpCalloutMock.class, httpMock);
-        Processor_Braintree.fetchPayments(apcWrapper, '');
+        Processor_Braintree.fetchTransactions(apcWrapper, '');
         
         //}
         Test.stopTest();
@@ -675,7 +675,7 @@ private class Test_Processor_Braintree {
     }
     
     @IsTest
-    static void syncPayments() {
+    static void syncTransactions() {
         User adminUser =  [SELECT Id FROM User WHERE Alias = 'TestUser' LIMIT 1];
         System.runAs(adminUser){
             BWP_Processor_Config__c apc = UnitTests.createPayConfig(ProcessorUtil.PAT_BRAINTREE);
@@ -696,7 +696,7 @@ private class Test_Processor_Braintree {
             bwpPM.Processor_Id__c = pmProcessorId;
             update bwpPM;
             
-            //Create a Charge.BraintreeCharge object that will get passed into syncPayments as part of a map
+            //Create a Charge.BraintreeCharge object that will get passed into syncTransactions as part of a map
             Charge.Customer chargeCust = new Charge.Customer();
             chargeCust.id = bwpCust.Processor_Customer_Id__c;
             
@@ -722,10 +722,10 @@ private class Test_Processor_Braintree {
                             ProcessorUtil.PAT_BRAINTREE => braintreeChargeMap
                                 };
                                     
-                                    List<ProcessorUtil.PaymentWrapper> response = Processor_Braintree.syncPayments(processorIdToPaymentMap, apcWrapper);
+                                    List<ProcessorUtil.TransactionWrapper> response = Processor_Braintree.syncTransactions(processorIdToPaymentMap, apcWrapper);
             
             //Verify the payment was added
-            Integer paymentCount = [SELECT COUNT() FROM BWP_Payment__c WHERE Customer__c = :bwpCust.Id];
+            Integer paymentCount = [SELECT COUNT() FROM BWP_Transaction__c WHERE Customer__c = :bwpCust.Id];
             System.assertEquals(1, paymentCount);
         }
     }
@@ -752,37 +752,6 @@ private class Test_Processor_Braintree {
             Processor_Braintree.constructBraintreePaymentMethod(new BWP_Payment_Method__c(), src, apcWrapper);
         }
         
-    }
-    @IsTest
-    static void hourlySync_When_Success() {
-        User adminUser =  [SELECT Id FROM User WHERE Alias = 'TestUser' LIMIT 1];
-        System.runAs(adminUser){
-            BWP_Processor_Config__c apc = UnitTests.createPayConfig(ProcessorUtil.PAT_BRAINTREE);
-            apc.Customer_Match_Type__c = ProcessorUtil.CMT_CONTACT;
-            BreadwinnerUtil.isBreadwinnerTransaction = true;
-            update apc;
-            
-            Test.startTest();
-            
-            UnitTests.MockHttpResponse httpMock = new UnitTests.MockHttpResponse();
-            httpMock.response =
-                '{"data": ' +
-                '{"search":' +
-                '{"customers":' +
-                '{"pageInfo": ' +
-                '{"hasNextPage": true,"startCursor": "WTNWemRHOXRaWEpmTWpBek1USTRNekV6OzIwMTktMTEtMDVUMDc6Mzc6MzNa","endCursor": "WTNWemRHOXRaWEpmTWpBek1USTRNekV6OzIwMTktMTEtMDVUMDc6Mzc6MzNa"},' +
-                '"edges": [{"node": {"id": "Y3VzdG9tZXJfMjAzMTI4MzEz","company": null,"createdAt": "2019-11-05T07:37:33.000000Z","firstName": "test", "lastName" : "customer", "paymentMethods": {"edges":[{"node":{"id":"cGF5bWVudG1ldGhvZF9jY19mdGh5dzNy","usage":"MULTI_USE","details":{"__typename":"CreditCardDetails"}}}]}},"cursor": "WTNWemRHOXRaWEpmTWpBek1USTRNekV6OzIwMTktMTEtMDVUMDc6Mzc6MzNa"}]}' +
-                '}' +
-                '}' +
-                ',"extensions": {"requestId": "sqpdag6n0R2NGBv73fmp0BqhsgKABgH0tNH5rWkjTU3jBg9Z0WCKhg=="}' +
-                '}';
-            Test.setMock(HttpCalloutMock.class, httpMock);
-            
-            HourlySyncBatch hourlySync = new HourlySyncBatch('Payment');
-            Database.executeBatch(hourlySync, 1);
-            
-            Test.stopTest();
-        }
     }
     
     @IsTest
@@ -827,10 +796,10 @@ private class Test_Processor_Braintree {
     static void getRequestBody_ForCodeCoverage(){
         User adminUser =  [SELECT Id FROM User WHERE Alias = 'TestUser' LIMIT 1];
         System.runAs(adminUser){
-            Processor_Braintree.getRequestBody('fetchAllCustomers','');
-            Processor_Braintree.getRequestBody('fetchAllPayments','');
-            Processor_Braintree.getRequestBody('fetchRecentCustomers','');
-            Processor_Braintree.getRequestBody('fetchRecentPayments','');
+            Processor_Braintree.getRequestBody(ProcessorUtil.ACT_FETCH_CUSTOMERS_ALL,'');
+            Processor_Braintree.getRequestBody(ProcessorUtil.ACT_FETCH_TRANSACTIONS_ALL,'');
+            Processor_Braintree.getRequestBody(ProcessorUtil.ACT_FETCH_CUSTOMERS_RECENT,'');
+            Processor_Braintree.getRequestBody(ProcessorUtil.ACT_FETCH_TRANSACTIONS_RECENT,'');
         }
     }
     

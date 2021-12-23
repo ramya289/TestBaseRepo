@@ -24,11 +24,15 @@ public abstract with sharing class Processor {
         throw new BreadwinnerUtil.UnsupportedProcessorException('Error fetching customers: This action is not supported.');
     }
 
-    public virtual ProcessorUtil.ResponseObject fetchPayments(String endpoint) {
+    public virtual ProcessorUtil.ResponseObject fetchTransactions(String endpoint) {
         throw new BreadwinnerUtil.UnsupportedProcessorException('Error fetching customers: This action is not supported.');
     }
     
     public virtual ProcessorUtil.ResponseObject verifyBankAccount(String requestJSON) {
         throw new BreadwinnerUtil.UnsupportedProcessorException('Error Verifying Bank Account: This action is not supported.');
+    }
+    
+    public virtual ProcessorUtil.ResponseObject createCheckoutURL(String requestJSON) {
+        throw new BreadwinnerUtil.UnsupportedProcessorException('Error creating Checkout URL: This action is not supported.');
     }
 }

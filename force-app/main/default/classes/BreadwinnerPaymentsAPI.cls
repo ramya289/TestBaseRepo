@@ -1,4 +1,4 @@
-public with sharing class BreadwinnerPaymentsAPI {
+global with sharing class BreadwinnerPaymentsAPI {
 
     public static List<ProcessorUtil.Error> apiErrors = new List<ProcessorUtil.Error>();
 
@@ -21,7 +21,7 @@ public with sharing class BreadwinnerPaymentsAPI {
         public String requestJSON;
     }
 
-    public static Map<String,Object> call(Map<String,Object> request) {
+    global static Map<String,Object> call(Map<String,Object> request) {
 
         Map<String,Object> response = new Map<String,Object>();
 
@@ -56,13 +56,16 @@ public with sharing class BreadwinnerPaymentsAPI {
                 responseObj = pi.updateCustomer(requestJSON);
             } else if (action == ProcessorUtil.ACT_CHARGE_PROCESSOR) {
                 responseObj = pi.chargeProcessor(requestJSON, timeout);
-            } else if (action == ProcessorUtil.ACT_FETCH_CUSTOMERS) {
+            } else if (action == ProcessorUtil.ACT_FETCH_CUSTOMERS_ALL) {
                 responseObj = pi.fetchCustomers(requestJSON);
-            } else if (action == ProcessorUtil.ACT_FETCH_PAYMENTS) {
-                responseObj = pi.fetchPayments(requestJSON);
+            } else if (action == ProcessorUtil.ACT_FETCH_TRANSACTIONS_ALL) {
+                responseObj = pi.fetchTransactions(requestJSON);
             } else if (action == ProcessorUtil.ACT_VERIFY_BANKACCOUNT) {
                 responseObj = pi.verifyBankAccount(requestJSON);
-            } else {
+            } else if (action == ProcessorUtil.ACT_CREATE_CHECKOUT){
+                responseObj = pi.createCheckoutURL(requestJSON);
+            }
+            else {
                 throw new INVALID_ACTION_Exception('"' + action + '" is not valid.');
             }
 
@@ -71,10 +74,20 @@ public with sharing class BreadwinnerPaymentsAPI {
             response.put(ProcessorUtil.RESP_STATUS, responseObj.status);
             response.put(ProcessorUtil.RESP_VAL_REQ, true);
             response.put(ProcessorUtil.RESP_JSON, responseObj.responseJSON);
-            response.put(ProcessorUtil.CUST_RESP, responseObj.customerList);
-            response.put(ProcessorUtil.PAYMETHOD_RESP, responseObj.paymentMethodList);
-            response.put(ProcessorUtil.PAYMENT_RESP, responseObj.paymentList);
-            if (responseObj.errors.size() > 0) {
+            // Sending only requested data to the end user.
+            if(String.isNotBlank(responseObj.checkoutResponseJSON)) {
+                response.put(ProcessorUtil.CHECKOUT_RESP, responseObj.checkoutResponseJSON);
+            }
+            if(responseObj.customerList != null) {
+                response.put(ProcessorUtil.CUST_RESP, responseObj.customerList);
+            }
+            if(responseObj.paymentMethodList != null) {
+                response.put(ProcessorUtil.PAYMETHOD_RESP, responseObj.paymentMethodList);
+            }
+            if(responseObj.transactionList != null) {
+                response.put(ProcessorUtil.PAYMENT_RESP, responseObj.transactionList);
+            }
+            if (responseObj.errors?.size() > 0) {
                 response.put(ProcessorUtil.RESP_PROC_ERRORS, responseObj.errors);
             }
 
@@ -105,7 +118,9 @@ public with sharing class BreadwinnerPaymentsAPI {
             pi = new Processor_Square(processorAccountId);
         } else if (appC.Payment_Processor_Type__c == ProcessorUtil.PAT_STRIPE){
             pi = new Processor_Stripe(processorAccountId);
-        } /*else if (appC.Payment_Processor_Type__c == ProcessorUtil.PAT_PAYPAL){
+        } else if (appC.Payment_Processor_Type__c == ProcessorUtil.PAT_AUTHORIZE_NET){
+            pi = new Processor_Authorize_Net(processorAccountId);
+        }/*else if (appC.Payment_Processor_Type__c == ProcessorUtil.PAT_PAYPAL){
           pi = new Processor_PayPal(processorAccountId);
         } */else {
             throw new INVALID_PROCESSOR_Exception('Unsupported payment processor: "' + appC.Payment_Processor_Type__c + '".');
@@ -126,7 +141,7 @@ public with sharing class BreadwinnerPaymentsAPI {
             throw new INVALID_SUBSCRIPTION_Exception();
         }
         if (BreadwinnerUtil.isReadOnlyModeEnabled()){
-        	if(action != ProcessorUtil.ACT_FETCH_CUSTOMERS && action != ProcessorUtil.ACT_FETCH_PAYMENTS){
+        	if(action != ProcessorUtil.ACT_FETCH_CUSTOMERS_ALL && action != ProcessorUtil.ACT_FETCH_TRANSACTIONS_ALL){
                 throw new READ_ONLY_MODE_ENABLED_Exception();
             }
         }
@@ -182,7 +197,7 @@ public with sharing class BreadwinnerPaymentsAPI {
             }
             when 'CONNECTION_NOT_FOUND' {
                 error.message = 'Breadwinner is not connected.';
-                error.detail = 'Please connect Breadwinner to your QuickBooks Onlne Org.';
+                error.detail = 'Please connect Breadwinner to your Payment Processor.';
             }
             when 'READ_ONLY_MODE_ENABLED' {
                 error.message = 'Breadwinner Read-Only mode is Enabled.';

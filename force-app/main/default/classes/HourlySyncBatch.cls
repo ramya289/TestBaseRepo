@@ -1,7 +1,7 @@
 /*
 * Created By  :  Surender & Suchimitha (Dhruvsoft) 
 * Description :  This class is to run hourly sync, which will run for each 15 minutes. It also includes sources(Payment Methods),payments for each customer. 
-* Functionalities : All customers & respective payment methods, and payments will be fetched and linked accordingly.
+* Functionalities : All customers & respective payment methods, and transactions will be fetched and linked accordingly.
 */
 public with sharing class HourlySyncBatch implements Database.Batchable<BreadwinnerUtil.AppConfig>, Database.AllowsCallouts, Database.Stateful, Schedulable {
     public List<BreadwinnerUtil.AppConfig> appConfigUpdateList = new List<BreadwinnerUtil.AppConfig>();
@@ -60,10 +60,10 @@ public with sharing class HourlySyncBatch implements Database.Batchable<Breadwin
         Map<String, Object> response = new Map<String, Object>();
         List<ProcessorUtil.Error> apiErrors = (List<ProcessorUtil.Error>) response.get(ProcessorUtil.RESP_API_ERRORS);
         List<ProcessorUtil.Error> processingErrors = (List<ProcessorUtil.Error>) response.get(ProcessorUtil.RESP_PROC_ERRORS);
-
+        if(apc.PaymentProcessorType != ProcessorUtil.PAT_AUTHORIZE_NET){        
         if(runningObject == BreadwinnerUtil.OBJ_SYNC_CUSTOMER) {
           try {
-                request.put(ProcessorUtil.API_ACTION, ProcessorUtil.ACT_FETCH_CUSTOMERS);
+                request.put(ProcessorUtil.API_ACTION, ProcessorUtil.ACT_FETCH_CUSTOMERS_ALL);
                 if(apc.paymentProcessorType == ProcessorUtil.PAT_STRIPE){
                     Processor_Stripe.FetchRequest fetchRequest = new Processor_Stripe.FetchRequest();
                     DateTime lastHourDateTime = apc.hourlyCustomerSyncLastRun != null ? apc.hourlyCustomerSyncLastRun.addMinutes(-20) : System.now().addMinutes(-200);
@@ -77,7 +77,7 @@ public with sharing class HourlySyncBatch implements Database.Batchable<Breadwin
 
                 else if(apc.PaymentProcessorType == ProcessorUtil.PAT_BRAINTREE){
                     Datetime hourlySyncDatetime;
-                    String requestJSON = Processor_Braintree.getRequestBody('fetchRecentCustomers', (String.isNotBlank(apc.lastCustomerId) ? (apc.lastCustomerId) : null));
+                    String requestJSON = Processor_Braintree.getRequestBody(ProcessorUtil.ACT_FETCH_CUSTOMERS_RECENT, (String.isNotBlank(apc.lastCustomerId) ? (apc.lastCustomerId) : null));
                     String reqBodyWithFilters = '';
                     hourlySyncDatetime = apc.hourlyCustomerSyncLastRun != null ? (apc.hourlyCustomerSyncLastRun.addMinutes(-20)) : (System.now().addMinutes(-20));
                     reqBodyWithFilters += '"variables": { "input": { "createdAt": { "greaterThanOrEqualTo": "'+(hourlySyncDatetime.formatGmt('yyyy-MM-dd\'T\'HH:mm:ss\'+\'00:00'))+'"';
@@ -128,7 +128,7 @@ public with sharing class HourlySyncBatch implements Database.Batchable<Breadwin
             }
         } else if(runningObject == BreadwinnerUtil.OBJ_SYNC_PAYMENT) {
           try{
-                request.put(ProcessorUtil.API_ACTION, ProcessorUtil.ACT_FETCH_PAYMENTS);
+                request.put(ProcessorUtil.API_ACTION, ProcessorUtil.ACT_FETCH_TRANSACTIONS_ALL);
                 if(apc.paymentProcessorType == ProcessorUtil.PAT_STRIPE){
                     Processor_Stripe.FetchRequest fetchRequest = new Processor_Stripe.FetchRequest();
                     DateTime lastHourDateTime = apc.hourlyPaymentSyncLastRun != null ? apc.hourlyPaymentSyncLastRun.addMinutes(-20) : System.now().addMinutes(-200);
@@ -141,7 +141,7 @@ public with sharing class HourlySyncBatch implements Database.Batchable<Breadwin
                 }
                 else if(apc.PaymentProcessorType == ProcessorUtil.PAT_BRAINTREE){
                     Datetime hourlySyncDatetime;
-                    String requestJSON = Processor_Braintree.getRequestBody('fetchRecentPayments', (String.isNotBlank(apc.lastPaymentId) ? (apc.lastPaymentId) : null));
+                    String requestJSON = Processor_Braintree.getRequestBody(ProcessorUtil.ACT_FETCH_TRANSACTIONS_RECENT, (String.isNotBlank(apc.lastPaymentId) ? (apc.lastPaymentId) : null));
                     String reqBodyWithFilters = '';
                     hourlySyncDatetime = apc.hourlyPaymentSyncLastRun != null ? (apc.hourlyPaymentSyncLastRun.addMinutes(-20)) : (System.now().addMinutes(-20));
                     reqBodyWithFilters += '"variables": { "input": { "createdAt": { "greaterThanOrEqualTo": "'+(hourlySyncDatetime.formatGmt('yyyy-MM-dd\'T\'HH:mm:ss\'+\'00:00'))+'"';
@@ -199,10 +199,11 @@ public with sharing class HourlySyncBatch implements Database.Batchable<Breadwin
                 }
 
             } catch(Exception ex) {
-                System.debug('Exception occurred while fetching payments from '+apc.paymentProcessorType+'.'+ex.getStackTraceString()+'See '+ex.getLineNumber()+'\n'+ex.getmessage());
+                System.debug('Exception occurred while fetching transactions from '+apc.paymentProcessorType+'.'+ex.getStackTraceString()+'See '+ex.getLineNumber()+'\n'+ex.getmessage());
                 apc.requireNextPaymentSyncRun = false;
                 exceptionInExecute = ex;
             }
+        }
         }
         appConfigUpdateList.add(apc);
     }
@@ -249,7 +250,7 @@ public with sharing class HourlySyncBatch implements Database.Batchable<Breadwin
                 }else if(runningObject.containsIgnoreCase(BreadwinnerUtil.OBJ_SYNC_PAYMENT)){
                     
                     if(appConfigWrapper.requireNextPaymentSyncRun && !appConfigWrapper.needToReconnect) { //if more records
-                        system.debug('need payment sync run');
+                        system.debug('need transaction sync run');
                         appConfigWrapper.isHourlyPaymentSyncDone = false;
                         appConfigNeedToRun.add(appConfigWrapper);
                     } else if(appConfigWrapper.requireNextPaymentSyncRun && appConfigWrapper.needToReconnect) { // Failed records
@@ -257,18 +258,17 @@ public with sharing class HourlySyncBatch implements Database.Batchable<Breadwin
                     } else {
                         //appConfigCompleteRecord.Is_Hourly_Payment_Sync_Done__c = true;
                         APICallHandler.userInteractionLogPush(TRUE, 'Hourly Sync', 'FINISHED' , 'Object Name: Payment, Syncing Processor: '+appConfigWrapper.paymentProcessorType+' ('+appConfigWrapper.accountName+'), Requested LastSyncDateTime: '+appConfigCompleteRecord.Hourly_Payment_Sync_Last_Run__c+', CurrentPage Parsed Records: '+requestRecordsCount);
-                        
-                        //Refresh the Access Token for Square Orgs
-                        if(!Test.isRunningTest()) {
-                            checkAndRefreshAccessToken(BreadwinnerUtil.processorConfigList);
-                        }
                     }
                     appConfigCompleteRecord.Hourly_Payment_Sync_Last_Run__c = System.now();
                     appConfigCompleteRecord.Need_To_Reconnect__c = appConfigWrapper.needToReconnect;
                     appConfigNeedToUpdate.add(appConfigCompleteRecord);
                 }
+                //Refresh the Access Token
+                if(!Test.isRunningTest()) {
+                    checkAndRefreshAccessToken(BreadwinnerUtil.processorConfigList);
+                }
             }
-			BreadwinnerUtil.isBreadwinnerTransaction = true;
+            BreadwinnerUtil.isBreadwinnerTransaction = true;
             SecurityUtil.databaseUpsert(appConfigNeedToUpdate);
             
             if(!appConfigNeedToRun.isEmpty()) {
@@ -277,7 +277,7 @@ public with sharing class HourlySyncBatch implements Database.Batchable<Breadwin
                     HourlySyncBatch hourlySync = new HourlySyncBatch(runningObject, appConfigNeedToRun);
                     Database.executeBatch(hourlySync, 1);
                 }
-            } else if(appConfigNeedToRun.isEmpty() && appConfigNeedToUpdate.size()>0) { //No more batches to run. So start payments batch.
+            } else if(appConfigNeedToRun.isEmpty() && appConfigNeedToUpdate.size()>0) { //No more batches to run. So start transactions batch.
                 if(!BreadwinnerUtil.isBatchRunning(BreadwinnerUtil.CNTX_HOUR_SYNC)) {
                     System.debug('Ready for Payment sync');
                     String getNextSyncObjectName = BreadwinnerUtil.findNextSyncName(runningObject);
@@ -293,6 +293,7 @@ public with sharing class HourlySyncBatch implements Database.Batchable<Breadwin
     
     /* Schedulable - execute */
     public void execute(SchedulableContext sc) {
+        BreadwinnerUtil.deleteConfigsWhenSandboxRefresh();
         if(BreadwinnerUtil.isAdministrator()) {
             if(BreadwinnerUtil.isBreadwinnerActive()) {
                 runHourlySyncBatch();
@@ -312,7 +313,6 @@ public with sharing class HourlySyncBatch implements Database.Batchable<Breadwin
             if(BreadwinnerUtil.isBreadwinnerAdministrator() && !BreadwinnerUtil.isBatchRunning(BreadwinnerUtil.CNTX_HOUR_SYNC)) {
                 HourlySyncBatch hourlySync = new HourlySyncBatch(BreadwinnerUtil.OBJ_SYNC_CUSTOMER);
                 Database.executeBatch(hourlySync, 1); //At a time only one company should be run. Don't make it other than 1.
-                APICallHandler.userInteractionLogPush(false, 'Hourly Sync', 'Success' , 'Hourly Sync Restarted');
             }
         }
         catch(Exception e){
@@ -331,10 +331,9 @@ public with sharing class HourlySyncBatch implements Database.Batchable<Breadwin
                     }
                 }
                 if(existedScheduledJobs.size() == 0 || abortExistedJobs) {
-                    //System.scheduleBatch(new HourlySyncBatch('Customer'),'BreadwinnerPaymentsHourlySync',minutes,1);
                     DateTime nextScheduleTime = System.now().addMinutes(minutes);
                     String CronExpression = '0 ' + nextScheduleTime.minute() + ' ' + nextScheduleTime.hour() + ' ' + nextScheduleTime.day() + ' ' + nextScheduleTime.month() + ' ? ' + nextScheduleTime.year() + ' BreadwinnerSync';
-                    HourlySyncBatch hourlySync = new HourlySyncBatch('Customer');
+                    HourlySyncBatch hourlySync = new HourlySyncBatch(BreadwinnerUtil.OBJ_SYNC_CUSTOMER);
                     System.schedule(BreadwinnerUtil.SYNC_CNTX_HOURLY + System.now(), CronExpression, hourlySync);
                 }
             }
@@ -344,7 +343,7 @@ public with sharing class HourlySyncBatch implements Database.Batchable<Breadwin
         }
     }
 
-    //This method is used to check the Square Access token status
+    //This method is used to check the Access token status
     public static void checkAndRefreshAccessToken(List<BWP_Processor_Config__c> procConfigList){
         for(BWP_Processor_Config__c appC : procConfigList){
             if(appC.Payment_Processor_Type__c == ProcessorUtil.PAT_SQUARE){
@@ -353,11 +352,14 @@ public with sharing class HourlySyncBatch implements Database.Batchable<Breadwin
                     Processor_Square.refreshAccessToken(appC);
                 }
             }
-            if(appC.Payment_Processor_Type__c == ProcessorUtil.PAT_PAYPAL){
+            if(appC.Payment_Processor_Type__c == ProcessorUtil.PAT_PAYPAL || appC.Payment_Processor_Type__c == ProcessorUtil.PAT_AUTHORIZE_NET){
                 if(appC.Access_Token_Expiry_Date__c != NULL){
-                    DateTime expiryDate = (appC.Access_Token_Expiry_Date__c).addHours(-2);
+                    DateTime expiryDate = appC.Payment_Processor_Type__c == ProcessorUtil.PAT_AUTHORIZE_NET ? (appC.Access_Token_Expiry_Date__c).addHours(-1) : (appC.Access_Token_Expiry_Date__c).addHours(-2);
                     if(System.now() >= expiryDate){
-                        Processor_PayPal.refreshAccessToken(appC);
+                        if(appC.Payment_Processor_Type__c == ProcessorUtil.PAT_PAYPAL)
+                            Processor_PayPal.refreshAccessToken(appC);
+                        else if(appC.Payment_Processor_Type__c == ProcessorUtil.PAT_AUTHORIZE_NET)
+                            Processor_Authorize_Net.refreshAccessToken(appC);
                     }
                 }
             }

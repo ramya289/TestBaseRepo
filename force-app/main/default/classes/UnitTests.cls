@@ -46,6 +46,7 @@ public class UnitTests {
                     Refresh_Token__c = 'rt_EIsycxuAZOjoiQ7KODs9MlSkT9hrfYaTJu20HtHodGwCCPH',
                     Scope__c = 'Read/write',
                     Provider_ID__c = 'acct_1Do5IGeHGxQ9S2f-' + i,
+                    Card_Creation_Key__c = 'pk_test123456abcde',
                     Need_To_Reconnect__c = false,
                     Payment_Processor_Type__c = ProcessorUtil.PAT_STRIPE,
                     Customer_Match_Type__c = ProcessorUtil.CMT_ACCOUNT
@@ -133,8 +134,8 @@ public class UnitTests {
         Profile prof = [SELECT Id FROM Profile WHERE Name = 'Standard User' LIMIT 1 ];
         User user = new User(Alias = 'TestUser', Email = 'testuser@testorg.com', EmailEncodingKey = 'UTF-8', LastName = 'Testing', LanguageLocaleKey = 'en_US', LocaleSidKey = 'en_US', ProfileId = prof.Id, TimeZoneSidKey = 'America/Los_Angeles', UserName = uniqueUserName);
         insert user;
-        String adminPSName = 'Breadwinner_Payments_Admin_User';
-        List<PermissionSet> pset = [SELECT Id FROM PermissionSet WHERE Name = 'Breadwinner_Payments_Admin_User'];
+        String adminPSName = BreadwinnerUtil.ADMIN_PS_NAME;
+        List<PermissionSet> pset = [SELECT Id FROM PermissionSet WHERE Name = :BreadwinnerUtil.ADMIN_PS_NAME];
         insert new PermissionSetAssignment(AssigneeId = user.id, PermissionSetId = pset[0].Id);
     }
 
@@ -206,17 +207,17 @@ public class UnitTests {
     }
 
     @TestVisible
-    private static List<BWP_Payment__c> payments(Integer count) {
-        List<BWP_Payment__c> payments = new List<BWP_Payment__c> ();
+    private static List<BWP_Transaction__c> transactions(Integer count) {
+        List<BWP_Transaction__c> transactions = new List<BWP_Transaction__c> ();
         for (Integer i = 1; i <= count; i++) {
 
-            BWP_Payment__c payment = new BWP_Payment__c(
+            BWP_Transaction__c Trxn = new BWP_Transaction__c(
                 Amount__c = 100
             );
-            payments.add(payment);
+            transactions.add(Trxn);
         }
-        insert payments;
-        return payments;
+        insert transactions;
+        return transactions;
     }
 
     @TestVisible
@@ -295,13 +296,13 @@ public class UnitTests {
             Test.setCurrentPage(pageRef);
             UnitTests.customers(5);
             UnitTests.paymentMethods(5);
-            UnitTests.payments(5);
+            UnitTests.transactions(5);
             BreadwinnerController b = new BreadwinnerController();
             b.customerMatchType = ProcessorUtil.CMT_ACCOUNT;
             b.isProcessorConnected = true; 
             b.customersCount = 5;
             b.paymentMethodsCount = 5;
-            b.paymentsCount = 5;
+            b.bwpTransCount  = 5;
             b.objectName = 'Customers';
             b.deleteRecords();
             b.objectName = 'PaymentMethods';
@@ -310,7 +311,7 @@ public class UnitTests {
             b.deleteRecords();
     
             System.assert([Select Id from BWP_Customer__c].size() == 0);
-            System.assert([Select Id from BWP_Payment__c].size() == 0);
+            System.assert([Select Id from BWP_Transaction__c].size() == 0);
             System.assert([Select Id from BWP_Payment_Method__c].size() == 0);
         }
     }
@@ -325,13 +326,13 @@ public class UnitTests {
             Test.setCurrentPage(pageRef);
             UnitTests.customers(5);
             UnitTests.paymentMethods(5);
-            UnitTests.payments(5);
+            UnitTests.transactions(5);
             BreadwinnerController b = new BreadwinnerController();
             b.customerMatchType = ProcessorUtil.CMT_CONTACT;
             b.isProcessorConnected = false;
             b.customersCount = 5;
             b.paymentMethodsCount = 5;
-            b.paymentsCount = 5;
+            b.bwpTransCount  = 5;
             b.objectName = 'Customers';
             b.deleteRecords();
             b.objectName = 'PaymentMethods';
@@ -347,7 +348,7 @@ public class UnitTests {
             
             
             System.assert([Select Id from BWP_Customer__c].size() == 0);
-            System.assert([Select Id from BWP_Payment__c].size() == 0);
+            System.assert([Select Id from BWP_Transaction__c].size() == 0);
             System.assert([Select Id from BWP_Payment_Method__c].size() == 0);
         }
         Test.stopTest();
@@ -363,6 +364,51 @@ public class UnitTests {
         List<String> zeroDecimalStripeCurrencies = BreadwinnerUtil.getZeroDecimalStripeCurrencies();
         String baseEndpointURL = BreadwinnerUtil.getBaseEndpointURL();
         String baseAPIURL = BreadwinnerUtil.getBW_API_BaseURL();
+    }
+
+    @IsTest
+    private static void coverCreatedViaMethod_When_CRCV_ISNULL(){
+        String createdVia = BreadwinnerUtil.getCreatedViaValue(null);
+        System.assertEquals(createdVia, 'Breadwinner');
+    }
+    @IsTest
+    private static void coverCreatedViaMethod_When_CRCV_ISBLANK(){
+        String createdVia = BreadwinnerUtil.getCreatedViaValue('');
+        System.assertEquals(createdVia, 'Breadwinner');
+    }
+    @IsTest
+    private static void coverCreatedViaMethod_When_CRCV_HistoricalSync(){
+        String createdVia = BreadwinnerUtil.getCreatedViaValue(BreadwinnerUtil.CNTX_HIST_SYNC);
+        System.assertEquals(createdVia, 'Historical Sync');
+    }
+    @IsTest
+    private static void coverCreatedViaMethod_When_CRCV_HourlySync(){
+        String createdVia = BreadwinnerUtil.getCreatedViaValue(BreadwinnerUtil.CNTX_HOUR_SYNC);
+        System.assertEquals(createdVia, 'Regular Sync');
+    }
+    @IsTest
+    private static void coverCreatedViaMethod_When_CRCV_BW(){
+        String createdVia = BreadwinnerUtil.getCreatedViaValue(BreadwinnerUtil.CNTX_BW);
+        System.assertEquals(createdVia, 'Breadwinner');
+    }
+    @IsTest
+    private static void coverCreatedViaMethod_When_CRCV_BWAPI(){
+        String createdVia = BreadwinnerUtil.getCreatedViaValue(BreadwinnerUtil.CNTX_BWAPI);
+        System.assertEquals(createdVia, 'Breadwinner API');
+    }
+    @IsTest
+    private static void coverCreatedViaMethod_When_CP_CreateCustomer(){
+        PageReference pageRef = Page.CreateCustomer;
+        Test.setCurrentPage(pageRef);
+        String createdVia = BreadwinnerUtil.getCreatedViaValue(BreadwinnerUtil.CNTX_BWAPI);
+        System.assertEquals(createdVia, 'Breadwinner');
+    }
+    @IsTest
+    private static void coverCreatedViaMethod_When_CP_BreadwinnerPayments(){
+        PageReference pageRef = Page.BreadwinnerPayments;
+        Test.setCurrentPage(pageRef);
+        String createdVia = BreadwinnerUtil.getCreatedViaValue(BreadwinnerUtil.CNTX_BWAPI);
+        System.assertEquals(createdVia, 'Breadwinner API');
     }
 
     @IsTest
@@ -391,17 +437,14 @@ public class UnitTests {
     private static void testCustomURLGeneration(){
         Test.setCurrentPageReference(new PageReference('Page.CustomURLGenerator'));
         System.currentPageReference().getParameters().put('originating_object', 'Account');
+        createPayConfig(ProcessorUtil.PAT_STRIPE);
         CustomURLGeneratorController CUG= new CustomURLGeneratorController();
-        //CUG.objectname = 'Account';
         CUG.ParentObjectName = 'Account';
-        CUG.ChildObjectName = 'Opportunity';
         CUG.selectedObject ='Account';
-        CUG.selectedChildObject = 'Opportunity';
-        CUG.Parent_Account1 = 'parentid';
         test.startTest();
-        CUG.Childobjects();
-        CUG.next2();
+        CUG.parentObjectFields();
         CUG.generateURL();
+        CUG.goBack();
         test.stopTest();
     }
 
@@ -454,7 +497,6 @@ public class UnitTests {
         Test.stopTest();
     }
 
-
     @IsTest
     private static void postInstall() {
         Test.startTest();
@@ -485,7 +527,6 @@ public class UnitTests {
         }
     }
 
-
     @IsTest
     private static void coverBreadwinnerController(){
         User adminUser =  [SELECT Id FROM User WHERE Alias = 'TestUser' LIMIT 1];
@@ -494,7 +535,6 @@ public class UnitTests {
             bwSetting.Name = 'bwpsetting';
             bwSetting.Support_URL__c = 'test.com';
             update bwSetting;
-            
             BreadwinnerController bc = new BreadwinnerController();
             bc.initializeApp();
             bc.getAvailableEndpointURLs();
@@ -513,6 +553,8 @@ public class UnitTests {
             bc.restartWeeklySync();
             bc.restartScheduledJobs();
             bc.saveCustomerConfigurationValues();
+            BreadwinnerController.scheduledJobsRunByActiveOrAdminUserMap();
+            bc.TroubleshootGeneralInitialize();
             bc.BW_API_BaseURL = 'Test';
             bc.BW_SupportPortalURL = 'BW_SupportPortalURL';
             Boolean jobRunningByActiveUser = bc.isScheduledJobsRunByActiveUser;
@@ -674,7 +716,7 @@ public class UnitTests {
 
     @IsTest
     private static void codeCoverage_APICallHandler(){
-        APICallHandler.synchronousLogPush('','','','','','','','','');
+        APICallHandler.synchronousLogPush('','','');
         APICallHandler.BreadwinnerORGCreation(false);
         APICallHandler.parseAccountResponse('');
         APICallHandler.updateBWCustomSettingRecord(new APICallHandler.AccountResponse());
@@ -682,7 +724,7 @@ public class UnitTests {
 
     @IsTest
     private static void codeCoverage_LogPush(){
-        APICallHandler.synchronousLogPush('','','','','','','','','');
+        APICallHandler.synchronousLogPush('','','');
     }
 
     @IsTest
@@ -913,6 +955,5 @@ public class UnitTests {
         String randNum = String.valueOf(randomNumber).right(3);
         return Id.valueOf(keyPrefix + '000000000' + randNum);
     }
-
-
+    
 }

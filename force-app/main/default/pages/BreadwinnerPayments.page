@@ -5,7 +5,7 @@
                 <meta charset="utf-8" />
                 <apex:variable value="{!OR($User.UIThemeDisplayed == 'Theme4d', $User.UIThemeDisplayed == 'Theme4t')}" var="isLightning" />
                 <apex:slds />
-                <script src="{!URLFOR($Resource.Breadwinner_Payments,'Breadwinner_Payments/js/jquery-3.3.1.min.js')}"></script>
+                <script src="{!URLFOR($Resource.Breadwinner_Payments,'Breadwinner_Payments/js/jquery-3.5.1.min.js')}"></script>
                 <!-- Version 49 of the google chart loader taken from https://www.gstatic.com/charts/loader.js -->
                 <script src="{!URLFOR($Resource.Breadwinner_Payments,'Breadwinner_Payments/js/gcharts-49.js')}"></script>
                 <script type="text/javascript">
@@ -164,6 +164,9 @@
                         j$(elmnt).parent("li").siblings().children("a").attr("aria-selected", false);
                         j$(elmnt).attr("aria-selected", true);
                     }
+                    function openPermissionSetTab(){
+                        selectTab(document.getElementById("Permissions"));
+                    }
                     function OpenContactSupportTab() {
                         var SupportTabId = "ContactSupport";
                         selectTab(document.getElementById(SupportTabId));
@@ -265,6 +268,10 @@
                             console.log('height'+document.getElementById(e.data.iframeId).style.height);
                         }
                     };
+                    function showspinner(){
+                        j$('#spinnerId').addClass('slds-show').removeClass('slds-hide');
+                    }
+
                     var loaded=false;
                     function NavigateToBreadwinnerPaymentsTab() {
                         var actualURL = window.location.href;
@@ -296,8 +303,9 @@
                                                                  );
                     }
                     function resetBraintreeAPIKeys(){
-                        j$("[id$=publicKey]").val('');
+                        j$("[id$=publicKey]").val(''); 
                         j$("[id$=privateKey]").val('');
+                        j$("[id$=tokenizationKey]").val('');
                         j$("[id$=selectedprocessorType]").val('none');
                         j$("[id$=braintreeAuthErrors]").val('');
                     }
@@ -631,6 +639,9 @@
                         transform: rotate(0deg); border-bottom: 0px; border-right: 0px;
                         content: 'Active Mode'; color: white;
                     }
+                    button:hover + .slds-popover.slds-popover_tooltip.slds-hide {
+                        display : block!important;
+                    }
                     /* Checkbox toggle - Read only/Active modes styles End */
                 </style>
             </head>
@@ -672,25 +683,23 @@
                                     <div class="slds-page-header" role="banner">
                                         <div class="slds-media slds-media_center">
                                             <div class="slds-media__body" style="padding:1rem">
-                                                <p class="slds-page-header__title slds-truncate" title="Breadwinner is now connecting to {!connectingAppName}">Breadwinner is now connecting to {!connectingAppName}</p>
+                                                <p class="slds-page-header__title slds-truncate" title="Breadwinner is now connected to {!connectingAppName}">Breadwinner is now connected to {!connectingAppName}</p>
                                                 <p class="slds-text-body_small">Breadwinner • Payments </p>
                                             </div>
                                         </div>
                                     </div>
                                     <!-- -----------------------------header end ---------------------------->
                                     <div class="slds-m-top_medium slds-text-align_center">
-                                        <apex:outputPanel rendered="{!connectingAppName == 'Stripe'}">
-                                            <apex:commandButton id="redirectButton" value="Continue" action="{!saveConnectedAppCredentials}" reRender="theForm, pgMessage" oncomplete="NavigateToBreadwinnerPaymentsTab();message();" status="assign-action-status" styleClass="slds-button slds-button_brand"/>
-                                        </apex:outputPanel> 
-                                        <apex:outputPanel rendered="{!connectingAppName == 'Square'}">
-                                            <apex:commandButton id="redirectButtonForSquare" value="Continue" action="{!saveSquareCredentials}" reRender="theForm, pgMessage" oncomplete="NavigateToBreadwinnerPaymentsTab();message();" status="assign-action-status" styleClass="slds-button slds-button_brand"/>
-                                        </apex:outputPanel> 
-                                        <apex:outputPanel rendered="{!connectingAppName == 'PayPal'}">
-                                            <apex:commandButton id="redirectButtonForPayPal" value="Continue" action="{!savePayPalCredentials}" reRender="theForm, pgMessage" oncomplete="NavigateToBreadwinnerPaymentsTab();message();" status="assign-action-status" styleClass="slds-button slds-button_brand"/>
-                                        </apex:outputPanel>
-                                        <apex:outputPanel rendered="{!connectingAppName == 'Authorize.Net'}">
-                                            <apex:commandButton id="redirectButtonForAuthorizeNet" value="Continue" action="{!saveAuthorizeNetCredentials}" reRender="theForm, pgMessage" oncomplete="NavigateToBreadwinnerPaymentsTab();message();" status="assign-action-status" styleClass="slds-button slds-button_brand"/>
-                                        </apex:outputPanel>
+                                        <apex:commandButton id="redirectButton" value="Continue" action="{!saveStripeCredentials}" onclick="showspinner();"  reRender="theForm, pgMessage" oncomplete="NavigateToBreadwinnerPaymentsTab();message();" styleClass="disableMe-Onlick slds-button slds-button_brand" rendered="{!connectingAppName == 'Stripe'}"/>
+                                        <apex:commandButton id="redirectButtonForSquare" value="Continue" action="{!saveSquareCredentials}" onclick="showspinner();" reRender="theForm, pgMessage" oncomplete="NavigateToBreadwinnerPaymentsTab();message();" styleClass="slds-button slds-button_brand" rendered="{!connectingAppName == 'Square'}"/>
+                                        <apex:commandButton id="redirectButtonForPayPal" value="Continue" action="{!savePayPalCredentials}" onclick="showspinner();" reRender="theForm, pgMessage" oncomplete="NavigateToBreadwinnerPaymentsTab();message();" styleClass="slds-button slds-button_brand" rendered="{!connectingAppName == 'PayPal'}"/>
+                                        <apex:commandButton id="redirectButtonForAuthorizeNet" value="Continue" action="{!saveAuthorizeNetCredentials}" onclick="showspinner();" reRender="theForm, pgMessage" oncomplete="NavigateToBreadwinnerPaymentsTab();message();" styleClass="slds-button slds-button_brand" rendered="{!connectingAppName == 'Authorize.Net'}"/>
+                                    </div>
+                                    <div id="spinnerId" class="slds-spinner_container spinner-main slds-hide">
+                                        <div class="slds-spinner_brand slds-spinner slds-spinner_medium" aria-hidden="false" role="alert">
+                                            <div class="slds-spinner__dot-a"></div>
+                                            <div class="slds-spinner__dot-b"></div>
+                                        </div>
                                     </div>
                                 </apex:outputPanel>
                                 <apex:pageMessages />
@@ -857,11 +866,10 @@
                                                 </div>
                                             </div>
                                         </div>
-                                        <apex:outputPanel id="msgPannel">
+                                        <apex:outputPanel id="msgPannel" layout="block" styleClass="slds-m-around_small">
                                             <apex:pageMessages />      
                                         </apex:outputPanel>
                                         
-                                        <br/>
                                         <apex:outputPanel id="setupRightContent">
                                         <!-- Arrow Path Starts -->
                                         <apex:outputPanel layout="block" id="setupArrowPath" style="padding-bottom:1px;">
@@ -914,21 +922,7 @@
                                                                             </span>
                                                                         </a>
                                                                     </li>
-                                                                    <!-- 
-<li class="slds-path__item {!IF(AND(bwSetting.Active, isProcessorConnected), IF(AND(bwSetting.Page_Layouts_Updated, NOT(unableToAddRemoteSiteSetting)),'slds-is-complete','slds-is-active'),'slds-is-incomplete')}" role="presentation"> 
-<a aria-selected="false" class="slds-path__link" href="javascript:void(0);" role="option" tabindex="-1">
-<span class="slds-path__stage" id="stage3">
-<svg class="slds-icon slds-icon_x-small" aria-hidden="true">
-<use xlink:href="{!URLFOR($Asset.SLDS, 'assets/icons/utility-sprite/svg/symbols.svg#check')}" />
-</svg>
-<span class="slds-assistive-text">
-<apex:outputText >  {!IF(bwSetting.Page_Layouts_Updated,'Pagelayouts Updated','Update Pagelayouts')} </apex:outputText>
-</span>
-</span>
-<span class="slds-path__title"> <apex:outputText >{!IF(AND(bwSetting.Page_Layouts_Updated, NOT(unableToAddRemoteSiteSetting)),'Pagelayouts Updated','Update Pagelayouts')}</apex:outputText></span>
-</a>
-</li> 
--->
+                                                                   
                                                                     <li class="slds-path__item {!IF(AND(bwSetting.Active,isProcessorConnected), IF(AND(appC.isCustomerMatchComplete , unMatchedRecordCount == 0),'slds-is-complete',IF(isProcessorConnected,'slds-is-active','slds-is-incomplete') ),'slds-is-incomplete')}" role="presentation">
                                                                         <a aria-selected="false" class="slds-path__link" href="javascript:void(0);" role="option" tabindex="-1">
                                                                             <span class="slds-path__stage" id="stage5">
@@ -940,6 +934,19 @@
                                                                             <span class="slds-path__title"><apex:outputText >{!IF(AND(bwSetting.Active, isProcessorConnected, appC.isCustomerMatchComplete,unMatchedRecordCount == 0),'Customers Matched','Match Customers')}</apex:outputText></span>
                                                                         </a>
                                                                     </li>
+                                                                    <li class="slds-path__item {!IF(AND(bwSetting.Active, bwSetting.pageLayoutsUpdated, isProcessorConnected, NOT(unableToAddRemoteSiteSetting)), 'slds-is-complete', IF(AND(isProcessorConnected, appC.isCustomerMatchComplete, NOT(bwSetting.pageLayoutsUpdated)), 'slds-is-active', 'slds-is-incomplete' ))}" role="presentation"> 
+                                                                        <a aria-selected="false" class="slds-path__link" href="javascript:void(0);" role="option" tabindex="-1">
+                                                                            <span class="slds-path__stage" id="stage3">
+                                                                                <svg class="slds-icon slds-icon_x-small" aria-hidden="true">
+                                                                                <use xlink:href="{!URLFOR($Asset.SLDS, 'assets/icons/utility-sprite/svg/symbols.svg#check')}" />
+                                                                                </svg>
+                                                                                <span class="slds-assistive-text">
+                                                                                    <apex:outputText >  {!IF(bwSetting.pageLayoutsUpdated,'Layouts Updated','Update Layouts')} </apex:outputText>
+                                                                                </span>
+                                                                            </span>
+                                                                            <span class="slds-path__title"> <apex:outputText >{!IF(AND(bwSetting.pageLayoutsUpdated, NOT(unableToAddRemoteSiteSetting)),'Layouts Updated','Update Layouts')}</apex:outputText></span>
+                                                                        </a>
+                                                                    </li> 
                                                                 </ul>
                                                             </div>
                                                         </div>
@@ -1028,7 +1035,7 @@
                                                         <div>
                                                             <apex:outputPanel layout="block" id="connectionInfoPanel">
                                                                 <apex:outputPanel rendered="{!OR(AND(bwSetting.Active,bwSetting.Active != null) , isProcessorConnected)}">
-                                                                    <apex:commandlink styleClass="slds-m-left_xx-small" rendered="{!AND(isBreadwinnerAdministrator, NOT(isProcessorConnected))}" style="color: rgb(0, 109, 204);font-style:italic;font-weight:600" value="Connect with a Payment Processor" status="assign-action-status" onclick="showModal('chooseProcessorModal','backdrop','','');" rerender="selectPaymentProcessorSection, paymentProcessorsSection" >
+                                                                    <apex:commandlink styleClass="slds-m-left_xx-small" rendered="{!AND(isBreadwinnerAdministrator, NOT(isProcessorConnected))}" value="Connect with a Payment Processor" status="assign-action-status" onclick="showModal('chooseProcessorModal','backdrop','','');" rerender="selectPaymentProcessorSection, paymentProcessorsSection" >
                                                                         <!--apex:param name="selectedProcessorType" assignTo="{!selectedProcessorType}" value="stripe" /-->
                                                                     </apex:commandlink>
                                                                     <apex:repeat value="{!appConfigList}" var="appC">
@@ -1073,7 +1080,7 @@
                                                                         </apex:outputPanel>
                                                                     </apex:repeat>
                                                                     <apex:outputPanel rendered="{!AND((isMultiProcessorEnabled ),(isBreadwinnerAdministrator),(processorConfigList!=null&&processorConfigList.size>0))}">
-                                                                        <apex:commandlink styleClass="slds-m-left_xx-small" style="color: rgb(0, 109, 204);font-style:italic;font-weight:600" value="Add another Payment Processor" status="assign-action-status" onclick="showModal('chooseProcessorModal','backdrop','','');" rerender="selectPaymentProcessorSection, paymentProcessorsSection, authErrors" >
+                                                                        <apex:commandlink styleClass="slds-m-left_xx-small" value="Add another Payment Processor" status="assign-action-status" onclick="showModal('chooseProcessorModal','backdrop','','');" rerender="selectPaymentProcessorSection, paymentProcessorsSection, authErrors" >
                                                                         </apex:commandlink>&nbsp;
                                                                     </apex:outputPanel>
                                                                     
@@ -1107,73 +1114,28 @@
                                                         </div>
                                                     </td>
                                                 </tr>
-                                                
-                                                <!-- Page layouts update section starts -
-<tr>
-<td >
-<div class="slds-text-heading_medium">
-<apex:outputPanel id="pageLayoutHeadingPanel" >
-<script type="text/javascript">
-function createRemoteSiteMetadata(){
-    try{
-        var binding = new XMLHttpRequest();
-        var host = "{!LEFT($Api.Enterprise_Server_URL_330, FIND('/services',$Api.Enterprise_Server_URL_330))}";
-        var request = 
-            '<?xml version="1.0" encoding="UTF-8"?><env:Envelope xmlns:env="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><env:Header><SessionHeader xmlns="http://soap.sforce.com/2006/04/metadata"><sessionId>{!$Api.Session_ID}</sessionId></SessionHeader></env:Header><env:Body><upsertMetadata xmlns="http://soap.sforce.com/2006/04/metadata"><metadata xsi:type="RemoteSiteSetting"><fullName>Breadwinner_Xero_MyServer</fullName><description>Required to use Metadata API, created by Breadwinner</description><disableProtocolSecurity>false</disableProtocolSecurity><isActive>true</isActive><url>'+host+'</url></metadata></upsertMetadata></env:Body></env:Envelope>';
-        
-        binding.open('POST', host+'services/Soap/m/33.0');
-        binding.setRequestHeader('SOAPAction','""');
-        binding.setRequestHeader('Content-Type', 'text/xml');
-        binding.onreadystatechange =
-            function() {
-            if(this.readyState==4) {
-                var parser = new DOMParser();
-                var doc  = parser.parseFromString(this.response, 'application/xml');
-                var errors = doc.getElementsByTagName('errors');
-                console.log(errors);
-            }
-        }
-        binding.send(request);
-    }
-    catch(error){
-        console.log(error);
-    }
-}
-</script>
-<apex:outputPanel rendered="{!unableToAddRemoteSiteSetting && NOT(bwSetting.Page_Layouts_Updated)}" >
-<a  target="_blank" style="color:gray" href="{!BW_SupportPortalURL}/customer/portal/articles/1607408-configure-your-page-layouts">
-Read Instructions
-</a>
-on configuring your Page Layouts
-<div class="slds-text-body_small">
-(we can&apos;t monitor this, so no green check will appear)
-</div>
-</apex:outputPanel>
-<apex:outputPanel rendered="{!OR(NOT(unableToAddRemoteSiteSetting),bwSetting.Page_Layouts_Updated)}">
-
-<apex:outputPanel rendered="{!AND(processorConfigList.size>0,NOT(OR(isLayoutUpdated, bwSetting.Page_Layouts_Updated)),isAdministrator)}">
-<apex:commandLink style="color:black" oncomplete="updatingPageLayouts();" reRender="noofAssignee,pmStatus" status="assign-action-status">Update Account Page Layouts</apex:commandLink>
-</apex:outputPanel>
-<apex:outputPanel rendered="{!OR(processorConfigList.size==0,isLayoutUpdated, NOT(isAdministrator), bwSetting.Page_Layouts_Updated)}">
-Update Account Page Layouts
-</apex:outputPanel> 
-</apex:outputPanel>
-<apex:outputPanel rendered="{!AND(unableToAddRemoteSiteSetting,!bwSetting.Page_Layouts_Updated)}">Update Account Page Layouts
-</apex:outputPanel>
-</apex:outputPanel>
-</div>
-</td>
-<td>
-<div>
-<apex:outputPanel id="LayoutsUpdateCheck">
-<apex:image url="{!URLFOR($Resource.Breadwinner_Payments,'Breadwinner_Payments/images/RedCheck.png')}" id="redchk4" rendered="{!OR(!bwSetting.Page_Layouts_Updated, NOT(isProcessorConnected), !bwSetting.Active)}" />
-<apex:image url="{!URLFOR($Resource.Breadwinner_Payments,'Breadwinner_Payments/images/GreenCheck.png')}" id="greenchk4" rendered="{!AND(bwSetting.Page_Layouts_Updated, isProcessorConnected, bwSetting.Active)}" />
-</apex:outputPanel>
-</div>
-</td>
-<td/>
-</tr-->
-<!-- Page layouts update section Ends -->
+                                                <!-- Assign Permission Set Section -->
+                                                <tr>
+                                                    <td>  
+                                                        <div class="slds-text-heading_medium">
+                                                            Assign Breadwinner Payments Permission Sets
+                                                        </div>
+                                                    </td> 
+                                                    <td >
+                                                        <div class="iconDiv">
+                                                            <apex:outputPanel id="psIcon">
+                                                                <apex:image url="{!URLFOR($Resource.Breadwinner_Payments,'Breadwinner_Payments/images/GreenCheck.png')}" id="psgreenchk" rendered="{!AND(isProcessorConnected, isPermissionSetAssigned)}" />     
+                                                                <apex:image url="{!URLFOR($Resource.Breadwinner_Payments,'Breadwinner_Payments/images/YellowCheck.png')}" id="psyellowchk" rendered="{!AND(isProcessorConnected, !isPermissionSetAssigned)}"/> 
+                                                                <apex:image url="{!URLFOR($Resource.Breadwinner_Payments,'Breadwinner_Payments/images/RedCheck.png')}" id="psredchk" rendered="{!!isProcessorConnected}"/>
+                                                            </apex:outputPanel>
+                                                        </div>
+                                                    </td>  
+                                                    <td>
+                                                        <apex:outputPanel id="psLinkPanel" rendered="{!AND(canAssignPermissionSets, !isPermissionSetAssigned, isProcessorConnected)}">
+                                                                <apex:commandLink status="assign-action-status" styleClass="slds-text-heading_small slds-m-left_xx-small" onclick="openPermissionSetTab();" reRender="Permissions" >Assign Breadwinner Permission Sets</apex:commandLink>
+                                                        </apex:outputPanel>                                                    
+                                                    </td> 
+                                                </tr> 
                                                 <!--apex:outputPanel id="accountMatchSection"-->
                                                     
                                                     <tr>
@@ -1185,9 +1147,9 @@ Update Account Page Layouts
                                                         <td>
                                                             <div class="iconDiv">
                                                                 <apex:outputPanel id="AccountMatchCheck">
-                                                                    <apex:image url="{!URLFOR($Resource.Breadwinner_Payments,'Breadwinner_Payments/images/RedCheck.png')}" id="redchk3" rendered="{!OR(NOT(isCustomerMatchComplete), !bwSetting.Active)}" />
-                                                                    <apex:image url="{!URLFOR($Resource.Breadwinner_Payments,'Breadwinner_Payments/images/GreenCheck.png')}" id="greenchk3" rendered="{!AND(isCustomerMatchComplete, NOT(areThereUnmatchedCustomers), bwSetting.Active)}" />
-                                                                    <apex:image url="{!URLFOR($Resource.Breadwinner_Payments,'Breadwinner_Payments/images/YellowCheck.png')}" id="yellowchk3" rendered="{!AND(isCustomerMatchComplete, areThereUnmatchedCustomers, bwSetting.Active)}" />
+                                                                    <apex:image url="{!URLFOR($Resource.Breadwinner_Payments,'Breadwinner_Payments/images/RedCheck.png')}" id="redchk3" rendered="{!OR(NOT(isCustomerMatchStarted), !bwSetting.Active)}" />
+                                                                    <apex:image url="{!URLFOR($Resource.Breadwinner_Payments,'Breadwinner_Payments/images/GreenCheck.png')}" id="greenchk3" rendered="{!AND(isCustomerMatchStarted, NOT(areThereUnmatchedCustomers), bwSetting.Active)}" />
+                                                                    <apex:image url="{!URLFOR($Resource.Breadwinner_Payments,'Breadwinner_Payments/images/YellowCheck.png')}" id="yellowchk3" rendered="{!AND(isCustomerMatchStarted, areThereUnmatchedCustomers, bwSetting.Active)}" />
                                                                 </apex:outputPanel>
                                                             </div>
                                                         </td>
@@ -1196,7 +1158,7 @@ Update Account Page Layouts
                                                                 <apex:outputPanel rendered="{!AND(isProcessorConnected, OR(isBreadwinnerAdministrator, canPerformBreadwinnerOperations))}">
                                                                     <apex:outputPanel rendered="{!!isAccountMatchDoneForAllProcessors}">
                                                                         <div class="slds-form-element__control slds-m-left_xx-small" style="display: inline-flex">
-                                                                            <apex:outputPanel rendered="{!OR(displayCustomerMatchOptions, isAccountMatchComplete)}">
+                                                                            <apex:outputPanel rendered="{!OR(displayCustomerMatchOptions, isAccountMatchStarted)}">
                                                                                 <span class="slds-radio">
                                                                                     <input type="radio" id="accountSync" name="syncOptions" onclick="selectSyncObject('Account');"/>
                                                                                     <label class="slds-radio__label" for="accountSync">
@@ -1205,7 +1167,7 @@ Update Account Page Layouts
                                                                                     </label>
                                                                                 </span>
                                                                             </apex:outputPanel>
-                                                                            <apex:outputPanel rendered="{!OR(displayCustomerMatchOptions, isContactMatchComplete)}">
+                                                                            <apex:outputPanel rendered="{!OR(displayCustomerMatchOptions, isContactMatchStarted)}">
                                                                                 <span class="slds-radio">
                                                                                     <input type="radio" id="contactSync" name="syncOptions" onclick="selectSyncObject('Contact');" />
                                                                                     <label class="slds-radio__label" for="contactSync">
@@ -1248,6 +1210,27 @@ Update Account Page Layouts
                                                         </td>
                                                     </tr> 
                                                 <!--/apex:outputPanel-->              
+                                                  <!-- Update Page Layouts Section-->
+                                                  <tr>
+                                                    <td>  
+                                                        <div class="slds-text-heading_medium">
+                                                            Update Page Layouts
+                                                        </div>
+                                                    </td> 
+                                                    <td >
+                                                        <div class="iconDiv">
+                                                            <apex:outputPanel id="layoutCheck">
+                                                                <apex:image styleClass="crossIcon" value="{!IF(AND(isProcessorConnected, isLayoutUpdated), URLFOR($Resource.Breadwinner_Payments, 'Breadwinner_Payments/images/GreenCheck.png') , URLFOR($Resource.Breadwinner_Payments, 'Breadwinner_Payments/images/RedCheck.png') )}" height="32" width="32"/>
+                                                            </apex:outputPanel>
+                                                        </div>
+                                                    </td>  
+                                                    <td>
+                                                        <apex:outputPanel id="pageLayoutLinkPanel" rendered="{!canUpdatePageLayouts}">
+                                                            <apex:commandLink action="{!updatePageLayouts}" status="assign-action-status" styleClass="slds-text-heading_small slds-m-left_xx-small">Update {!IF(isCustomerMatchStarted, customerMatchType, '')} Page Layouts</apex:commandLink>
+                                                        </apex:outputPanel>                                                 
+                                                    </td> 
+                                                </tr> 
+
                                                 <tr>
                                                     <td>
                                                         <div class="slds-text-heading_medium">
@@ -1403,7 +1386,7 @@ Update Account Page Layouts
                                                             </apex:outputPanel>
                                                             <apex:outputPanel layout="block" styleClass="slds-m-top_medium slds-align_absolute-center" rendered="{!AND(isBreadwinnerAdministrator, selectedProcessorType == 'stripe')}" >
                                                                 <apex:outputLink value="{!stripeAuthUrl}" target="_top" onclick="createRemoteSiteMetadata('Stripe_Authentication', 'https://connect.stripe.com');createRemoteSiteMetadata('Stripe_API', 'https://api.stripe.com');">
-                                                                    <apex:image url="{!URLFOR($Resource.Breadwinner_Payments,'Breadwinner_Payments/images/ConnectWithStripe.png')}" />
+                                                                    <apex:image url="{!URLFOR($Resource.Breadwinner_Payments,'Breadwinner_Payments/images/ConnectwithStripe.svg')}" />
                                                                 </apex:outputLink>
                                                                 <apex:outputPanel style="padding-left:10px">
                                                                     <apex:outputLink value="{!stripeTestAuthUrl}" target="_top" styleClass="slds-text-body_small" onclick="createRemoteSiteMetadata('Stripe_Authentication', 'https://connect.stripe.com');createRemoteSiteMetadata('Stripe_API', 'https://api.stripe.com');">Connect Stripe in TEST Mode</apex:outputLink>
@@ -1421,7 +1404,7 @@ Update Account Page Layouts
                                                                         </div>
                                                                     </div>
                                                                 </apex:outputPanel>
-                                                                <apex:outputPanel layout="block" styleClass="slds-m-top_x-small slds-m-bottom_x-small" id="braintreePrivateKey">
+                                                                <apex:outputPanel layout="block" styleClass="slds-m-top_x-small" id="braintreePrivateKey">
                                                                     <div class="slds-form-element">
                                                                         <span class="slds-form-element__label">Private Key</span>
                                                                         <div class="slds-form-element__control">
@@ -1429,7 +1412,25 @@ Update Account Page Layouts
                                                                         </div>
                                                                     </div>
                                                                 </apex:outputPanel>
-                                                                <apex:outputPanel styleClass="slds-text-body_small"  style="color: gray;">Note: Breadwinner doesn't store your Braintree API Keys, instead it stores a single value by encoding the two keys, as required for&nbsp;<apex:outputLink value="https://graphql.braintreepayments.com/guides/making_api_calls/#request-requirements" target="_blank">Braintree Authorization</apex:outputLink>.</apex:outputPanel>
+                                                                <apex:outputPanel layout="block" styleClass="slds-m-top_x-small slds-m-bottom_x-small" id="braintreeTokenizationKey">
+                                                                    <div class="slds-form-element">
+                                                                        <span class="slds-form-element__label">Tokenization Key</span>
+                                                                        <div class="slds-form-element__icon">
+                                                                            <button class="slds-button slds-button_icon" aria-describedby="help">
+                                                                                <span class="slds-icon_container slds-icon-standard-info" >
+                                                                                    <apex:image url="{!URLFOR($Resource.Breadwinner_Payments,'Breadwinner_Payments/images/Info.png')}"  onclick="return false;"  style="width: 13px;height: 15px;padding-top: 3px;"></apex:image>
+                                                                                </span>
+                                                                            </button>
+                                                                            <div class="slds-popover slds-popover_tooltip slds-nubbin_bottom-left slds-hide" role="tooltip" id="help" style="position:absolute;top:-45px;left:-15px;width:270px">
+                                                                                <div class="slds-popover__body">Tokenization Key is used for Card creation with PCI Compliance</div>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div class="slds-form-element__control">
+                                                                            <apex:inputtext id="tokenizationKey" value="{!braintreeTokenizationKey}" styleClass="slds-input" />
+                                                                        </div>
+                                                                    </div>
+                                                                </apex:outputPanel>
+                                                                <apex:outputPanel styleClass="slds-text-body_small"  style="color: gray;">Note: Breadwinner doesn't store your Braintree API Keys, instead it stores a single value by encoding the Public Key and Private Key, as required for&nbsp;<apex:outputLink value="https://graphql.braintreepayments.com/guides/making_api_calls/#request-requirements" target="_blank">Braintree Authorization</apex:outputLink>.</apex:outputPanel>
                                                                 <apex:outputPanel id="braintreeRemoteSiteError" >
                                                                     <apex:outputPanel layout="block"  style="font-weight:Bold;font-style:italic;margin-top: 10px; text-align: center;" rendered="{!IF((AND(selectedProcessorType == 'braintree',unableToAddRemoteSiteSetting)), true, false)}">
                                                                         Breadwinner is unable to read your Remote Site Settings. Please create the Remote Site Settings manually with the help of <a href="https://help-payments.breadwinner.com/support/solutions/articles/44001952121-create-remote-sites-in-breadwinner-payments" target="_blank"> this article</a>. 
@@ -1479,7 +1480,7 @@ Update Account Page Layouts
                                                             <apex:outputPanel layout="block" style="color: gray" styleClass="slds-m-top_small" rendered="{!AND(isBreadwinnerAdministrator, selectedProcessorType == 'authorize.net')}">
                                                                 <apex:outputPanel layout="block" styleClass="slds-m-top_medium" style="text-align: center" rendered="{!AND(isBreadwinnerAdministrator, selectedProcessorType == 'authorize.net')}" >
                                                                     <apex:outputPanel style="padding-left:10px">
-                                                                        <apex:outputText styleClass="slds-text-body_small">Connect with Authorize.Net Live(coming soon)</apex:outputText>
+                                                                        <apex:outputText styleClass="slds-text-body_small">Connect with Authorize.Net Live (coming soon)</apex:outputText>
                                                                     </apex:outputPanel>
                                                                     <apex:outputPanel style="padding-left:10px">
                                                                         <apex:outputLink value="{!AuthorizeNetTestAuthUrl}" target="_top" styleClass="slds-text-body_small" onclick="createRemoteSiteMetadata('AuthNetTest_Token', 'https://accesstest.authorize.net');createRemoteSiteMetadata('AuthNetTest_Api', 'https://apitest.authorize.net');">Connect with Authorize.Net Sandbox</apex:outputLink>
@@ -2041,12 +2042,12 @@ Update Account Page Layouts
                                                             <td class="generalTab-value"><apex:outputtext value="{!orgInfo.Id}"></apex:outputtext></td>
                                                         </tr>
                                                         <tr>
-                                                            <td class="generalTab-header">Breadwinner Plan Code:</td>
-                                                            <td class="generalTab-value"><apex:outputtext value="{!bwSetting.Plan_Code}"></apex:outputtext></td>
-                                                        </tr>
-                                                        <tr>
-                                                            <td class="generalTab-header">Breadwinner Plan Name:</td>
+                                                            <td class="generalTab-header">Breadwinner Plan:</td>
                                                             <td class="generalTab-value"><apex:outputtext value="{!planName}"></apex:outputtext></td>
+                                                        </tr>
+                                                        <tr style="display:{!IF(bwSetting.isOverridePlanExpired,'none','')}">
+                                                            <td class="generalTab-header">Trial Plan:</td>
+                                                            <td class="generalTab-value">{!bwSetting.overridePlanName} ({!bwSetting.overridePlanExpiresInDaysText})</td>
                                                         </tr>
                                                         <tr>
                                                             <td class="generalTab-header">Breadwinner Version:</td>
@@ -2067,23 +2068,24 @@ Update Account Page Layouts
                                                             <b><i>{!IF(NOT(isScheduledJobsRunbyActiveUser),'an Inactive User',IF(NOT(isScheduledJobsRunbyAdmin),'Non Administrator','an Inactive User or Non Administrator'))}</i></b>
                                                         </apex:outputPanel>
                                                         <apex:outputPanel >
-                                                            <apex:commandButton value="Restart Scheduled Jobs under my Admin User" action="{!restartScheduledJobs}" status="assign-action-status" styleClass="slds-m-left_medium slds-button {!IF(OR(NOT(isScheduledJobsRunbyActiveUser),NOT(isScheduledJobsRunbyAdmin)),'slds-button_destructive','slds-button_brand')}" oncomplete="showModal('restartSyncModel','backdropRestart','restartModalContent','Succesfully restarted Scheduled Jobs to run under you.');"></apex:commandButton>
+                                                            <apex:commandButton value="Restart Scheduled Jobs under my Admin User" action="{!restartScheduledJobs}" status="assign-action-status" styleClass="slds-m-left_medium slds-button {!IF(OR(NOT(isScheduledJobsRunbyActiveUser),NOT(isScheduledJobsRunbyAdmin)),'slds-button_text-destructive','slds-button_outline-brand')}" oncomplete="showModal('restartSyncModel','backdropRestart','restartModalContent','Succesfully restarted Scheduled Jobs to run under you.');"></apex:commandButton>
                                                         </apex:outputPanel>
                                                     </apex:outputPanel>
                                                 </div>
                                             
-                                                <h3 class="slds-section-title_divider slds-m-bottom_small">Restarting And Updating</h3> 
+                                                <h3 class="slds-section-title_divider">Restarting And Updating</h3> 
                                               
                                                 <apex:outputPanel layout="block" styleclass="slds-m-horizontal_medium slds-m-bottom_small">
-                                                    <apex:commandButton id="restartCustomerSync" value="Restart Historical Customer / Payment Method Sync" action="{!restartHistoricalSync}" oncomplete="showModal('restartSyncModel','backdropRestart','restartModalContent','{!IF(isBatchStarted,'Historical Customer / Payment Method Sync is started now.','Historical Customer / Payment Method Sync is already running. Please try again later.')}');" status="assign-action-status" styleClass="slds-button slds-button_brand slds-m-top_x-small slds-m-left_xx-small slds-m-right_small" reRender="nothing" >
+                                                    <apex:commandButton id="restartCustomerSync" value="Restart Historical Customer / Payment Method Sync" action="{!restartHistoricalSync}" oncomplete="showModal('restartSyncModel','backdropRestart','restartModalContent','{!IF(isBatchStarted,'Historical Customer / Payment Method Sync is started now.','Historical Customer / Payment Method Sync is already running. Please try again later.')}');" status="assign-action-status" styleClass="slds-button slds-button_outline-brand slds-m-top_small slds-m-left_xx-small slds-m-right_small" reRender="nothing" >
                                                         <apex:param value="Customer" assignTo="{!syncName}" />
                                                     </apex:commandButton>
-                                                    <apex:commandButton id="restartPaymentSync" value="Restart Historical Payment Sync" action="{!restartHistoricalSync}" oncomplete="showModal('restartSyncModel','backdropRestart','restartModalContent','{!IF(isBatchStarted,'Historical Payment Sync is started now.','Historical Payment Sync is already running. Please try again later.')}');" status="assign-action-status" styleClass="slds-button slds-button_brand slds-m-top_x-small slds-m-left_xx-small slds-m-right_small" reRender="nothing" >
+                                                    <apex:commandButton id="restartPaymentSync" value="Restart Historical Payment Sync" action="{!restartHistoricalSync}" oncomplete="showModal('restartSyncModel','backdropRestart','restartModalContent','{!IF(isBatchStarted,'Historical Payment Sync is started now.','Historical Payment Sync is already running. Please try again later.')}');" status="assign-action-status" styleClass="slds-button slds-button_outline-brand slds-m-top_small slds-m-left_xx-small slds-m-right_small" reRender="nothing" >
                                                         <apex:param value="Payment" assignTo="{!syncName}" />
                                                     </apex:commandButton>
-                                                    <apex:commandButton id="restartHistoricalSync" value="Restart Historical Sync" action="{!restartWeeklySync}" oncomplete="showModal('restartSyncModel','backdropRestart','restartModalContent','{!IF(isBatchStarted,'Historical Sync is started now.','Historical Sync is already running. Please try again later.')}');" status="assign-action-status" styleClass="slds-button slds-button_brand slds-m-top_x-small slds-m-left_xx-small slds-m-right_small" reRender="nothing" >
+                                                    <apex:commandButton id="restartHistoricalSync" value="Restart Historical Sync" action="{!restartWeeklySync}" oncomplete="showModal('restartSyncModel','backdropRestart','restartModalContent','{!IF(isBatchStarted,'Historical Sync is started now.','Historical Sync is already running. Please try again later.')}');" status="assign-action-status" styleClass="slds-button slds-button_outline-brand slds-m-top_small slds-m-left_xx-small slds-m-right_small" reRender="nothing" >
                                                     </apex:commandButton>
-                                                    <apex:commandButton id="restartHourlySync" value="Restart Hourly Sync" action="{!rescheduleHourlySync}"  oncomplete="showModal('restartSyncModel','backdropRestart','restartModalContent','Hourly Sync batches will be rescheduled now.');" status="assign-action-status" styleClass="slds-button slds-button_brand slds-m-top_x-small slds-m-right_x-small" reRender="nothing" />
+                                                    <apex:commandButton id="restartHourlySync" value="Restart Regular Sync" action="{!rescheduleHourlySync}"  oncomplete="showModal('restartSyncModel','backdropRestart','restartModalContent','Hourly Sync batches will be rescheduled now.');" status="assign-action-status" styleClass="slds-button slds-button_outline-brand slds-m-top_small slds-m-right_x-small" reRender="nothing" />
+                                                    <apex:commandButton id="restartBBHourlySync" value="Restart Billing Regular Sync" action="{!rescheduleBillingHourlySync}"  oncomplete="showModal('restartSyncModel','backdropRestart','restartModalContent','Billing Hourly Sync batches will be rescheduled now.');" status="assign-action-status" styleClass="slds-button slds-button_outline-brand slds-m-top_small slds-m-right_x-small" reRender="nothing" rendered="{!isBreadwinnerBillingInstalled}" />
                                                 </apex:outputPanel>
                                                 
                                             </apex:outputPanel>
@@ -2093,14 +2095,20 @@ Update Account Page Layouts
                                                     <div class="slds-text-title_caps slds-m-top_small" style="color:red;">Don&apos;t use the delete functionality unless specifically asked by Breadwinner Support.</div>
                                                     <div class="slds-text-title slds-m-top_small">Click delete to remove all Breadwinner Payments Customers, Payment Methods or Payments from Salesforce (no data in your Payment processor will be affected).</div>
                                                     <div>
-                                                        <apex:commandButton id="tsDeleteCustomerBtn" value="Delete All BWP Customers ({!customersCount}) from Salesforce" oncomplete="showModal('tsModal','tsBackdrop','deleteMessage','Are you sure, you want to delete ALL ({!customersCount}) BWP Customers from Salesforce?','customer');" styleClass="slds-button slds-button_destructive  {!IF(OR($User.UIThemeDisplayed == 'Theme4d',$User.UIThemeDisplayed == 'Theme4t'),'','slds-m-top_small')} slds-m-left_xx-small slds-m-right_small" reRender="nothing" disabled="{!If(customersCount>0,FALSE,TRUE)}">
+                                                        <apex:commandButton id="tsDeleteCustomerBtn" value="Delete All Customers ({!customersCount}) from Salesforce" oncomplete="showModal('tsModal','tsBackdrop','deleteMessage','Are you sure, you want to delete ALL ({!customersCount}) Customers from Salesforce?','customer');" styleClass="slds-button slds-button_text-destructive  {!IF(OR($User.UIThemeDisplayed == 'Theme4d',$User.UIThemeDisplayed == 'Theme4t'),'','slds-m-top_small')} slds-m-left_xx-small slds-m-right_small" reRender="nothing" disabled="{!If(customersCount>0,FALSE,TRUE)}">
                                                             <apex:param name="deleteCustomer" value="Customers" assignTo="{!objectName}"/>
                                                         </apex:commandButton>
-                                                        <apex:commandButton id="tsDeletePaymentMethodsBtn" value="Delete All BWP Payment Methods ({!paymentMethodsCount}) from Salesforce" oncomplete="showModal('tsModal','tsBackdrop','deleteMessage','Are you sure, you want to delete ALL ({!paymentMethodsCount}) BWP Payment Methods from Salesforce?','payment methods');" styleClass="slds-button slds-button_destructive slds-m-top_small slds-m-left_xx-small slds-m-right_small" reRender="nothing" disabled="{!If(paymentMethodsCount>0,FALSE,TRUE)}">
+                                                        <apex:commandButton id="tsDeletePaymentMethodsBtn" value="Delete All Payment Methods ({!paymentMethodsCount}) from Salesforce" oncomplete="showModal('tsModal','tsBackdrop','deleteMessage','Are you sure, you want to delete ALL ({!paymentMethodsCount}) Payment Methods from Salesforce?','payment methods');" styleClass="slds-button slds-button_text-destructive slds-m-top_small slds-m-left_xx-small slds-m-right_small" reRender="nothing" disabled="{!If(paymentMethodsCount>0,FALSE,TRUE)}">
                                                             <apex:param name="deletePaymentMethods" value="PaymentMethods" assignTo="{!objectName}"/>
                                                         </apex:commandButton>
-                                                        <apex:commandButton id="tsDeletePaymentBtn" value="Delete All BWP Payments ({!paymentsCount}) from Salesforce" oncomplete="showModal('tsModal','tsBackdrop','deleteMessage','Are you sure, you want to delete ALL ({!paymentsCount}) BWP Payments from Salesforce?','payment');" styleClass="slds-button slds-button_destructive slds-m-top_small slds-m-left_xx-small slds-m-right_small" reRender="nothing" disabled="{!If(paymentsCount>0,FALSE,TRUE)}">
+                                                        <apex:commandButton id="tsDeletePaymentBtn" value="Delete All Payments ({!bwpTransCount }) from Salesforce" oncomplete="showModal('tsModal','tsBackdrop','deleteMessage','Are you sure, you want to delete ALL ({!bwpTransCount }) Payments from Salesforce?','payment');" styleClass="slds-button slds-button_text-destructive slds-m-top_small slds-m-left_xx-small slds-m-right_small" reRender="nothing" disabled="{!If(bwpTransCount >0,FALSE,TRUE)}">
                                                             <apex:param name="deletePayment" value="Payments" assignTo="{!objectName}"/>
+                                                        </apex:commandButton>
+                                                        <apex:commandButton id="tsDeleteProductBtn" value="Delete All Products ({!productsCount}) from Salesforce" oncomplete="showModal('tsModal','tsBackdrop','deleteMessage','Are you sure, you want to delete ALL ({!productsCount}) Products from Salesforce?','product');" styleClass="slds-button slds-button_text-destructive slds-m-top_small slds-m-left_xx-small slds-m-right_small" reRender="nothing" disabled="{!If(productsCount >0,FALSE,TRUE)}">
+                                                            <apex:param name="deleteProduct" value="Products" assignTo="{!objectName}"/>
+                                                        </apex:commandButton>
+                                                        <apex:commandButton id="tsDeletePriceBtn" value="Delete All Products ({!pricesCount}) from Salesforce" oncomplete="showModal('tsModal','tsBackdrop','deleteMessage','Are you sure, you want to delete ALL ({!pricesCount}) Prices from Salesforce?','price');" styleClass="slds-button slds-button_text-destructive slds-m-top_small slds-m-left_xx-small slds-m-right_small" reRender="nothing" disabled="{!If(pricesCount >0,FALSE,TRUE)}">
+                                                            <apex:param name="deletePrice" value="Prices" assignTo="{!objectName}"/>
                                                         </apex:commandButton>
                                                     </div>
                                                 </apex:outputPanel>
@@ -2134,7 +2142,7 @@ Update Account Page Layouts
                                                             <apex:repeat value="{!appConfigList}" var="a">
                                                                 <li class="slds-tabs_default__item slds-text-heading_label slds-truncate" title="{!a.accountName}" role="presentation" style='display:{!if(i<=3,"block","none")}'>
                                                                     <a class="slds-tabs_default__link " href="javascript:void(0);" style="text-decoration: none;" role="tab" tabindex="0" aria-selected="false" aria-controls="{!a.accountId}" id="{!a.accountId}__processor" onclick="TroubleshootselectTab(this,'{!JSENCODE(a.accountId)}',null);">
-                                                                        {!a.accountName}
+                                                                        {!IF(a.accountName == '', a.PaymentProcessorType, a.accountName)}
                                                                     </a>
                                                                 </li>
                                                                 <apex:variable value="{!i+1}" var="i"/>
@@ -2178,12 +2186,20 @@ Update Account Page Layouts
                                                 <h3 class="slds-section-title_divider slds-m-bottom_small slds-m-top_medium">Restarting And Updating</h3> 
                                               
                                                 <apex:outputPanel layout="block" styleclass="slds-m-horizontal_medium slds-m-bottom_small">
-                                                    <apex:commandButton id="restartProcessorCustomerSync" value="Restart Historical Customer / Payment Method Sync" action="{!restartHistoricalSync}" oncomplete="showModal('restartSyncModel','backdropRestart','restartModalContent','{!IF(isBatchStarted,'Historical Customer / Payment Method Sync is started now.','Historical Customer / Payment Method Sync is already running. Please try again later.')}');" status="assign-action-status" styleClass="slds-button slds-button_brand slds-m-top_x-small slds-m-left_xx-small slds-m-right_small" reRender="nothing" >
+                                                    <apex:commandButton id="restartProcessorCustomerSync" value="Sync Historical Customers / Payment Methods" action="{!restartHistoricalSync}" oncomplete="showModal('restartSyncModel','backdropRestart','restartModalContent','{!IF(isBatchStarted,'Historical Customer / Payment Method Sync is started now.','Historical Customer / Payment Method Sync is already running. Please try again later.')}');" status="assign-action-status" styleClass="slds-button slds-button_outline-brand slds-m-top_x-small slds-m-left_xx-small slds-m-right_small" reRender="nothing" >
                                                         <apex:param value="Customer" assignTo="{!syncName}" />
                                                         <apex:param value="{!processorAccountId}" assignTo="{!syncProcessor}" />
                                                     </apex:commandButton>
-                                                    <apex:commandButton id="restartProcessorPaymentSync" value="Restart Historical Payment Sync" action="{!restartHistoricalSync}" oncomplete="showModal('restartSyncModel','backdropRestart','restartModalContent','{!IF(isBatchStarted,'Historical Payment Sync is started now.','Historical Payment Sync is already running. Please try again later.')}');" status="assign-action-status" styleClass="slds-button slds-button_brand slds-m-top_x-small slds-m-left_xx-small slds-m-right_small" reRender="nothing" >
+                                                    <apex:commandButton id="restartProcessorPaymentSync" value="Sync Historical Payments" action="{!restartHistoricalSync}" oncomplete="showModal('restartSyncModel','backdropRestart','restartModalContent','{!IF(isBatchStarted,'Historical Payment Sync is started now.','Historical Payment Sync is already running. Please try again later.')}');" status="assign-action-status" styleClass="slds-button slds-button_outline-brand slds-m-top_x-small slds-m-left_xx-small slds-m-right_small" reRender="nothing" >
                                                         <apex:param value="Payment" assignTo="{!syncName}" />
+                                                        <apex:param value="{!processorAccountId}" assignTo="{!syncProcessor}" />
+                                                    </apex:commandButton>
+                                                    <apex:commandButton id="restartProcessorProductSync" value="Sync Historical Products" action="{!restartBillingHistoricalSync}" oncomplete="showModal('restartSyncModel','backdropRestart','restartModalContent','{!IF(isBatchStarted,'Billing Historical Product Sync is started now.','Billing Historical Product Sync is already running. Please try again later.')}');" status="assign-action-status" styleClass="slds-button slds-button_outline-brand slds-m-top_x-small slds-m-left_xx-small slds-m-right_small" reRender="nothing" rendered="{!isBreadwinnerBillingInstalled}" >
+                                                        <apex:param value="Product" assignTo="{!syncName}" />
+                                                        <apex:param value="{!processorAccountId}" assignTo="{!syncProcessor}" />
+                                                    </apex:commandButton>
+                                                    <apex:commandButton id="restartProcessorPriceSync" value="Sync Historical Prices" action="{!restartBillingHistoricalSync}" oncomplete="showModal('restartSyncModel','backdropRestart','restartModalContent','{!IF(isBatchStarted,'Billing Historical Price Sync is started now.','Billing Historical Price Sync is already running. Please try again later.')}');" status="assign-action-status" styleClass="slds-button slds-button_outline-brand slds-m-top_x-small slds-m-left_xx-small slds-m-right_small" reRender="nothing" rendered="{!isBreadwinnerBillingInstalled}" >
+                                                        <apex:param value="Price" assignTo="{!syncName}" />
                                                         <apex:param value="{!processorAccountId}" assignTo="{!syncProcessor}" />
                                                     </apex:commandButton>
                                                 </apex:outputPanel>
@@ -2192,16 +2208,22 @@ Update Account Page Layouts
                                                     <h3 class="slds-section-title_divider slds-m-bottom_small slds-m-top_medium">Delete BWP Customers, Payment Methods and Payments</h3>
                                                     <apex:outputPanel layout="block" styleclass="slds-m-horizontal_medium">
                                                         <div class="slds-text-title_caps slds-m-top_small" style="color:red;">Don&apos;t use the delete functionality unless specifically asked by Breadwinner Support.</div>
-                                                        <div class="slds-text-title slds-m-top_small">Click delete to remove all Breadwinner Payments Customers, Payment Methods or Payments from Salesforce (no data in your Payment processor will be affected).</div>
+                                                        <div class="slds-text-title slds-m-top_small">Click delete to remove Breadwinner Payments Customers, Payment Methods or Payments from Salesforce from the selected processor (no data in your Payment processor will be affected).</div>
                                                         <div>
-                                                            <apex:commandButton id="DeleteCustomerBtn" value="Delete All BWP Customers ({!customersCount}) from Salesforce" oncomplete="showModal('tsModal','tsBackdrop','deleteMessage','Are you sure, you want to delete ALL ({!customersCount}) BWP Customers from Salesforce?','customer');" styleClass="slds-button slds-button_destructive  {!IF(OR($User.UIThemeDisplayed == 'Theme4d',$User.UIThemeDisplayed == 'Theme4t'),'','slds-m-top_small')} slds-m-left_xx-small slds-m-right_small" reRender="nothing" disabled="{!If(customersCount>0,FALSE,TRUE)}">
+                                                            <apex:commandButton id="DeleteCustomerBtn" value="Delete {!customersCount} Customers from Salesforce" oncomplete="showModal('tsModal','tsBackdrop','deleteMessage','Are you sure, you want to delete ALL ({!customersCount}) Customers from Salesforce?','customer');" styleClass="slds-button slds-button_text-destructive  {!IF(OR($User.UIThemeDisplayed == 'Theme4d',$User.UIThemeDisplayed == 'Theme4t'),'','slds-m-top_small')} slds-m-left_xx-small slds-m-right_small" reRender="nothing" disabled="{!If(customersCount>0,FALSE,TRUE)}">
                                                                 <apex:param name="deleteCustomer" value="Customers" assignTo="{!objectName}"/>
                                                             </apex:commandButton>
-                                                            <apex:commandButton id="DeletePaymentMethodsBtn" value="Delete All BWP Payment Methods ({!paymentMethodsCount}) from Salesforce" oncomplete="showModal('tsModal','tsBackdrop','deleteMessage','Are you sure, you want to delete ALL ({!paymentMethodsCount}) BWP Payment Methods from Salesforce?','payment methods');" styleClass="slds-button slds-button_destructive slds-m-top_small slds-m-left_xx-small slds-m-right_small" reRender="nothing" disabled="{!If(paymentMethodsCount>0,FALSE,TRUE)}">
+                                                            <apex:commandButton id="DeletePaymentMethodsBtn" value="Delete {!paymentMethodsCount} Payment Methods from Salesforce" oncomplete="showModal('tsModal','tsBackdrop','deleteMessage','Are you sure, you want to delete ALL ({!paymentMethodsCount}) Payment Methods from Salesforce?','payment methods');" styleClass="slds-button slds-button_text-destructive slds-m-top_small slds-m-left_xx-small slds-m-right_small" reRender="nothing" disabled="{!If(paymentMethodsCount>0,FALSE,TRUE)}">
                                                                 <apex:param name="deletePaymentMethods" value="PaymentMethods" assignTo="{!objectName}"/>
                                                             </apex:commandButton>
-                                                            <apex:commandButton id="DeletePaymentBtn" value="Delete All BWP Payments ({!paymentsCount}) from Salesforce" oncomplete="showModal('tsModal','tsBackdrop','deleteMessage','Are you sure, you want to delete ALL ({!paymentsCount}) BWP Payments from Salesforce?','payment');" styleClass="slds-button slds-button_destructive slds-m-top_small slds-m-left_xx-small slds-m-right_small" reRender="nothing" disabled="{!If(paymentsCount>0,FALSE,TRUE)}">
+                                                            <apex:commandButton id="DeletePaymentBtn" value="Delete {!bwpTransCount} Payments from Salesforce" oncomplete="showModal('tsModal','tsBackdrop','deleteMessage','Are you sure, you want to delete ALL ({!bwpTransCount }) Payments from Salesforce?','payment');" styleClass="slds-button slds-button_text-destructive slds-m-top_small slds-m-left_xx-small slds-m-right_small" reRender="nothing" disabled="{!If(bwpTransCount >0,FALSE,TRUE)}">
                                                                 <apex:param name="deletePayment" value="Payments" assignTo="{!objectName}"/>
+                                                            </apex:commandButton>
+                                                            <apex:commandButton id="DeleteProductBtn" value="Delete {!productsCount} Products from Salesforce" oncomplete="showModal('tsModal','tsBackdrop','deleteMessage','Are you sure, you want to delete ALL ({!productsCount}) Products from Salesforce?','product');" styleClass="slds-button slds-button_text-destructive slds-m-top_small slds-m-left_xx-small slds-m-right_small" reRender="nothing" disabled="{!If(productsCount >0,FALSE,TRUE)}" rendered="{!isBreadwinnerBillingInstalled}">
+                                                                <apex:param name="deleteProduct" value="Products" assignTo="{!objectName}"/>
+                                                            </apex:commandButton>
+                                                            <apex:commandButton id="DeletePriceBtn" value="Delete {!pricesCount} Prices from Salesforce" oncomplete="showModal('tsModal','tsBackdrop','deleteMessage','Are you sure, you want to delete ALL ({!pricesCount}) Prices from Salesforce?','price');" styleClass="slds-button slds-button_text-destructive slds-m-top_small slds-m-left_xx-small slds-m-right_small" reRender="nothing" disabled="{!If(pricesCount >0,FALSE,TRUE)}" rendered="{!isBreadwinnerBillingInstalled}">
+                                                                <apex:param name="deletePrice" value="Prices" assignTo="{!objectName}"/>
                                                             </apex:commandButton>
                                                         </div>
                                                     </apex:outputPanel>
@@ -2265,7 +2287,7 @@ Update Account Page Layouts
                                             <div class="slds-text-color_weak">
                                                 This page shows error messages and exceptions. To check logs please click on the button below.
                                             </div>
-                                            <apex:commandButton styleClass="slds-m-top_medium slds-button slds-button_brand" value="Check Log for Recent Errors" onclick="drawTable();" reRender="nothingRenders" />
+                                            <apex:commandButton styleClass="slds-m-top_medium slds-button slds-button_outline-brand" value="Check Log for Recent Errors" onclick="drawTable();" reRender="nothingRenders" />
                                             
                                             <div id="StatusLogSpinner" style="display:none;">
                                                 <div class="slds-spinner_container">

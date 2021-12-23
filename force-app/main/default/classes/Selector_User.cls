@@ -1,8 +1,6 @@
-@namespaceAccessible
 public with sharing class Selector_User extends QuerySelector {
 
     // Core list of fields
-    @namespaceAccessible
     public static List<Schema.SObjectField> FIELD_LIST {
         get {
             if (FIELD_LIST == null) {
@@ -35,12 +33,10 @@ public with sharing class Selector_User extends QuerySelector {
         private set;
     }
 
-    @namespaceAccessible
     public Selector_User() {
         super();
     }
 
-    @namespaceAccessible
     public override Schema.SObjectType getSObjectType() {
          return User.SObjectType;
     }
@@ -54,7 +50,6 @@ public with sharing class Selector_User extends QuerySelector {
      * Allows the calling class to override the default FIELD_LIST
      * @param fieldList list of field that will be passed into the query
      */
-    @namespaceAccessible
     public void setSObjectFieldList(List<Schema.SObjectField> fieldList){
         this.sObjectFieldList = fieldList;
     }
@@ -64,7 +59,6 @@ public with sharing class Selector_User extends QuerySelector {
         return String.isBlank(orderBy) ? 'Name ASC' : orderBy;
     }
 
-    @namespaceAccessible
     public List<User> selectById(Set<String> idSet){
         QueryBuilder qb = newQueryBuilder();
         qb.setCondition('Id IN :idSet');

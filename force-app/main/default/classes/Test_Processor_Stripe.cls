@@ -9,8 +9,8 @@ private class Test_Processor_Stripe {
         Profile prof = [SELECT Id FROM Profile WHERE Name = 'Standard User' LIMIT 1 ];
         User user = new User(Alias = 'TestUser', Email = 'testuser@testorg.com', EmailEncodingKey = 'UTF-8', LastName = 'Testing', LanguageLocaleKey = 'en_US', LocaleSidKey = 'en_US', ProfileId = prof.Id, TimeZoneSidKey = 'America/Los_Angeles', UserName = uniqueUserName);
         insert user;
-        String adminPSName = 'Breadwinner_Payments_Admin_User';
-        List<PermissionSet> pset = [SELECT Id FROM PermissionSet WHERE Name = 'Breadwinner_Payments_Admin_User'];
+        String adminPSName = BreadwinnerUtil.ADMIN_PS_NAME;
+        List<PermissionSet> pset = [SELECT Id FROM PermissionSet WHERE Name = :BreadwinnerUtil.ADMIN_PS_NAME];
         insert new PermissionSetAssignment(AssigneeId = user.id, PermissionSetId = pset[0].Id);
     }
     @IsTest
@@ -28,7 +28,7 @@ private class Test_Processor_Stripe {
             Test.setMock(HttpCalloutMock.class, httpMock);
             BreadwinnerController bc = new BreadwinnerController();
             
-            bc.saveConnectedAppCredentials();
+            bc.saveStripeCredentials();
         }
         Test.stopTest();
     }
@@ -48,7 +48,7 @@ private class Test_Processor_Stripe {
             Test.setMock(HttpCalloutMock.class, httpMock);
             BreadwinnerController bc = new BreadwinnerController();
             
-            bc.saveConnectedAppCredentials();
+            bc.saveStripeCredentials();
         }
         Test.stopTest();
     }
@@ -91,7 +91,7 @@ private class Test_Processor_Stripe {
                 ps.fetchCustomers('');
             } catch (Exception ex){}
             try{
-                ps.fetchPayments('');
+                ps.fetchTransactions('');
             } catch (Exception ex){}
             try{
                 ps.verifyBankAccount('');
@@ -495,7 +495,7 @@ private class Test_Processor_Stripe {
     }
     
     @IsTest
-    static void fetchPayments_When_Success() {
+    static void fetchTransactions_When_Success() {
         User adminUser =  [SELECT Id FROM User WHERE Alias = 'TestUser' LIMIT 1];
         System.runAs(adminUser){
             BreadwinnerUtil.AppConfig apcWrapper = UnitTests.getProcessorConfigWrapper(ProcessorUtil.PAT_STRIPE);
@@ -510,7 +510,7 @@ private class Test_Processor_Stripe {
             
             Test.setMock(HttpCalloutMock.class, httpMock);
             
-            ProcessorUtil.ResponseObject response =  Processor_Stripe.fetchPayments(apcWrapper, JSON.serializePretty(fetchRequest));
+            ProcessorUtil.ResponseObject response =  Processor_Stripe.fetchTransactions(apcWrapper, JSON.serializePretty(fetchRequest));
             System.debug('response: ' + response);
             
             Test.stopTest();
@@ -518,7 +518,7 @@ private class Test_Processor_Stripe {
     }
     
     @IsTest
-    static void fetchPayments_When_Failure() {
+    static void fetchTransactions_When_Failure() {
         User adminUser =  [SELECT Id FROM User WHERE Alias = 'TestUser' LIMIT 1];
         System.runAs(adminUser){
             BreadwinnerUtil.AppConfig apcWrapper = UnitTests.getProcessorConfigWrapper(ProcessorUtil.PAT_STRIPE);
@@ -533,7 +533,7 @@ private class Test_Processor_Stripe {
             httpMock.statusCode = 400;
             Test.setMock(HttpCalloutMock.class, httpMock);
             
-            ProcessorUtil.ResponseObject response =  Processor_Stripe.fetchPayments(apcWrapper, JSON.serializePretty(fetchRequest));
+            ProcessorUtil.ResponseObject response =  Processor_Stripe.fetchTransactions(apcWrapper, JSON.serializePretty(fetchRequest));
             System.debug('response: ' + response);
             
             Test.stopTest();
@@ -591,85 +591,7 @@ private class Test_Processor_Stripe {
             
             Test.stopTest();
         }
-    }
-    
-    @IsTest
-    static void historicalSync_When_Success() {
-        User adminUser =  [SELECT Id FROM User WHERE Alias = 'TestUser' LIMIT 1];
-        System.runAs(adminUser){
-            List<BWP_Processor_Config__c> apcs = UnitTests.createPayConfig(1, ProcessorUtil.PAT_STRIPE);
-            Test.startTest();
-            
-            UnitTests.MockHttpResponse httpMock = new UnitTests.MockHttpResponse();
-            httpMock.response = '{"object":"list","data":[{"id":"cus_Fk0tuYLi2hoGD7","object":"customer","account_balance":0,"address":null,"balance":0,"created":1567497366,"currency":null,"default_source":null,"delinquent":false,"description":null,"discount":null,"email":null,"invoice_prefix":"35B741BF","invoice_settings":{"custom_fields":null,"default_payment_method":null,"footer":null},"livemode":false,"metadata":{},"name":null,"phone":null,"preferred_locales":[],"shipping":null,"sources":{"object":"list","data":[{"id": "card_1G6dmEGZcuOzNASabbkto2Zd","object": "card","address_city": "knr", "address_country": "knr","address_line1": "kpt","address_line1_check": "kpt","address_line2": "kpt","address_state": "test","address_zip": "42424","address_zip_check": "pass","brand": "Visa","country": "US","customer": "cus_GdvdUEIDyUZQHd", "cvc_check": "pass","dynamic_last4": null, "exp_month": 4, "exp_year": 2024,"fingerprint": "n3cJX3BYeVmuPLfY","funding": "credit","last4": "4242","name": "test card name"},{ "id": "ba_1G6tRfGZcuOzNASa2eXCHZPx", "object": "bank_account","account_holder_name": "sam", "account_holder_type": "individual", "bank_name": "STRIPE TEST BANK","country": "US","currency": "usd", "cusomer": "cus_GdvdUEIDyUZQHd","fingerprint": "9XHNRgdny9ngsir5","last4": "6789","routing_number": "110000000","status": "verified"},{"id": "card_1G6dmEGZcuOzNASabbkto2Zd","object": "source","type":"card","brand": "Visa","country": "US","customer": "cus_GdvdUEIDyUZQHd", "cvc_check": "pass","dynamic_last4": null, "exp_month": 4, "exp_year": 2024,"fingerprint": "n3cJX3BYeVmuPLfY","funding": "credit","last4": "4242","name": "test card name"}],"has_more":false,"total_count":0,"url":"/v1/customers/cus_Fk0tuYLi2hoGD7/sources"},"subscriptions":{"object":"list","data":[],"has_more":false,"total_count":0,"url":"/v1/customers/cus_Fk0tuYLi2hoGD7/subscriptions"},"tax_exempt":"none","tax_ids":{"object":"list","data":[],"has_more":false,"total_count":0,"url":"/v1/customers/cus_Fk0tuYLi2hoGD7/tax_ids"},"tax_info":null,"tax_info_verification":null},{"id":"cus_FiCx160BmSxMSW","object":"customer","account_balance":0,"address":null,"balance":0,"created":1567080956,"currency":null,"default_source":null,"delinquent":false,"description":null,"discount":null,"email":"me@me.com","invoice_prefix":"36348D6A","invoice_settings":{"custom_fields":null,"default_payment_method":null,"footer":null},"livemode":false,"metadata":{},"name":"Regular Sync Check at 17:45 29-08","phone":null,"preferred_locales":[],"shipping":{"address":{"city":"","country":"","line1":"","line2":"","postal_code":"","state":""},"name":"Regular Sync Check at 17:45 29-08","phone":""},"sources":{"object":"list","data":[],"has_more":false,"total_count":0,"url":"/v1/customers/cus_FiCx160BmSxMSW/sources"},"subscriptions":{"object":"list","data":[],"has_more":false,"total_count":0,"url":"/v1/customers/cus_FiCx160BmSxMSW/subscriptions"},"tax_exempt":"none","tax_ids":{"object":"list","data":[],"has_more":false,"total_count":0,"url":"/v1/customers/cus_FiCx160BmSxMSW/tax_ids"},"tax_info":null,"tax_info_verification":null}],"has_more":false,"url":"/v1/customers"}';
-            Test.setMock(HttpCalloutMock.class, httpMock);
-            HistoricalSyncBatch historicalSync = new HistoricalSyncBatch('Customer');
-            
-            Database.executeBatch(historicalSync, 1);
-            Test.stopTest();
-        }
-    }
-    
-    @IsTest
-    static void historicalSync_When_Failure() {
-        User adminUser =  [SELECT Id FROM User WHERE Alias = 'TestUser' LIMIT 1];
-        System.runAs(adminUser){
-            List<BWP_Processor_Config__c> apcs = UnitTests.createPayConfig(1, ProcessorUtil.PAT_STRIPE);
-            
-            Test.startTest();
-            
-            UnitTests.MockHttpResponse httpMock = new UnitTests.MockHttpResponse();
-            httpMock.response = '{"object":"list","data":[],"has_more":false,"url":"/v1/customers"}';
-            httpMock.statusCode = 400;
-            Test.setMock(HttpCalloutMock.class, httpMock);
-            
-            HistoricalSyncBatch historicalSync = new HistoricalSyncBatch('Customer');
-            Database.executeBatch(historicalSync, 1);
-            
-            Test.stopTest();
-        }
-    }
-    
-    @IsTest
-    static void hourlySync_When_Success() {
-        User adminUser =  [SELECT Id FROM User WHERE Alias = 'TestUser' LIMIT 1];
-        System.runAs(adminUser){
-            BWP_Processor_Config__c apc = UnitTests.createPayConfig(ProcessorUtil.PAT_STRIPE);
-            apc.Customer_Match_Type__c = ProcessorUtil.CMT_CONTACT;
-            BreadwinnerUtil.isBreadwinnerTransaction = true;
-            update apc;
-            Test.startTest();
-            
-            UnitTests.MockHttpResponse httpMock = new UnitTests.MockHttpResponse();
-            httpMock.response = '{"object":"list","data":[{"id":"cus_Fk0tuYLi2hoGD7","object":"customer","account_balance":0,"address":null,"balance":0,"created":1567497366,"currency":null,"default_source":null,"delinquent":false,"description":null,"discount":null,"email":null,"invoice_prefix":"35B741BF","invoice_settings":{"custom_fields":null,"default_payment_method":null,"footer":null},"livemode":false,"metadata":{},"name":null,"phone":null,"preferred_locales":[],"shipping":null,"sources":{"object":"list","data":[{"id": "card_1G6dmEGZcuOzNASabbkto2Zd","object": "card","address_city": "knr", "address_country": "knr","address_line1": "kpt","address_line1_check": "kpt","address_line2": "kpt","address_state": "test","address_zip": "42424","address_zip_check": "pass","brand": "Visa","country": "US","customer": "cus_GdvdUEIDyUZQHd", "cvc_check": "pass","dynamic_last4": null, "exp_month": 4, "exp_year": 2024,"fingerprint": "n3cJX3BYeVmuPLfY","funding": "credit","last4": "4242","name": "test card name"},{ "id": "ba_1G6tRfGZcuOzNASa2eXCHZPx", "object": "bank_account","account_holder_name": "sam", "account_holder_type": "individual", "bank_name": "STRIPE TEST BANK","country": "US","currency": "usd", "cusomer": "cus_GdvdUEIDyUZQHd","fingerprint": "9XHNRgdny9ngsir5","last4": "6789","routing_number": "110000000","status": "verified"},{"id": "card_1G6dmEGZcuOzNASabbkto2Zd","object": "source","type":"card","brand": "Visa","country": "US","customer": "cus_GdvdUEIDyUZQHd", "cvc_check": "pass","dynamic_last4": null, "exp_month": 4, "exp_year": 2024,"fingerprint": "n3cJX3BYeVmuPLfY","funding": "credit","last4": "4242","name": "test card name"}],"has_more":false,"total_count":0,"url":"/v1/customers/cus_Fk0tuYLi2hoGD7/sources"},"subscriptions":{"object":"list","data":[],"has_more":false,"total_count":0,"url":"/v1/customers/cus_Fk0tuYLi2hoGD7/subscriptions"},"tax_exempt":"none","tax_ids":{"object":"list","data":[],"has_more":false,"total_count":0,"url":"/v1/customers/cus_Fk0tuYLi2hoGD7/tax_ids"},"tax_info":null,"tax_info_verification":null},{"id":"cus_FiCx160BmSxMSW","object":"customer","account_balance":0,"address":null,"balance":0,"created":1567080956,"currency":null,"default_source":null,"delinquent":false,"description":null,"discount":null,"email":"me@me.com","invoice_prefix":"36348D6A","invoice_settings":{"custom_fields":null,"default_payment_method":null,"footer":null},"livemode":false,"metadata":{},"name":"Regular Sync Check at 17:45 29-08","phone":null,"preferred_locales":[],"shipping":{"address":{"city":"","country":"","line1":"","line2":"","postal_code":"","state":""},"name":"Regular Sync Check at 17:45 29-08","phone":""},"sources":{"object":"list","data":[],"has_more":false,"total_count":0,"url":"/v1/customers/cus_FiCx160BmSxMSW/sources"},"subscriptions":{"object":"list","data":[],"has_more":false,"total_count":0,"url":"/v1/customers/cus_FiCx160BmSxMSW/subscriptions"},"tax_exempt":"none","tax_ids":{"object":"list","data":[],"has_more":false,"total_count":0,"url":"/v1/customers/cus_FiCx160BmSxMSW/tax_ids"},"tax_info":null,"tax_info_verification":null}],"has_more":false,"url":"/v1/customers"}';
-            Test.setMock(HttpCalloutMock.class, httpMock);
-            
-            HourlySyncBatch hourlySync = new HourlySyncBatch('Customer');
-            Database.executeBatch(hourlySync, 1);
-            
-            Test.stopTest();
-        }
-    }
-    
-    @IsTest
-    static void hourlySync_When_Failure() {
-        User adminUser =  [SELECT Id FROM User WHERE Alias = 'TestUser' LIMIT 1];
-        System.runAs(adminUser){
-            List<BWP_Processor_Config__c> apcs = UnitTests.createPayConfig(1, ProcessorUtil.PAT_STRIPE);
-            
-            Test.startTest();
-            
-            UnitTests.MockHttpResponse httpMock = new UnitTests.MockHttpResponse();
-            httpMock.response = '{"object":"list","data":[],"has_more":false,"url":"/v1/customers"}';
-            httpMock.statusCode = 400; 
-            Test.setMock(HttpCalloutMock.class, httpMock);
-            
-            HourlySyncBatch hourlySync = new HourlySyncBatch('Customer');
-            Database.executeBatch(hourlySync, 1);
-            
-            Test.stopTest();
-        }
-    }
+    }    
     
     @IsTest
     static void constructStripePaymentMethod() {

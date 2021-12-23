@@ -25,7 +25,7 @@
         <enabled>true</enabled>
     </classAccesses>
     <classAccesses>
-        <apexClass>CreateCustomerExtension</apexClass>
+        <apexClass>RecordCreationExtension</apexClass>
         <enabled>true</enabled>
     </classAccesses>
     <classAccesses>
@@ -288,7 +288,7 @@
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>BWP_Payment_Method__c.Account__c</field>
+        <field>BWP_Payment_Method__c.Salesforce_Account__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
@@ -343,7 +343,7 @@
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>BWP_Payment_Method__c.Contact__c</field>
+        <field>BWP_Payment_Method__c.Salesforce_Contact__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
@@ -443,162 +443,167 @@
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>BWP_Payment__c.Account__c</field>
+        <field>BWP_Transaction__c.Salesforce_Account__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>BWP_Payment__c.Amount_Refunded__c</field>
+        <field>BWP_Transaction__c.Amount_Refunded__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>BWP_Payment__c.Amount__c</field>
+        <field>BWP_Transaction__c.Amount__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>BWP_Payment__c.Application_Fee__c</field>
+        <field>BWP_Transaction__c.Application_Fee__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>BWP_Payment__c.Billing_City__c</field>
+        <field>BWP_Transaction__c.Billing_City__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>BWP_Payment__c.Billing_Country__c</field>
+        <field>BWP_Transaction__c.Billing_Country__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>BWP_Payment__c.Billing_Postal_Code__c</field>
+        <field>BWP_Transaction__c.Billing_Postal_Code__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>BWP_Payment__c.Billing_State__c</field>
+        <field>BWP_Transaction__c.Billing_State__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>BWP_Payment__c.Billing_Street_Address_1__c</field>
+        <field>BWP_Transaction__c.Billing_Street_Address_1__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>BWP_Payment__c.Billing_Street_Address_2__c</field>
+        <field>BWP_Transaction__c.Billing_Street_Address_2__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>BWP_Payment__c.Captured__c</field>
+        <field>BWP_Transaction__c.Captured__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>BWP_Payment__c.Charge_Status__c</field>
+        <field>BWP_Transaction__c.Charge_Status__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>BWP_Payment__c.Contact__c</field>
+        <field>BWP_Transaction__c.Salesforce_Contact__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>BWP_Payment__c.Created_Date_in_Processor__c</field>
+        <field>BWP_Transaction__c.Created_Date_in_Processor__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>BWP_Payment__c.Created_Via__c</field>
+        <field>BWP_Transaction__c.Created_Via__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>BWP_Payment__c.Currency__c</field>
+        <field>BWP_Transaction__c.Currency__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>BWP_Payment__c.Customer__c</field>
+        <field>BWP_Transaction__c.Customer__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>BWP_Payment__c.Description__c</field>
+        <field>BWP_Transaction__c.Description__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>BWP_Payment__c.Is_Live_Payment__c</field>
+        <field>BWP_Transaction__c.Location_Id__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>BWP_Payment__c.Location_Id__c</field>
+        <field>BWP_Transaction__c.Status__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>BWP_Payment__c.Payment_Fingerprint__c</field>
+        <field>BWP_Transaction__c.Processing_Fee__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>BWP_Payment__c.Payment_Status__c</field>
+        <field>BWP_Transaction__c.Processor_Customer_Id__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>BWP_Payment__c.Processing_Fee__c</field>
+        <field>BWP_Transaction__c.Processor_Id__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>BWP_Payment__c.Processor_Customer_Id__c</field>
+        <field>BWP_Transaction__c.Processor_Org_Id__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>BWP_Payment__c.Processor_Id__c</field>
+        <field>BWP_Transaction__c.Processor_Type__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>BWP_Payment__c.Processor_Org_Id__c</field>
+        <field>BWP_Transaction__c.Receipt_Email__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>BWP_Payment__c.Processor_Type__c</field>
+        <field>BWP_Transaction__c.Receipt_Number__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>BWP_Payment__c.Receipt_Email__c</field>
+        <field>BWP_Transaction__c.Receipt_URL__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>BWP_Payment__c.Receipt_Number__c</field>
+        <field>BWP_Transaction__c.Source__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>BWP_Payment__c.Receipt_URL__c</field>
+        <field>BWP_Transaction__c.Staff_Name__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>BWP_Payment__c.Source__c</field>
+        <field>BWP_Transaction__c.Txn_Type__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
         <editable>false</editable>
-        <field>BWP_Payment__c.Staff_Name__c</field>
+        <field>BWP_Sync_Details__c.Batch_Id__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>BWP_Sync_Details__c.Batch_Records_Sync_Page__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
@@ -614,6 +619,11 @@
     <fieldPermissions>
         <editable>false</editable>
         <field>BWP_Processor_Config__c.Account_Name__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>false</editable>
+        <field>BWP_Processor_Config__c.Card_Creation_Key__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <fieldPermissions>
@@ -732,8 +742,17 @@
         <allowEdit>false</allowEdit>
         <allowRead>true</allowRead>
         <modifyAllRecords>false</modifyAllRecords>
-        <object>BWP_Payment__c</object>
+        <object>BWP_Transaction__c</object>
         <viewAllRecords>false</viewAllRecords>
+    </objectPermissions>
+    <objectPermissions>
+        <allowCreate>true</allowCreate>
+        <allowDelete>true</allowDelete>
+        <allowEdit>true</allowEdit>
+        <allowRead>true</allowRead>
+        <modifyAllRecords>false</modifyAllRecords>
+        <object>BWP_Sync_Details__c</object>
+        <viewAllRecords>true</viewAllRecords>
     </objectPermissions>
     <objectPermissions>
         <allowCreate>false</allowCreate>
@@ -753,7 +772,7 @@
         <enabled>true</enabled>
     </pageAccesses>
     <pageAccesses>
-        <apexPage>CreatePayment</apexPage>
+        <apexPage>CreateTransaction</apexPage>
         <enabled>true</enabled>
     </pageAccesses>
     <pageAccesses>
@@ -777,7 +796,7 @@
         <enabled>true</enabled>
     </pageAccesses>
     <pageAccesses>
-        <apexPage>PaymentRecordInfo</apexPage>
+        <apexPage>TransactionRecordInfo</apexPage>
         <enabled>true</enabled>
     </pageAccesses>
 </PermissionSet>

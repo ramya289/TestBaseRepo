@@ -7,7 +7,7 @@
     <logo>Breadwinner_Payments/Logo.png</logo>
     <tabs>BreadwinnerPayments</tabs>
     <tabs>BWP_Customer__c</tabs>
-    <tabs>BWP_Payment__c</tabs>
+    <tabs>BWP_Transaction__c</tabs>
     <tabs>BWP_Payment_Method__c</tabs>
     <tabs>standard-Account</tabs>
     <tabs>standard-Contact</tabs>
