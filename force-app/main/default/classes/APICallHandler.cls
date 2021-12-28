@@ -10,6 +10,7 @@ public with sharing class APICallHandler {
     //event detail types for logging messages to POW
     public static final String ED_ERROR = 'ERROR';
 
+    @namespaceAccessible
     public static HttpResponse getList(BreadwinnerUtil.AppConfig appConfig, String method, String endPoint, String body) { 
         HttpRequest req = new HttpRequest();
         req = authorizeRequest(req, appConfig);

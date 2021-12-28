@@ -3,8 +3,10 @@
 * This class is to create data for test classes. It's created for more resuability.
 * All test methods will be here. This is the only the class for all test cases for all classes.
 */
+@namespaceAccessible
 public class UnitTests {
 
+    @namespaceAccessible
     public static BreadwinnerUtil.AppConfig getProcessorConfigWrapper(String paymentProcessorType){
         BWP_Processor_Config__c apc = UnitTests.createPayConfig(paymentProcessorType);
         BreadwinnerUtil.AppConfig apcWrapper = BreadwinnerUtil.getProcessorConfigWrapper(apc);
@@ -12,10 +14,12 @@ public class UnitTests {
     }
     
     //Test Data methods
+    @namespaceAccessible
     public static BWP_Processor_Config__c createPayConfig(String paymentProcessorType) {
         return createPayConfig(1,paymentProcessorType)[0];
     }
 
+    @namespaceAccessible
     public static List<BWP_Processor_Config__c> createPayConfig(Integer count, String paymentProcessorType) {
         List<BWP_Processor_Config__c> configs = instantiatePayConfig(count,paymentProcessorType);
         BreadwinnerUtil.isBreadwinnerTransaction = true;
@@ -23,7 +27,8 @@ public class UnitTests {
         return configs;
     }
     
-    private static List<BWP_Processor_Config__c> instantiatePayConfig(Integer count, String paymentProcessorType) {
+    @namespaceAccessible
+    public static List<BWP_Processor_Config__c> instantiatePayConfig(Integer count, String paymentProcessorType) {
         Integer settingsCount = [SELECT COUNT() FROM Breadwinner_Settings__c LIMIT 1];
         if (settingsCount == 0) {
             createBWSetting();
@@ -140,6 +145,7 @@ public class UnitTests {
     }
 
     @isTest
+    @namespaceAccessible
     public static Breadwinner_Settings__c createBWSetting() {
         Breadwinner_Settings__c bwSetting = new Breadwinner_Settings__c(
             Name = 'BWSetting',
@@ -435,17 +441,20 @@ public class UnitTests {
 
     @IsTest
     private static void testCustomURLGeneration(){
-        Test.setCurrentPageReference(new PageReference('Page.CustomURLGenerator'));
-        System.currentPageReference().getParameters().put('originating_object', 'Account');
-        createPayConfig(ProcessorUtil.PAT_STRIPE);
-        CustomURLGeneratorController CUG= new CustomURLGeneratorController();
-        CUG.ParentObjectName = 'Account';
-        CUG.selectedObject ='Account';
-        test.startTest();
-        CUG.parentObjectFields();
-        CUG.generateURL();
-        CUG.goBack();
-        test.stopTest();
+        User adminUser =  [SELECT Id FROM User WHERE Alias = 'TestUser' LIMIT 1];
+        System.runAs(adminUser){
+            Test.setCurrentPageReference(new PageReference('Page.CustomURLGenerator'));
+            System.currentPageReference().getParameters().put('originating_object', 'Account');
+            createPayConfig(ProcessorUtil.PAT_STRIPE);
+            CustomURLGeneratorController CUG= new CustomURLGeneratorController();
+            CUG.ParentObjectName = 'Account';
+            CUG.selectedObject ='Account';
+            test.startTest();
+            CUG.parentObjectFields();
+            CUG.generateURL();
+            CUG.goBack();
+            test.stopTest();
+        }
     }
 
     @IsTest
@@ -929,6 +938,7 @@ public class UnitTests {
         new MetadataService.ActionOverride();
     }
     
+    @namespaceAccessible
     public class MockHttpResponse implements HttpCalloutMock {
         public Integer statusCode = 200;
         public String response = '';

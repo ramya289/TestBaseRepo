@@ -79,6 +79,7 @@ public with sharing class ProcessorUtil {
     //Originating Object Field to Id Map, used in associating the originating record to the transaction
     public static Map<String, Id> originatingObjFieldToIdMap = new Map<String, Id>();
     
+    @namespaceAccessible
     public class ResponseObject {
         public String status;
         public String responseJSON;
@@ -89,6 +90,7 @@ public with sharing class ProcessorUtil {
         public List<Error> errors = new List<Error>();
     }
 
+    @namespaceAccessible
     public class Error {
         public String message;
         public String code;
@@ -273,6 +275,7 @@ public with sharing class ProcessorUtil {
         return mapOfCards;
     }
 
+    @namespaceAccessible
     public static string getLogAction(String currentRunningContext, String currentAction){
         return (currentRunningContext == BreadwinnerUtil.CNTX_HIST_SYNC ? 'Historical Sync' : (currentRunningContext == BreadwinnerUtil.CNTX_HOUR_SYNC ? 'Hourly Sync' : currentAction));
     }

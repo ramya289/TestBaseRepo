@@ -1619,6 +1619,7 @@ public with sharing class Processor_Stripe extends Processor {
     }
 
     // Replacing Stripe words in JSON response
+    @namespaceAccessible
     public static String replaceStripeWords(String str) {
         return str.replaceAll('"object"', '"stripe_object"').
             replaceAll('"currency"', '"stripe_currency"').
@@ -1626,7 +1627,7 @@ public with sharing class Processor_Stripe extends Processor {
             replaceAll('"limit"', '"stripe_limit"');
     }
 
-
+    @namespaceAccessible
     public static String formatLanguage(String language){
        
         Map<String, String> abbreviationMap = new Map<String,String>{ 'en' => 'English', 'english' => 'English',
@@ -1767,6 +1768,7 @@ public with sharing class Processor_Stripe extends Processor {
     }
 
     // Filter options when fetching stripe customers
+    @namespaceAccessible
     public class FetchRequest {
         public String customerId;
         public String createdGreaterThan;
@@ -1779,6 +1781,7 @@ public with sharing class Processor_Stripe extends Processor {
         public String starting_after;
     }
 
+    @namespaceAccessible
     public class FetchResponse {
         public String last_record_id;
         public boolean requireNextRun;

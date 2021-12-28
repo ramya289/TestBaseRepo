@@ -13,10 +13,10 @@ public with sharing class BreadwinnerUtil{
     @namespaceAccessible public static final String OBJ_SYNC_PRICE = 'Price';
 
     // Current Running Context Variables
-    public static final String CNTX_HIST_SYNC = 'HistoricalSyncBatch';
-	public static final String CNTX_HOUR_SYNC = 'HourlySyncBatch';
-	public static final String CNTX_BWAPI = 'Breadwinner API';
-	public static final String CNTX_BW = 'Breadwinner';
+    @namespaceAccessible public static final String CNTX_HIST_SYNC = 'HistoricalSyncBatch';
+	@namespaceAccessible public static final String CNTX_HOUR_SYNC = 'HourlySyncBatch';
+	@namespaceAccessible public static final String CNTX_BWAPI = 'Breadwinner API';
+	@namespaceAccessible public static final String CNTX_BW = 'Breadwinner';
     @namespaceAccessible public static final String CNTX_BB_HIST_SYNC = 'BillingHistoricalSyncBatch';
 
     public static final String SYNC_CNTX_HOURLY = 'BreadwinnerPaymentsHourlySync';
@@ -78,7 +78,7 @@ public with sharing class BreadwinnerUtil{
         return processorConfig.size()>0 ? processorConfig[0] : new BWP_Processor_Config__c();
     }
     
-    public static String namespaceApi = String.isNotBlank(namespace) ? namespace+'__' : '';
+    @namespaceAccessible public static String namespaceApi = String.isNotBlank(namespace) ? namespace+'__' : '';
     public static Set<String> zeroDecimalCurrencies = new Set<String>{'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA', 'PYG', 'RWF', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'};
     public static Id accountId;
     
@@ -87,6 +87,7 @@ public with sharing class BreadwinnerUtil{
         return (UserInfo.getUiThemeDisplayed() == 'Theme3' && Apexpages.currentPage().getParameters().get('beLightning') == null ? false : true);
     }
 
+    @namespaceAccessible
     public static Boolean isAdministrator(){
         if(Schema.sObjectType.Profile.isAccessible()) {
             return [SELECT Id, PermissionsModifyAllData FROM Profile WHERE Id=:UserInfo.getProfileId() LIMIT 1].PermissionsModifyAllData;
@@ -94,6 +95,7 @@ public with sharing class BreadwinnerUtil{
         return FALSE;
     }
 
+    @namespaceAccessible
     public static Boolean isProcessorConnected(){
         return !processorConfigList.isEmpty() && processorConfigList[0].Access_Token__c != null;
     }
@@ -155,6 +157,7 @@ public with sharing class BreadwinnerUtil{
         }
     }
     
+    @namespaceAccessible
     public static Breadwinner_Settings__c getBWSetting(){
         return Breadwinner_Settings__c.getAll().values().size() > 0 ? Breadwinner_Settings__c.getAll().values().get(0) : new Breadwinner_Settings__c(Name=CNTX_BW);
     }
@@ -183,6 +186,7 @@ public with sharing class BreadwinnerUtil{
     }
 
     /* These methods are related to Breadwinner Permission Set Module */
+    @namespaceAccessible
     public static Boolean isBreadwinnerAdministrator(){
         return (BreadwinnerUtil.isAdministrator() || BreadwinnerUtil.isBWAdminPSAssigned());
     }
@@ -301,6 +305,7 @@ public with sharing class BreadwinnerUtil{
         return bwSetting.Active__c;
     }
 
+    @namespaceAccessible
     public static Boolean isBatchRunning(String batchClassName) {
         Boolean returnValue = FALSE;
         batchClassName = String.escapeSingleQuotes(batchClassName);
@@ -311,6 +316,7 @@ public with sharing class BreadwinnerUtil{
         return returnValue;
     }
 
+    @namespaceAccessible
     public static Boolean isReadOnlyModeEnabled(){
         Breadwinner_Settings__c bwSetting = getBWSetting();
         return bwSetting != null ? bwSetting.Read_Only_Mode__c : false;
@@ -560,6 +566,7 @@ public with sharing class BreadwinnerUtil{
         return 'https://support-staging.breadwinnerhq.com';
     }
 
+    @namespaceAccessible
     public static String getCreatedViaValue(String currentRunningContext){
         // This will be used to know from where the record has been created, possible values are: Breadwinner, Breadwinner API, Regular Sync, Historical Sync
         List<String> bwPages  = new List<String>{'CreateCustomer','CreatePaymentMethod','CreateTransaction','CustomerOperations','CustomerRecordInfo','PaymentMethodRecordInfo','TransactionRecordInfo'};
@@ -584,6 +591,7 @@ public with sharing class BreadwinnerUtil{
         APICallHandler.userInteractionLogPush(false, 'App Config', 'Connected' , 'Connected to' + config.Payment_Processor_Type__c + 'Processor, Name:' + config.account_Name__c);
     }
 
+    @namespaceAccessible
     public static List<CronTrigger> getCronTrigger(String name){
         String synName = '%'+name+'%';
         return [SELECT Id, OwnerId, NextFireTime, CronExpression, CronJobDetail.Name FROM CronTrigger Where CronJobDetail.Name LIKE : synName];

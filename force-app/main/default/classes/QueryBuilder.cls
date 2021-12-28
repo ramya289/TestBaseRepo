@@ -146,6 +146,7 @@ public with sharing class QueryBuilder {
         return fieldMap.get(fieldName.toLowerCase());
     }
 
+    @namespaceAccessible
     public void addRelatedFields(List<String> soFieldList){
         for(String fld : soFieldList){
             addRelatedField(fld);
