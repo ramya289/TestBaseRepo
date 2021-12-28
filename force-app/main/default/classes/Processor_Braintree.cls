@@ -1237,6 +1237,12 @@ public with sharing class Processor_Braintree extends Processor {
                 if (paymentMethod != null) {
                     transactionSf.Source__c = paymentMethod.Id;
                 }
+                // Used in associating the originating object value while creating a Transaction via Custom Guided Wizard
+                if(ProcessorUtil.originatingObjFieldToIdMap?.size()>0){
+                    for(String originatingObjField :ProcessorUtil.originatingObjFieldToIdMap.keySet()){
+                        transactionSf.put(originatingObjField, ProcessorUtil.originatingObjFieldToIdMap.get(originatingObjField));
+                    }
+                }
                 transactionSf = constructBraintreeTransaction(transactionSf, pw, appConfig);
                 if (doNotImportCustomerAndFailedPayments && transactionSf.Status__c == ProcessorUtil.CHARGE_SUCCEEDED) {
                     if(String.isNotBlank(transactionSf.Customer__c)){

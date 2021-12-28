@@ -437,17 +437,14 @@ public class UnitTests {
     private static void testCustomURLGeneration(){
         Test.setCurrentPageReference(new PageReference('Page.CustomURLGenerator'));
         System.currentPageReference().getParameters().put('originating_object', 'Account');
+        createPayConfig(ProcessorUtil.PAT_STRIPE);
         CustomURLGeneratorController CUG= new CustomURLGeneratorController();
-        //CUG.objectname = 'Account';
         CUG.ParentObjectName = 'Account';
-        CUG.ChildObjectName = 'Opportunity';
         CUG.selectedObject ='Account';
-        CUG.selectedChildObject = 'Opportunity';
-        CUG.Parent_Account1 = 'parentid';
         test.startTest();
-        CUG.Childobjects();
-        CUG.next2();
+        CUG.parentObjectFields();
         CUG.generateURL();
+        CUG.goBack();
         test.stopTest();
     }
 
@@ -556,6 +553,11 @@ public class UnitTests {
             bc.restartWeeklySync();
             bc.restartScheduledJobs();
             bc.saveCustomerConfigurationValues();
+            bc.getCanUpdatePageLayouts();
+            bc.getIsPermissionSetAssigned();
+            BWP_Processor_Config__c config = createPayConfig(1, ProcessorUtil.PAT_STRIPE)[0];
+            bc.startHistoricalCustomerSync(config);
+            bc.updatePageLayouts();
             BreadwinnerController.scheduledJobsRunByActiveOrAdminUserMap();
             bc.TroubleshootGeneralInitialize();
             bc.BW_API_BaseURL = 'Test';

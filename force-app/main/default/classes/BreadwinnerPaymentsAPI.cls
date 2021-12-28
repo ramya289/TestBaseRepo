@@ -118,9 +118,9 @@ global with sharing class BreadwinnerPaymentsAPI {
             pi = new Processor_Square(processorAccountId);
         } else if (appC.Payment_Processor_Type__c == ProcessorUtil.PAT_STRIPE){
             pi = new Processor_Stripe(processorAccountId);
-        } /*else if (appC.Payment_Processor_Type__c == ProcessorUtil.PAT_AUTHORIZE_NET){
+        } else if (appC.Payment_Processor_Type__c == ProcessorUtil.PAT_AUTHORIZE_NET){
             pi = new Processor_Authorize_Net(processorAccountId);
-        }else if (appC.Payment_Processor_Type__c == ProcessorUtil.PAT_PAYPAL){
+        }/*else if (appC.Payment_Processor_Type__c == ProcessorUtil.PAT_PAYPAL){
           pi = new Processor_PayPal(processorAccountId);
         } */else {
             throw new INVALID_PROCESSOR_Exception('Unsupported payment processor: "' + appC.Payment_Processor_Type__c + '".');
@@ -197,7 +197,7 @@ global with sharing class BreadwinnerPaymentsAPI {
             }
             when 'CONNECTION_NOT_FOUND' {
                 error.message = 'Breadwinner is not connected.';
-                error.detail = 'Please connect Breadwinner to your QuickBooks Onlne Org.';
+                error.detail = 'Please connect Breadwinner to your Payment Processor.';
             }
             when 'READ_ONLY_MODE_ENABLED' {
                 error.message = 'Breadwinner Read-Only mode is Enabled.';

@@ -477,7 +477,6 @@ public with sharing class Processor_Stripe extends Processor {
                 response.errors.add(new ProcessorUtil.Error('Required field missing.','"amount" is required and must be greater than zero.'));
                 return response;
             }
-
             //Check and build UrlBody
             String reqBody =  'customer=' + getURLEncodeData(charge.customer);
             reqBody += '&currency=' + getURLEncodeData(charge.stripe_currency);
@@ -1259,7 +1258,12 @@ public with sharing class Processor_Stripe extends Processor {
                     transactionSf.Salesforce_Account__c = String.isNotBlank(customer.Salesforce_Account__c) ? customer.Salesforce_Account__c : NULL;
                     transactionSf.Salesforce_Contact__c = String.isNotBlank(customer.Salesforce_Contact__c) ? customer.Salesforce_Contact__c : NULL;
                 }
-                
+                // Used in associating the originating object value while creating a Transaction via Custom Guided Wizard
+                if(ProcessorUtil.originatingObjFieldToIdMap?.size()>0){
+                    for(String originatingObjField :ProcessorUtil.originatingObjFieldToIdMap.keySet()){
+                        transactionSf.put(originatingObjField, ProcessorUtil.originatingObjFieldToIdMap.get(originatingObjField));
+                    }
+                }
                 if(paymentMethod != NULL && String.isNotBlank(paymentMethod.Id))
                     transactionSf.Source__c = paymentMethod.Id;
                 transactionSf = constructStripeTransaction(transactionSf, pw, appConfig);

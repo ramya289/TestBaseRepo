@@ -79,7 +79,7 @@ public with sharing class Processor_Authorize_Net extends Processor{
         }
         return response;
     }
-    /* Commenting this as we have removed the BWP_Sync_Details object and Processor_Batch class
+    
     //*** Saving the Authorize.Net customers and related payment methods to SF. Orphan records will not be saved.
     public static ProcessorUtil.ResponseObject syncCustomers(Map<String, Object> processorToCustomerMap, BreadwinnerUtil.AppConfig appConfig, Boolean addToSalesforce) {
         ProcessorUtil.ResponseObject responseObj = new ProcessorUtil.ResponseObject();
@@ -527,6 +527,13 @@ public with sharing class Processor_Authorize_Net extends Processor{
                     
                     if(paymentMethod != NULL && String.isNotBlank(paymentMethod.Id))
                         transactionSf.Source__c = paymentMethod.Id;
+
+                    // Used in associating the originating object value while creating a Transaction via Custom Guided Wizard
+                    if(ProcessorUtil.originatingObjFieldToIdMap?.size()>0){
+                        for(String originatingObjField :ProcessorUtil.originatingObjFieldToIdMap.keySet()){
+                            transactionSf.put(originatingObjField, ProcessorUtil.originatingObjFieldToIdMap.get(originatingObjField));
+                        }
+                    }
                 }
                 
                 transactionSf = constructAuthNetTransaction(transactionSf, at, appConfig);
@@ -555,7 +562,7 @@ public with sharing class Processor_Authorize_Net extends Processor{
         }
         return rtnList;
     }
-
+        
     public static void syncBatchRecords(BreadwinnerUtil.AppConfig apc, Map<String, Object> processorTypeToRecordsMap){
         Map<String, Charge.AuthNetBatchList> authNetBatchResp = (Map<String, Charge.AuthNetBatchList>) processorTypeToRecordsMap.get(ProcessorUtil.PAT_AUTHORIZE_NET);
 		Set<String> batchIds = authNetBatchResp.keySet();
@@ -677,7 +684,7 @@ public with sharing class Processor_Authorize_Net extends Processor{
             requestBody = '{"getTransactionListRequest":{"merchantAuthentication":{"accessToken": "'+rawAccessToken+'"},"batchId":"'+custId+'","sorting":{"orderBy":"submitTimeUTC","orderDescending":"true"},"paging":{"limit":"20","offset":"'+offSet+'"}}}';
         }
         return requestBody;
-    }*/
+    }
     
     public static String getEndpointBaseUrl(BreadwinnerUtil.AppConfig appConfig){
         return appConfig.livemode ? authorizeNetBaseUrl : authorizeNetTestBaseUrl;

@@ -470,7 +470,7 @@
                             if(newRecords>0 || matchRecords >0 || doNotImportRecords >0){
                                 var infoMessageText = 'Clicking "Next" button will create '+newRecords+' new Salesforce '+(newRecords == 1 ? '{!selectedMatchType} from {!appC.paymentProcessorType} Customers' : '{!selectedMatchType}s from {!appC.paymentProcessorType} Customers');
                                if(matchRecords > 0){
-                                   infoMessageText = infoMessageText+', '+(doNotImportRecords == 0 ? 'and' : '')+' will match '+matchRecords+(matchRecords == 1 ?  ' {!appC.paymentProcessorType} Customer to existing Salesforce {!selectedMatchType}' : ' {!appC.paymentProcessorType} Customers to existing Salesforce {!selectedMatchType}s');
+                                    infoMessageText = infoMessageText+', '+(doNotImportRecords == 0 ? 'and' : '')+' will match '+matchRecords+(matchRecords == 1 ?  ' {!appC.paymentProcessorType} Customer to existing Salesforce {!selectedMatchType}' : ' {!appC.paymentProcessorType} Customers to existing Salesforce {!selectedMatchType}s');
                                 }
                                 if(doNotImportRecords > 0){
                                     infoMessageText = infoMessageText+', and will not associate '+doNotImportRecords+(doNotImportRecords == 1 ? ' {!appC.paymentProcessorType} Customer to any Salesforce {!selectedMatchType}' : ' {!appC.paymentProcessorType} Customers to any Salesforce {!selectedMatchType}s');

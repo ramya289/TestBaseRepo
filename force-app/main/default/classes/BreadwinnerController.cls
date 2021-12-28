@@ -24,7 +24,9 @@ public with sharing class BreadwinnerController {
     public Boolean isBatchStarted                {get;set;}
     public Integer customersCount                {get;set;}
     public Integer paymentMethodsCount           {get;set;}
-    public Integer bwpTransCount                  {get;set;}
+    public Integer bwpTransCount                 {get;set;}
+    public Integer productsCount                 {get;set;}
+    public Integer pricesCount                   {get;set;}
     public String objectName                     {get;set;}
     public Breadwinner_Settings__c bwSettings    {get;set;}
     public BreadwinnerSetting bwSetting          {get;set;}
@@ -84,6 +86,7 @@ public with sharing class BreadwinnerController {
 
     public Boolean isScheduledJobsRunByActiveUser           {get; set;}
     public Boolean isScheduledJobsRunByAdmin                {get; set;}
+    public Boolean isBreadwinnerBillingInstalled            {get; set;}
 
     public Boolean getCanUpdatePageLayouts(){
         return (isAdministrator && isCustomerMatchStarted && bwSetting.Active && !unableToAddRemoteSiteSetting && !isLayoutUpdated && isProcessorConnected);
@@ -140,7 +143,9 @@ public with sharing class BreadwinnerController {
         orgInfo = BreadwinnerUtil.orgInfo();
         customersCount = 0;
         paymentMethodsCount = 0;
-        bwpTransCount  = 0;
+        bwpTransCount = 0;
+        productsCount = 0;
+        pricesCount = 0;
         unMatchedRecordCount = 0;
         unableToAddRemoteSiteSetting = unableToAddRemoteSiteSetting != null && Boolean.valueOf(unableToAddRemoteSiteSetting) ? true : false;
         isUnauthorizedEndpoint = false;
@@ -186,7 +191,7 @@ public with sharing class BreadwinnerController {
         isAdministrator = BreadwinnerUtil.isAdministrator();
         Set<String> selectedMatchType = new Set<String>();
         for(BWP_Processor_Config__c appC : BreadwinnerUtil.processorConfigList){
-            if(String.isNotBlank(appC.Customer_Match_Type__c)){
+            if(appC.Is_Customer_Match_Completed__c && String.isNotBlank(appC.Customer_Match_Type__c)){
                 selectedMatchType.add(appC.Customer_Match_Type__c);
             }
             processorConfigList.add(appC);
@@ -252,7 +257,7 @@ public with sharing class BreadwinnerController {
         modifyAllDataSortExpression = 'Name';
         queryPermissionSetAssignedUsers();
         customerConfigValues();
-
+        isBreadwinnerBillingInstalled = BreadwinnerUtil.isBreadwinnerBillingInstalled();
     }
     public void refreshAppConfig(){
         processorConfigList = new Selector_BWP_ProcessorConfig().getAllAppConfig();
@@ -302,19 +307,19 @@ public with sharing class BreadwinnerController {
         }
         set;
     }
-
+ 
     public Boolean isPermissionSetAssigned = false;
     public Boolean getIsPermissionSetAssigned(){
         String sQuery ='SELECT id,Name FROM PermissionSet WHERE Name IN : allPMSets';
-            String namespace = BreadwinnerUtil.namespace;
-            sQuery += String.isNotBlank(namespace) ? ' AND NamespacePrefix=: namespace' : '';
-            Map<ID,PermissionSet> PermissionsetMap = new Map<ID,PermissionSet>();
-            PermissionsetMap.putAll((list<PermissionSet>)database.query(sQuery));
-            list<PermissionSetAssignment> pmsetAssignmentList= [SELECT AssigneeId FROM PermissionSetAssignment WHERE AssigneeId IN: userMap.keyset() AND PermissionSetId IN: PermissionsetMap.keyset()];
-            if(pmsetAssignmentList?.size()>0){
-                isPermissionSetAssigned = true;
-            }
-           return isPermissionSetAssigned;
+        String namespace = BreadwinnerUtil.namespace;
+        sQuery += String.isNotBlank(namespace) ? ' AND NamespacePrefix=: namespace' : '';
+        Map<ID,PermissionSet> PermissionsetMap = new Map<ID,PermissionSet>();
+        PermissionsetMap.putAll((list<PermissionSet>)database.query(sQuery));
+        list<PermissionSetAssignment> pmsetAssignmentList= [SELECT AssigneeId FROM PermissionSetAssignment WHERE AssigneeId IN: userMap.keyset() AND PermissionSetId IN: PermissionsetMap.keyset()];
+        if(pmsetAssignmentList?.size()>0){
+            isPermissionSetAssigned = true;
+        }
+        return isPermissionSetAssigned;
     }
 
     private Set<String> allPMSets = new Set<String>{
@@ -369,8 +374,8 @@ public with sharing class BreadwinnerController {
         paymentProcessorsList.add(new SelectOption(ProcessorUtil.PAT_STRIPE.toLowerCase(), ProcessorUtil.PAT_STRIPE));
         paymentProcessorsList.add(new SelectOption(ProcessorUtil.PAT_BRAINTREE.toLowerCase(), ProcessorUtil.PAT_BRAINTREE));
         paymentProcessorsList.add(new SelectOption(ProcessorUtil.PAT_SQUARE.toLowerCase(), ProcessorUtil.PAT_SQUARE));
+        paymentProcessorsList.add(new SelectOption(ProcessorUtil.PAT_AUTHORIZE_NET.toLowerCase(), ProcessorUtil.PAT_AUTHORIZE_NET));
         // removing until we actually build this out.
-        //paymentProcessorsList.add(new SelectOption(ProcessorUtil.PAT_AUTHORIZE_NET.toLowerCase(), ProcessorUtil.PAT_AUTHORIZE_NET));
         // paymentProcessorsList.add(new SelectOption(ProcessorUtil.PAT_PAYPAL.toLowerCase(), ProcessorUtil.PAT_PAYPAL));
         return paymentProcessorsList;
     }
@@ -586,6 +591,19 @@ public with sharing class BreadwinnerController {
         }
     }
 
+    //To reschedule all hourly sync batches.
+    public void rescheduleBillingHourlySync(){
+        try{
+            if(isBreadwinnerAdministrator){
+                Database.batchable<BreadwinnerUtil.AppConfig> instance = (Database.batchable<BreadwinnerUtil.AppConfig>) Type.forName('BillingHourlySyncBatch').newInstance(); 
+                APICallHandler.userInteractionLogPush(FALSE, 'Restarted Hourly Sync', 'Troubleshoot-General' , 'Restarted Billing Hourly Sync from the Troubleshoot section of Breadwinnner tab');
+            }
+        }
+        catch(exception e){
+            APICallHandler.userInteractionLogPush(FALSE, 'Restarted Hourly Sync', 'ERROR' , 'Error occurred while restarting Hourly Sync from the Troubleshoot section of Breadwinnner tab' +e);
+        }
+    }
+
     public void startHistoricalCustomerSync(BWP_Processor_Config__c config){
         BreadwinnerUtil.AppConfig apcWrapper = BreadwinnerUtil.getProcessorConfigWrapper(config);
         HistoricalSyncBatch historicalSync = new HistoricalSyncBatch(BreadwinnerUtil.OBJ_SYNC_CUSTOMER, new List<BreadwinnerUtil.AppConfig>{apcWrapper});
@@ -611,6 +629,40 @@ public with sharing class BreadwinnerController {
         }
         catch(exception e){
             APICallHandler.userInteractionLogPush(FALSE, 'Restarted Historical '+runningSyncName+' Sync', 'ERROR' , 'Error occurred while restarting Historical Sync from the Troubleshoot section of Breadwinnner tab '+(String.isNotBlank(syncProcessor) ? ' for Processor : '+ appC.paymentProcessorType+' ('+appC.accountName+').' : '.') +e.getMessage());
+        }
+    }
+
+    public void restartBillingHistoricalSync(){
+        isBatchStarted = false;    
+        String runningSyncName = String.isNotBlank(syncName) ? syncName : BreadwinnerUtil.OBJ_SYNC_PRODUCT;
+        try {
+            if(String.isNotBlank(syncProcessor) && appC.accountId == syncProcessor && !BreadwinnerUtil.isBatchRunning(BreadwinnerUtil.CNTX_BB_HIST_SYNC)){
+                List<BreadwinnerUtil.AppConfig> appConfigList = new List<BreadwinnerUtil.AppConfig>();
+                if(BreadwinnerUtil.getBWSetting().Active__c && !appC.needToReconnect && appC.accessToken != NULL) {
+                    appConfigList.add(appC);
+                }
+
+                Type t = Type.forName('BillingHistoricalSyncBatch');
+                Database.batchable<BreadwinnerUtil.AppConfig> instance = (Database.batchable<BreadwinnerUtil.AppConfig>)t.newInstance();           
+                Map<String, Object> variableMap = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(instance));
+                variableMap.put('appConfigList', appConfigList);
+                variableMap.put('runningObjectName', runningSyncName);
+                variableMap.put('runThisSyncOnly', String.isNotBlank(syncName) ? true : false);
+                instance = (Database.Batchable<BreadwinnerUtil.AppConfig>)JSON.deserialize(JSON.serialize(variableMap), t);
+                Database.executeBatch(instance, 1);
+            } else{
+                Type t = Type.forName('BillingHistoricalSyncBatch');
+                Database.batchable<BreadwinnerUtil.AppConfig> instance = (Database.batchable<BreadwinnerUtil.AppConfig>)t.newInstance();           
+                Map<String, Object> variableMap = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(instance));
+                variableMap.put('runningObjectName', runningSyncName);
+                variableMap.put('runThisSyncOnly', String.isNotBlank(syncName) ? true : false);
+                instance = (Database.Batchable<BreadwinnerUtil.AppConfig>)JSON.deserialize(JSON.serialize(variableMap), t);
+                Database.executeBatch(instance, 1);
+            }
+            isBatchStarted = true;
+            APICallHandler.userInteractionLogPush(false, 'Restarted Billing Historical '+runningSyncName+' Sync', 'Troubleshoot-'+(String.isNotBlank(syncProcessor) ? 'Connection' : 'General'), 'Restarted Billing Historical Sync from the Troubleshoot section of Breadwinnner tab '+(String.isNotBlank(syncProcessor) ? ' for Processor : '+ appC.paymentProcessorType+' ('+appC.accountName+')' : ' '));
+        } catch (Exception e) {
+            APICallHandler.userInteractionLogPush(FALSE, 'Restarted Billing Historical '+runningSyncName+' Sync', 'ERROR' , 'Error occurred while restarting Billing Historical Sync from the Troubleshoot section of Breadwinnner tab '+(String.isNotBlank(syncProcessor) ? ' for Processor : '+ appC.paymentProcessorType+' ('+appC.accountName+').' : '.') +e.getMessage());
         }
     }
     
@@ -732,7 +784,11 @@ public with sharing class BreadwinnerController {
         if(!isProcessorConnected){
             customersCount = selectorCustomer.selectCount(null,10000);
             paymentMethodsCount = selectorPaymentMethod.selectCount(null,35000);
-            bwpTransCount  = selectorTransaction.selectCount(null,35000);
+            bwpTransCount = selectorTransaction.selectCount(null,35000);
+            if(isBreadwinnerBillingInstalled){
+                productsCount = getBillingRecordsCount('BWP_Product__c', null, 10000);
+                pricesCount = getBillingRecordsCount('BWP_Price__c', null, 10000);
+            }
         }
    }
 
@@ -742,7 +798,11 @@ public with sharing class BreadwinnerController {
             appC = BreadwinnerUtil.getProcessorConfigWrapper(BreadwinnerUtil.getProcessorConfig(processorId));
             customersCount = selectorCustomer.selectCount('Processor_Org_Id__c = \'' + processorId + '\'',10000);
             paymentMethodsCount = selectorPaymentMethod.selectCount('Processor_Org_Id__c = \'' + processorId + '\'',35000);
-            bwpTransCount  = selectorTransaction.selectCount('Processor_Org_Id__c = \'' + processorId + '\'',35000);
+            bwpTransCount = selectorTransaction.selectCount('Processor_Org_Id__c = \'' + processorId + '\'',35000);
+            if(isBreadwinnerBillingInstalled){
+                productsCount = getBillingRecordsCount('BWP_Product__c','Processor_Org_Id__c = \'' + processorId + '\'',10000);
+                pricesCount = getBillingRecordsCount('BWP_Price__c','Processor_Org_Id__c = \'' + processorId + '\'',10000);
+            }
         }
     }
     // to check unmatched Customers status
@@ -828,8 +888,16 @@ public with sharing class BreadwinnerController {
             else if(objectName == 'PaymentMethods' && paymentMethodsCount > 0){
                 deletePaymentMethods();
             }
-            else if(objectName == 'Payments' && bwpTransCount  > 0){
+            else if(objectName == 'Payments' && bwpTransCount > 0){
                 deleteBwpTransactions();
+            }
+            else if(objectName == 'Products' && productsCount > 0){
+                if(isProcessorConnected) deleteBillingRecords('BWP_Product__c', 'Processor_Org_Id__c = \'' + processorAccountId + '\'', 9000);
+                else deleteBillingRecords('BWP_Product__c', null, 9000);
+            }
+            else if(objectName == 'Prices' && pricesCount > 0){
+                if(isProcessorConnected) deleteBillingRecords('BWP_Price__c', 'Processor_Org_Id__c = \'' + processorAccountId + '\'', 9000);
+                else deleteBillingRecords('BWP_Price__c', null, 9000);
             }
         }   
         catch(Exception e){
@@ -852,6 +920,7 @@ public with sharing class BreadwinnerController {
             SecurityUtil.dmlDelete(deleteList);
             customersCount = selectorCustomer.selectCount(null, 10000);
         }
+        APICallHandler.userInteractionLogPush(FALSE, 'Deleting Records', 'SUCCESS' , 'Successfully deleted the '+customersCount+' Customers.');
     }
     
     public void deletePaymentMethods(){
@@ -869,6 +938,7 @@ public with sharing class BreadwinnerController {
             SecurityUtil.dmlDelete(deleteList);
             paymentMethodsCount = paymentMethodsCount = selectorPaymentMethod.selectCount(null,10000);
         }
+        APICallHandler.userInteractionLogPush(FALSE, 'Deleting Records', 'SUCCESS' , 'Successfully deleted the '+paymentMethodsCount+' Payment Methods.');
     }
     
     public void deleteBwpTransactions(){
@@ -886,6 +956,46 @@ public with sharing class BreadwinnerController {
             SecurityUtil.dmlDelete(deleteList);
             bwpTransCount  = selectorTransaction.selectCount(null,10000);
         }
+        APICallHandler.userInteractionLogPush(FALSE, 'Deleting Records', 'SUCCESS' , 'Successfully deleted the '+bwpTransCount+' Transactions.');
+    }
+
+    public void deleteBillingRecords(String ObjName, String whereString, Integer lim){
+        if(isBreadwinnerBillingInstalled){
+            SObjectType sObjType = ((SObject) Type.forName(ObjName).newInstance()).getSObjectType();
+            QueryBuilder qb = new QueryBuilder(sObjType, true, true, true);
+            qb.addSObjectFields(sObjType.getDescribe().fields.getMap().values());
+            if(String.isNotBlank(whereString)) qb.setCondition(whereString);
+            if(lim != null) qb.setLimit(lim);
+            System.debug('qb.toSOQL() ::: '+qb.toSOQL());
+            List<Sobject> deleteList = Database.query(qb.toSOQL());
+            System.debug('deleteList ::: '+deleteList);
+            SecurityUtil.dmlDelete(deleteList);
+    
+            if(isProcessorConnected){
+                if(ObjName == 'BWP_Product__c') productsCount = getBillingRecordsCount(ObjName, 'Processor_Org_Id__c = \'' + processorAccountId + '\'', 10000);
+                else if(ObjName == 'BWP_Price__c') pricesCount = getBillingRecordsCount(ObjName, 'Processor_Org_Id__c = \'' + processorAccountId + '\'', 10000);
+            }
+            else{
+                if(ObjName == 'BWP_Product__c') productsCount = getBillingRecordsCount(ObjName, null, 10000);
+                else if(ObjName == 'BWP_Price__c') pricesCount = getBillingRecordsCount(ObjName, null, 10000);
+            }
+            APICallHandler.userInteractionLogPush(FALSE, 'Deleting Records', 'SUCCESS' , 'Successfully deleted the '+ObjName+' Records.');
+        }
+    }
+
+    public Integer getBillingRecordsCount(String ObjName, String whereString, Integer lim){
+        Integer countOfRecords = 0;
+        if(isBreadwinnerBillingInstalled){
+            Type t = Type.forName(ObjName);
+            SObjectType sObjType;
+            if(t != NULL) sObjType = ((SObject) t.newInstance()).getSObjectType();
+            QueryBuilder qb = new QueryBuilder(sObjType, true, true, true);
+            if(String.isNotBlank(whereString)) qb.setCondition(whereString);
+            if(lim != null) qb.setLimit(lim);
+            System.debug('qb.toCountSOQL() ::: '+qb.toCountSOQL());
+            countOfRecords = Database.countQuery(qb.toCountSOQL());
+        }
+        return countOfRecords;
     }
 
     public PageReference queryPermissionSetAssignedUsers(){

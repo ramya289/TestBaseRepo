@@ -1087,6 +1087,12 @@ public with sharing class Processor_Square  extends Processor {
 
                 transactionSf.Staff_Name__c = String.isNotBlank(pw.employee_id) ? (employeeIdToNameMap.get(pw.employee_id) != null ? employeeIdToNameMap.get(pw.employee_id) : '') : '';
                 transactionSf.Processor_Customer_Id__c = String.isNotBlank(pw.customer_id) ? pw.customer_id : (paymentIdToCustomerIdMap.get(pw.id) != null ? paymentIdToCustomerIdMap.get(pw.id) : '');
+                // Used in associating the originating object value while creating a Transaction via Custom Guided Wizard
+                if(ProcessorUtil.originatingObjFieldToIdMap?.size()>0){
+                    for(String originatingObjField :ProcessorUtil.originatingObjFieldToIdMap.keySet()){
+                        transactionSf.put(originatingObjField, ProcessorUtil.originatingObjFieldToIdMap.get(originatingObjField));
+                    }
+                }
                 transactionSf = constructSquareTransaction(transactionSf, pw, appConfig);
                 if (doNotImportCustomerAndFailedPayments && transactionSf.Status__c == ProcessorUtil.CHARGE_SUCCEEDED) {
                     if(String.isNotBlank(transactionSf.Customer__c)){

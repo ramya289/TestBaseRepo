@@ -87,6 +87,23 @@ public with sharing class QueryBuilder {
 
     }
 
+    /**
+     * @return full COUNT SOQL string to be used in the query
+     */
+    @namespaceAccessible
+    public String toCountSOQL(){
+
+        String soqlStr = 'SELECT COUNT() FROM ' + sObjType;
+        if (String.isNotBlank(whereString)) {
+            soqlStr += ' WHERE ' + whereString;
+        }
+        if (limitCount != null){
+            soqlStr += ' LIMIT ' + String.valueOf(limitCount);
+        }
+        return soqlStr;
+
+    }
+
     @namespaceAccessible
     public QueryBuilder addSObjectFields(List<Schema.SObjectField> soFieldList){
         for(Schema.SObjectField soField : soFieldList){
