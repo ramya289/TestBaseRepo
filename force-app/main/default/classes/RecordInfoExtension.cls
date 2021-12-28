@@ -218,12 +218,12 @@ public with sharing class RecordInfoExtension{
                     paymethod = new BWP_Payment_Method__c();
                     canCreatePaymentMethod = canCreatePaymentMethod(customer.Processor_Type__c);
                     canCreateTransaction = canCreateTransaction(customer.Processor_Type__c);
-                    hasMultiplePmTypes = RecordCreationExtension.hasMultiplePmTypes(customer.Processor_Type__c);
+                    hasMultiplePmTypes = CreateCustomerExtension.hasMultiplePmTypes(customer.Processor_Type__c);
                     canUpdateCustomer = canUpdateCustomer(customer.Processor_Type__c);
                     showShippingAddress = (String.isNotBlank(customer.Shipping_Street_Address_1__c) || String.isNotBlank(customer.Shipping_Street_Address_2__c) || String.isNotBlank(customer.Shipping_State__c) || String.isNotBlank(customer.Shipping_City__c) || String.isNotBlank(customer.Shipping_Country__c) || String.isNotBlank(customer.Shipping_Postal_Code__c)) ? True : False;
                     fetchCustomerRelatedPaymentMethods();
                     updateSelectedPaymentMethodDetails();
-                    authorizeBankMessage = RecordCreationExtension.authorizeBankMessage(customer);
+                    authorizeBankMessage = CreateCustomerExtension.authorizeBankMessage(customer);
                     if (schema.SobjectType.BWP_Transaction__c.isAccessible()) {
                         List<String> relatedList = new List<String>{
                             'Source__r.Name',
@@ -376,7 +376,7 @@ public with sharing class RecordInfoExtension{
             request.put(ProcessorUtil.API_VERSION, ProcessorUtil.VER_1);
             request.put(ProcessorUtil.API_PROCESSOR_ID, config.Provider_ID__c);
             BWP_Payment_Method__c paymethod = sObjName == appNameSpace+'BWP_Customer__c' && selectedPaymentMethod!=null ? paymentMethodsMap.get(selectedPaymentMethod) :paymethod;
-            RecordCreationExtension.chargeInfo chargeInfo = new RecordCreationExtension.chargeInfo(paymethod.Processor_Customer_Id__c, paymethod.Processor_Id__c, paymethod.Type__c, chargeAmount, selectedCurrency, chargingDescription, chargeIsTaxExempt, chargeTaxAmount, idempotencyKey);
+            CreateCustomerExtension.chargeInfo chargeInfo = new CreateCustomerExtension.chargeInfo(paymethod.Processor_Customer_Id__c, paymethod.Processor_Id__c, paymethod.Type__c, chargeAmount, selectedCurrency, chargingDescription, chargeIsTaxExempt, chargeTaxAmount, idempotencyKey);
             if(chargeAmount <= 0){
                 chargeMessage = 'Amount must be greater than 0';   
             }
@@ -385,13 +385,13 @@ public with sharing class RecordInfoExtension{
                     if(chargingDescription.length()<=1000 ){
                         chargeMessage = chargingDescription.length()>1000? ' Invalid string: Description must be at most 1000 characters': ' Please provide valid Amount';
                     }
-                    response = RecordCreationExtension.chargeCustomer_Stripe(request, chargeInfo);
+                    response = CreateCustomerExtension.chargeCustomer_Stripe(request, chargeInfo);
                 }
                 else if(config.Payment_Processor_Type__c == ProcessorUtil.PAT_BRAINTREE){
-                    response = RecordCreationExtension.chargeCustomer_Braintree(request, chargeInfo);
+                    response = CreateCustomerExtension.chargeCustomer_Braintree(request, chargeInfo);
                 }
                 else if(config.Payment_Processor_Type__c == ProcessorUtil.PAT_SQUARE){
-                    response = RecordCreationExtension.chargeCustomer_Square(request, chargeInfo);
+                    response = CreateCustomerExtension.chargeCustomer_Square(request, chargeInfo);
                 }
             }
             isChargeSuccess = ProcessorUtil.isValidResponse(response);
@@ -525,9 +525,9 @@ public with sharing class RecordInfoExtension{
         verifyACHErrors ='';
         isVerifySuccess = false;
         try{
-            RecordCreationExtension.verifyInfo verifyInfo = new RecordCreationExtension.verifyInfo(paymethod.Processor_Customer_Id__c, paymethod.Processor_Id__c, firstDeposit, secondDeposit);
+            CreateCustomerExtension.verifyInfo verifyInfo = new CreateCustomerExtension.verifyInfo(paymethod.Processor_Customer_Id__c, paymethod.Processor_Id__c, firstDeposit, secondDeposit);
            
-            Map<String, Object> response = RecordCreationExtension.verifyBank(config.Provider_ID__c, verifyInfo);
+            Map<String, Object> response = CreateCustomerExtension.verifyBank(config.Provider_ID__c, verifyInfo);
 
             List<ProcessorUtil.Error> apiErrors = (List<ProcessorUtil.Error>) response.get(ProcessorUtil.RESP_API_ERRORS);
             List<ProcessorUtil.Error> processingErrors = (List<ProcessorUtil.Error>) response.get(ProcessorUtil.RESP_PROC_ERRORS);
@@ -677,24 +677,24 @@ public with sharing class RecordInfoExtension{
             request.put(ProcessorUtil.API_ACTION, (newPMType == ProcessorUtil.PM_CARD ? (config.Payment_Processor_Type__c != ProcessorUtil.PAT_BRAINTREE ? ProcessorUtil.ACT_UPDATE_CUSTOMER : ProcessorUtil.ACT_CREATE_CARD_TOKEN) : ProcessorUtil.ACT_CREATE_BANK_TOKEN));
             request.put(ProcessorUtil.API_VERSION, ProcessorUtil.VER_1);
             request.put(ProcessorUtil.API_PROCESSOR_ID, config.Provider_ID__c);
-            RecordCreationExtension.cardInfo cInfo;
-            RecordCreationExtension.bankAccountInfo bankInfo;
+            CreateCustomerExtension.cardInfo cInfo;
+            CreateCustomerExtension.bankAccountInfo bankInfo;
             if(newPMType == ProcessorUtil.PM_CARD){
-                RecordCreationExtension.cardAddress cAddress = new RecordCreationExtension.cardAddress(cardStreetLine1, cardStreetLine2, cardCity, cardState, cardCountry, cardPostalCode);
-                cInfo = new RecordCreationExtension.cardInfo(processorCustomerId, cardNumber, cardExpiryMonth, cardExpiryYear, cardCVC, cardHolderName, PMTokenValue, cAddress);
+                CreateCustomerExtension.cardAddress cAddress = new CreateCustomerExtension.cardAddress(cardStreetLine1, cardStreetLine2, cardCity, cardState, cardCountry, cardPostalCode);
+                cInfo = new CreateCustomerExtension.cardInfo(processorCustomerId, cardNumber, cardExpiryMonth, cardExpiryYear, cardCVC, cardHolderName, PMTokenValue, cAddress);
             }
             if(newPMType == ProcessorUtil.PM_BANK){
                 List<BWP_Customer__c> customerList = selectorCustomer.selectByProcessorCustomerId(new Set<String>{processorCustomerId}, 1);
                 String company = customerList.size()> 0 ? customerList[0].Company__c : '';
                 String accountType = config.Payment_Processor_Type__c == ProcessorUtil.PAT_STRIPE ? bankPMAccountHolderType : bankPMBankAccountType;
-                bankInfo = new RecordCreationExtension.bankAccountInfo(processorCustomerId, bankPMCountry, bankPMCurrency, bankPMAccountHolderName, accountType, bankPMAccountNumber, bankPMRoutingNumber, bankPMBusinessOwnerName, bankPMIndividualOwnerFirstName, bankPMIndividualOwnerLastName, company);
+                bankInfo = new CreateCustomerExtension.bankAccountInfo(processorCustomerId, bankPMCountry, bankPMCurrency, bankPMAccountHolderName, accountType, bankPMAccountNumber, bankPMRoutingNumber, bankPMBusinessOwnerName, bankPMIndividualOwnerFirstName, bankPMIndividualOwnerLastName, company);
             }
             if(config.Payment_Processor_Type__c == ProcessorUtil.PAT_STRIPE){
                 if(newPMType == ProcessorUtil.PM_CARD){
-                    response = RecordCreationExtension.createCard_Stripe(request, cInfo);
+                    response = CreateCustomerExtension.createCard_Stripe(request, cInfo);
                 }
                 else if(newPMType == ProcessorUtil.PM_BANK){
-                    PMmessage = RecordCreationExtension.validateBankAccount(config.Payment_Processor_Type__c, bankPMAccountHolderName, bankPMRoutingNumber, bankPMAccountNumber);
+                    PMmessage = CreateCustomerExtension.validateBankAccount(config.Payment_Processor_Type__c, bankPMAccountHolderName, bankPMRoutingNumber, bankPMAccountNumber);
                     if(String.isNotBlank(PMmessage)){
                         return;
                     }
@@ -703,30 +703,30 @@ public with sharing class RecordInfoExtension{
                         return;
                     }
                     if(!isBankAuthAccepted){
-                        PMmessage = RecordCreationExtension.bankAuthMessage();
+                        PMmessage = CreateCustomerExtension.bankAuthMessage();
                         return;
                     }
-                    response = RecordCreationExtension.createBankAccount_Stripe(request, bankInfo);
+                    response = CreateCustomerExtension.createBankAccount_Stripe(request, bankInfo);
                 }
             }
             else if(config.Payment_Processor_Type__c == ProcessorUtil.PAT_BRAINTREE){
                 if(newPMType == ProcessorUtil.PM_CARD && String.isNotBlank(PMTokenValue)){
-                    response = RecordCreationExtension.createCard_Braintree(request, cInfo);
+                    response = CreateCustomerExtension.createCard_Braintree(request, cInfo);
                 }
                 else if(newPMType == ProcessorUtil.PM_BANK){
-                    PMmessage = RecordCreationExtension.validateBankAccount(config.Payment_Processor_Type__c, '', bankPMRoutingNumber, bankPMAccountNumber);
+                    PMmessage = CreateCustomerExtension.validateBankAccount(config.Payment_Processor_Type__c, '', bankPMRoutingNumber, bankPMAccountNumber);
                     if(String.isNotBlank(PMmessage)){
                         return;
                     }
-                    PMmessage = RecordCreationExtension.validateBraintreeOwner(bankPMAccountHolderType, bankPMBusinessOwnerName, bankPMIndividualOwnerFirstName,  bankPMIndividualOwnerLastName);
+                    PMmessage = CreateCustomerExtension.validateBraintreeOwner(bankPMAccountHolderType, bankPMBusinessOwnerName, bankPMIndividualOwnerFirstName,  bankPMIndividualOwnerLastName);
                     if(String.isNotBlank(PMmessage)){
                         return;
                     }
                     if(!isBankAuthAccepted){
-                        PMmessage = RecordCreationExtension.bankAuthMessage();
+                        PMmessage = CreateCustomerExtension.bankAuthMessage();
                         return;
                     }
-                    response = RecordCreationExtension.createBankAccount_Braintree(request, bankInfo);
+                    response = CreateCustomerExtension.createBankAccount_Braintree(request, bankInfo);
                 }
             }
             else if(config.Payment_Processor_Type__c == ProcessorUtil.PAT_SQUARE){
@@ -735,7 +735,7 @@ public with sharing class RecordInfoExtension{
                     return;
                 }
                 if(String.isBlank(squareCardErrors) && String.isNotBlank(PMTokenValue))
-                    response = RecordCreationExtension.createCard_Square(request, cInfo);
+                    response = CreateCustomerExtension.createCard_Square(request, cInfo);
             }
             isPaymentMethodCreated = ProcessorUtil.isValidResponse(response);
             if(isPaymentMethodCreated){
@@ -814,7 +814,7 @@ public with sharing class RecordInfoExtension{
     }
 
     public List<SelectOption> getPaymentMethodOptions(){
-        return RecordCreationExtension.paymentMethodOptions;
+        return CreateCustomerExtension.paymentMethodOptions;
     }
     public Boolean canCreatePaymentMethod(String processorType){
         return Schema.SObjectType.BWP_Payment_Method__c.isCreateable() & ProcessorUtil.processorsThatAllowPaymentMethods.contains(processorType);

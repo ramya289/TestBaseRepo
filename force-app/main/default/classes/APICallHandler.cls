@@ -71,11 +71,11 @@ public with sharing class APICallHandler {
             req.setHeader('Authorization', 'Basic ' + rawAccessToken);
         } else if (ac.PaymentProcessorType == ProcessorUtil.PAT_SQUARE) {
             req.setHeader('Authorization', 'Bearer ' + rawAccessToken);
-        } else if (ac.PaymentProcessorType == ProcessorUtil.PAT_PAYPAL){
+        } /*else if (ac.PaymentProcessorType == ProcessorUtil.PAT_PAYPAL){
             req.setHeader('Authorization', 'Bearer '+ rawAccessToken);
         } else if (ac.PaymentProcessorType == ProcessorUtil.PAT_AUTHORIZE_NET){
             req.setHeader('Authorization', 'Bearer '+ rawAccessToken);
-        }
+        }*/
         return req;
     }
 
@@ -286,7 +286,7 @@ public with sharing class APICallHandler {
             HttpResponse response;
            	response = http.send(request);
             if(Test.isRunningTest()) {
-                response.setBody('{"version":"v3","result":{"account":{"status":"trial","expiration":"2021-12-11 06:20:19","billing_status":null,"active":"true","days_overdue":null,"free_plan":false,"plan_name":"Starter","plan_code":20,"override_plan_name":"Business","override_plan_code":91,"override_plan_expiration":"2021-12-01 23:59:59"}}}');
+                response.setBody('{"version":"v2","result":{"account":{"status":"trial","expiration":"2021-12-11 06:20:19","billing_status":null,"active":"true","days_overdue":null,"free_plan":false,"plan_name":"Starter","plan_code":20,"override_plan_name":"Business","override_plan_code":91,"override_plan_expiration":"2021-12-01 23:59:59"}}}');
                 response.setStatusCode(200);
             }
             System.debug('org Response :::------'+response.getBody());

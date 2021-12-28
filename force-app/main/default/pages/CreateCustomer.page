@@ -1,4 +1,4 @@
-<apex:page sidebar="false" standardcontroller="BWP_Customer__c" id="pg" extensions="RecordCreationExtension" cache="true" title="New Customer">
+<apex:page sidebar="false" standardcontroller="BWP_Customer__c" id="pg" extensions="CreateCustomerExtension" cache="true" title="{!IF(true,'New Customer', 'Select Customer')}" action="{!CustomerFromCustomObj}">
     <apex:form >
         <html xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
             <head>
@@ -442,11 +442,23 @@
                                     </div>
                                 </div>
                             </apex:outputPanel>
+                            <apex:outputPanel rendered="{!IF(TestingPage == 'true', true, false)}">
+                                <div class="slds-media slds-media_center">
+                                    <div class="slds-media__figure">
+                                        <svg aria-hidden="true" class="slds-icon slds-icon-standard-user">
+                                            <use xlink:href="{!URLFOR($Asset.SLDS,'assets/icons/standard-sprite/svg/symbols.svg#account')}" />
+                                        </svg>
+                                    </div>
+                                    <div class="slds-media__body">
+                                        <p class="slds-text-heading_label">Customer Parameters Testing Page</p>
+                                    </div>
+                                </div>
+                            </apex:outputPanel>
                         </div>
                     </apex:outputPanel>
                     
-                    <apex:outputPanel id="pathPanel" layout="block" styleClass="slds-m-bottom_small" rendered="{!isProcessorConnected}">
-                        <apex:outputPanel rendered="{!IF(testingPage == 'false', true, false)}">
+                    <apex:outputPanel id="pathPanel" layout="block" styleClass="slds-m-bottom_small">
+                        <apex:outputPanel rendered="{!IF(TestingPage == 'false', true, false)}">
                         <article class="slds-card" style="border:0px;box-shadow: 0 0px">
                             <div class="slds-path slds-path_has-coaching slds-p-top_small">
                                 <div class="slds-grid slds-path__track">
@@ -544,11 +556,12 @@
                     </apex:outputPanel>
                     <apex:pagemessages rendered="{!NOT(ISBLANK(errorMessage))}" id="pagemessages"></apex:pagemessages>
                     
-                    <apex:outputPanel id="CustomerSection" rendered="{!isProcessorConnected}">
+                    <apex:outputPanel id="CustomerSection">
                         <apex:outputPanel id="CustomerSection1">
                             <apex:outputPanel rendered="{!CustomerPage}">
                                 <apex:outputPanel styleClass="slds-m-top_small" layout="block" id="msgInfo">
                                     <apex:pageMessage id="readOnlyModeInfoMessage" rendered="{!isBreadwinnerReadOnlyMode}" summary="You are using Breadwinner in {!selectedProcessorAccountType} Read Only Mode. While Breadwinner reads data from {!selectedProcessorAccountType}, no changes will be made to {!selectedProcessorAccountType}. {!selectedProcessorAccountType} is in Read-Only mode and will not be altered in any way." severity="INFO" strength="3"/>
+                                    <apex:pageMessage rendered="{!connectedProcessorsList.size==0}" summary="Please connect to a Payment Processor" severity="INFO" strength="3"/>
                                 </apex:outputPanel>
                                 <div class="slds-grid slds-wrap slds-m-top_xx-small">
                                     <div class="slds-col_padded slds-size_1-of-1 slds-medium-size_1-of-3 slds-large-size_1-of-3">
@@ -557,7 +570,7 @@
                                                 <span class="slds-form-element__label">Select Processor Name</span>
                                                 <div class="slds-form-element__control">
                                                     <div class="slds-select_container">
-                                                        <apex:selectList id="processorName" value="{!selectedProcessorName}" size="1" styleClass="slds-select slds-size_1-of-1 slds-medium-size_1-of-1 slds-large-size_1-of-1" onchange="selectedProcessorName();" >
+                                                        <apex:selectList id="processorName" disabled="{!connectedProcessorsList.size==0}" value="{!selectedProcessorName}" size="1" styleClass="slds-select slds-size_1-of-1 slds-medium-size_1-of-1 slds-large-size_1-of-1" onchange="selectedProcessorName();" >
                                                             <apex:selectOptions value="{!connectedProcessorsList}"/>
                                                         </apex:selectList>
                                                     </div>
@@ -566,7 +579,7 @@
                                         </apex:outputPanel>
                                         <apex:actionFunction name="selectedProcessorName" status="assign-action-status" action="{!updateOrgDetails}" reRender="selectedProcessorName, customerDetailsSection, accountLookupStyleSection, contactLookupStyleSection, readOnlyModeInfoMessage, readOnlyMessage, msgInfo, buttonsSection, pagemessages" oncomplete="message();"/>
                                         <apex:outputPanel id="customerDetailsSection">
-                                        <apex:outputPanel id="selectedProcessorName" styleClass="slds-m-left_small slds-m-top_medium" layout="block">
+                                        <apex:outputPanel id="selectedProcessorName" rendered="{!connectedProcessorsList.size>0}" styleClass="slds-m-left_small slds-m-top_medium" layout="block">
                                             <img src="{!IF(selectedProcessorAccountType == 'Stripe', URLFOR($Resource.Breadwinner_Payments, 'Breadwinner_Payments/images/StripeLogo.png'), (IF(selectedProcessorAccountType == 'Braintree', URLFOR($Resource.Breadwinner_Payments, 'Breadwinner_Payments/images/BraintreeLogo.png'),(IF(selectedProcessorAccountType == 'Square', URLFOR($Resource.Breadwinner_Payments, 'Breadwinner_Payments/images/SquareLogo.png'), '')))))}" style="{!IF(selectedProcessorAccountType == 'Stripe', 'width: 3.5rem;margin-top: -3px', ( IF(selectedProcessorAccountType == 'Braintree', 'width: 5.0rem;margin-top: -3px;', 'width: 5.0rem;margin-top: -7px')))};"/><span>&nbsp;&nbsp;You are creating a new Customer in {!selectedProcessorAccountType} Account <b>{!selectedProcessorAccountName}</b></span></apex:outputPanel>
                                         <c:SldsInputText fieldValue="{!newCustomer.Customer_Name__c}" label="{!$ObjectType.BWP_Customer__c.fields.Customer_Name__c.label}" rendered="{!selectedProcessorAccountType == 'Stripe'}" />
                                         <c:SldsInputText fieldValue="{!newCustomer.First_Name__c}" label="{!$ObjectType.BWP_Customer__c.fields.First_Name__c.label}" rendered="{!OR(selectedProcessorAccountType == 'Braintree', selectedProcessorAccountType == 'Square')}" />
@@ -980,7 +993,7 @@
                         </apex:outputPanel>
                         <apex:outputPanel rendered="{!CustomerPage}" id="buttonsSection">
                             <div class="slds-text-align_center slds-m-top_medium slds-m-bottom_medium">
-                                <apex:commandButton value="Create Customer" reRender="headerSection, paymentMethodSection, Tokenpage, chooseCreateCustomerSection, pagemessages, CustomerSection, pathPanel" status="assign-action-status" styleClass="slds-button slds-button_brand slds-m-right_small" action="{!createCustomer}" oncomplete="message();reRendercheckmarkSVGIcons();reRenderHeaderSVG('customerIcon');reRenderHeaderSVG('paymentMethodIcon');reRenderCollapsibleSVGIcons();" disabled="{!OR(isBreadwinnerReadOnlyMode, (selectedObject != customerMatchType))}"/>
+                                <apex:commandButton value="Create Customer" reRender="headerSection, paymentMethodSection, Tokenpage, chooseCreateCustomerSection, pagemessages, CustomerSection, pathPanel" status="assign-action-status" styleClass="slds-button slds-button_brand slds-m-right_small" action="{!createCustomer}" oncomplete="message();reRendercheckmarkSVGIcons();reRenderHeaderSVG('customerIcon');reRenderHeaderSVG('paymentMethodIcon');reRenderCollapsibleSVGIcons();" disabled="{!OR(isBreadwinnerReadOnlyMode, (selectedObject != customerMatchType),connectedProcessorsList.size==0)}"/>
                                 <apex:outputPanel id="createCustomerandPaymentButton">
                                     <apex:commandButton value="Create Customer & Proceed to Payment" reRender="headerSection, CustomerSection, paymentSection, pagemessages, chooseCreateCustomerSection, pathPanel" status="assign-action-status" styleClass="slds-button slds-button_brand slds-m-right_small" action="{!createPayment}" rendered="{!AND(PMType == 'Card', PMTokenValue!=null,!ISBLANK(PMTokenValue))}" oncomplete="message();reRenderHeaderSVG('customerIcon');reRenderHeaderSVG(paymentMethodIcon);reRendercheckmarkSVGIcons();" disabled="{!OR(isBreadwinnerReadOnlyMode, (selectedObject != customerMatchType))}"/>
                                 </apex:outputPanel>
@@ -992,7 +1005,7 @@
                     </apex:outputPanel>
                     <apex:actionFunction name="verifyDepositsRender" reRender="verifyDepositsSection" id="verifyDepositsRender" />
                     
-                    <apex:outputPanel id="verifyDepositsSection" rendered="{!isProcessorConnected}">
+                    <apex:outputPanel id="verifyDepositsSection" >
                         <apex:outputPanel rendered="{!AND(isBankAccountCreated, !transactionPage)}">
                             <c:SldsInputText label="First Deposit" fieldValue="{!firstDeposit}" id="firstDeposit" styleClass="slds-col_padded slds-size_1-of-1 slds-medium-size_1-of-3 slds-large-size_1-of-3 slds-m-top_xx-small slds-m-bottom_xx-small" onKeyPressFunction="return validateFloatKeyPress(this,window.event)" onKeyUpFunction="verifyAmount();"/>
                             <c:SldsInputText label="Second Deposit" fieldValue="{!secondDeposit}" id="secondDeposit" styleClass="slds-col_padded slds-size_1-of-1 slds-medium-size_1-of-3 slds-large-size_1-of-3 slds-m-top_xx-small slds-m-bottom_xx-small" onKeyPressFunction="return validateFloatKeyPress(this,window.event)" onKeyUpFunction="verifyAmount();"/>
@@ -1006,7 +1019,7 @@
                         </apex:outputPanel>
                     </apex:outputPanel>
                     
-                    <apex:outputPanel id="paymentSection" rendered="{!isProcessorConnected}">
+                    <apex:outputPanel id="paymentSection">
                         <apex:actionFunction status="assign-action-status" id="renderPMSection" name="renderPMSection" reRender="paymentMethodSection, paymentSection" />
                         <script>
                         j$("[id$=listOfCurrencies]").select2();

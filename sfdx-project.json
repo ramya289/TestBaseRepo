@@ -4,8 +4,8 @@
             "path": "force-app",
             "default": true,
             "package": "Test BWP Base Package",
-            "versionName": "ver 0.3",
-            "versionNumber": "0.3.0.NEXT"
+            "versionName": "1.0",
+            "versionNumber": "1.0.0.NEXT"
         }
     ],
     "name": "TestBaseRepo",
@@ -15,6 +15,7 @@
     "packageAliases": {
         "Test BWP Base Package": "0Ho5g00000000XlCAI",
         "Test BWP Base Package@0.2.0-1": "04t5g000000xzKUAAY",
-        "Test BWP Base Package@0.3.0-1": "04t5g000000xzKtAAI"
+        "Test BWP Base Package@0.3.0-1": "04t5g000000xzKtAAI",
+        "Test BWP Base Package@1.0.0-1": "04t5g000000y3OUAAY"
     }
 }

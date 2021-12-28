@@ -170,7 +170,7 @@ private class Test_Processor_Authorize_Net {
         }
     }
     
-    @IsTest
+    /*@IsTest
     static void processorBatchCustomerSync_When_Success() {
         User adminUser =  [SELECT Id FROM User WHERE Alias = 'TestUser' LIMIT 1];
         System.runAs(adminUser){
@@ -204,7 +204,7 @@ private class Test_Processor_Authorize_Net {
             
             Test.stopTest();
         }
-    }
+    }*/
     
     
     @IsTest

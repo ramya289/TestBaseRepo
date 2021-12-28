@@ -1,4 +1,4 @@
-<apex:page sidebar="false" standardcontroller="BWP_Transaction__c" extensions="RecordCreationExtension">
+<apex:page sidebar="false" standardcontroller="BWP_Transaction__c" extensions="CreateCustomerExtension">
     <html xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
         <head>
             <apex:slds />
@@ -292,61 +292,7 @@
                             Alternatively, if this is for an entirely new Breadwinner Payments Customer, you can create a&nbsp;<apex:commandLink action="{!standardNewPaymentButtonToCreateNewCustomer}" reRender="mainPanel, warningMsg" oncomplete="reRenderHeaderSVG();">new Customer, Payment Method, and Payment</apex:commandLink>.
                         </apex:outputPanel>
                     </apex:outputPanel>
-                    <apex:outputPanel rendered="{!IF(testingPage == 'true', true, false)}" id="testingPage">
-                        <!-- ---------------------------- Page Header Start ------------------------------>
-                        <div class="slds-page-header slds-m-bottom_medium" role="banner">
-                            <div class="slds-media slds-media_center">
-                                <div class="slds-media__figure">
-                                    <svg aria-hidden="true" class="slds-icon slds-icon-standard-user">
-                                        <use xlink:href="{!URLFOR($Asset.SLDS,'assets/icons/standard-sprite/svg/symbols.svg#account')}" />
-                                    </svg>
-                                </div>
-                                <div class="slds-media__body">
-                                    <p class="slds-page-header__title">Parameters Testing Page</p>
-                                    <p class="slds-text-body_small">Breadwinner • Payments</p>
-                                </div>
-                            </div>
-                        </div>
-                        <apex:pageMessages id="pgMsg"/>
-                        <apex:outputPanel layout="block" rendered="{!isProcessorConnected}">
-                            <table class="slds-table">
-                                <tr>
-                                    <td><apex:outputlabel ><b>Breadwinner Field / Param</b></apex:outputlabel></td>
-                                    <td><apex:outputlabel ><b>Param Value / Salesforce Field Name (API)</b></apex:outputlabel></td>
-                                    <td><apex:outputlabel ><b>Value</b></apex:outputlabel></td>
-                                </tr>
-                                <tr>
-                                    <td><apex:outputText >Originating Object <abbr class="slds-required" title="required"> *</abbr></apex:outputText></td>
-                                    <td><apex:outputlabel style="{!IF(ISBLANK(originatingObjName),'color:Red;','')}">{!IF(ISBLANK(originatingObjName), 'Not Specified (Required)', originatingObjName)}</apex:outputlabel></td>
-                                    <td><apex:outputlabel rendered="{!IF(ISBLANK(originatingObjName),FALSE,TRUE)}">{!sObj['Name']}</apex:outputlabel></td>
-                                </tr>
-                                <tr>
-                                    <td><apex:outputText >Parent Salesforce Acount <abbr class="slds-required" title="required"> *</abbr></apex:outputText></td>
-                                    <td><apex:outputlabel style="{!IF(ISBLANK(ParentField),'color:Red;','')}">{!IF(ISBLANK(ParentField), 'Not Specified (Required)', ParentField)}</apex:outputlabel></td>
-                                    <td><apex:outputlabel rendered="{!!ISBLANK(ParentField)}" >{!IF(customerMatchType == 'Account', selectedAccount.Name, SelectedContact.Name)}</apex:outputlabel></td>
-                                </tr>
-                                <tr>
-                                    <td><apex:outputText >Payment Amount </apex:outputText></td>
-                                    <td><apex:outputlabel>{!IF(ISBLANK(paymentAmountField), 'Not Specified', paymentAmountField)}</apex:outputlabel></td>
-                                    <td><apex:outputlabel rendered="{!!ISBLANK(paymentAmountField)}" >{!sObj[paymentAmountField]}</apex:outputlabel></td>
-                                </tr>
-                                <tr>
-                                    <td><apex:outputText >Payment Currency </apex:outputText></td>
-                                    <td><apex:outputlabel>{!IF(ISBLANK(paymentCurrencyField), 'Not Specified', paymentCurrencyField)}</apex:outputlabel></td>
-                                    <td><apex:outputlabel rendered="{!!ISBLANK(paymentCurrencyField)}" >{!sObj[paymentCurrencyField]}</apex:outputlabel></td>
-                                </tr>
-                                <tr>
-                                    <td><apex:outputText >Payment Description </apex:outputText></td>
-                                    <td><apex:outputlabel>{!IF(ISBLANK(paymentDescriptionField), 'Not Specified', paymentDescriptionField)}</apex:outputlabel></td>
-                                    <td><apex:outputlabel rendered="{!!ISBLANK(paymentDescriptionField)}" >{!sObj[paymentDescriptionField]}</apex:outputlabel></td>
-                                </tr>
-                            </table>
-                            <div align="center" class="slds-m-vertical_medium">
-                                <apex:commandButton styleClass="slds-button slds-button_brand" value="Next" action="{!redirectToNewTransactionPage}" status="action-status" reRender="theForm" id="goToNewTransactionPanelBtn"  />
-                            </div>
-                        </apex:outputPanel>
-                    </apex:outputPanel>
-                    <apex:outputPanel layout="block" rendered="{!IF(testingPage == 'false', true, false)}" id="mainPanel" >
+                    <apex:outputPanel layout="block" id="mainPanel">
                         <apex:outputPanel rendered="{!If(isPaymentFromStandardNewButton, false, true)}">
                             <!-- ---------------------------- Page Header Start ------------------------------>
                             <div class="slds-page-header slds-m-bottom_medium" role="banner">
@@ -365,8 +311,8 @@
                                 </div>
                             </div>
                             <!----------------------------- Page Header End ------------------------------------>
-                            <!----------------------------- Arrow Path Start --------------------------------- -->
-                            <apex:outputPanel id="pathPanel" layout="block" styleClass="slds-m-bottom_small" rendered="{!isProcessorConnected}">
+                            <!----------------------------- Arrow Path Start ----------------------------------->
+                            <apex:outputPanel id="pathPanel" layout="block" styleClass="slds-m-bottom_small" >
                                 <article class="slds-card" style="border:0px;box-shadow: 0 0px">
                                     <div class="slds-path slds-path_has-coaching">
                                         <div class="slds-grid slds-path__track">
@@ -439,9 +385,9 @@
                             </apex:outputPanel>
                             <!----------------------------- Arrow Path End -------------------------------------->
                             <!-- -----------------Select BWP Customer Start-------------------------------------->
-                            <apex:pageMessages id="pgMsgs"/>
+                            <apex:pageMessages />
                             
-                            <apex:outputPanel id="selectCustomersSection" rendered="{!isProcessorConnected}">
+                            <apex:outputPanel id="selectCustomersSection">
                                 <apex:outputPanel rendered="{!CustomerPage}">
                                     <div class="slds-m-top_small slds-col_padded">
                                         <h1 class="slds-section__title">Select the Breadwinner Payments Customer for this Payment</h1>
@@ -482,8 +428,8 @@
                                 </script>
                             </apex:outputPanel>
                             <!-- ----------------- Select BWP Customer End ------------------------------------->
-                            <!-- ----------------- Select Payment Method Section Start ----------------------- -->
-                            <apex:outputPanel id="selectPaymentMethodSection" rendered="{!isProcessorConnected}">
+                            <!-- ----------------- Select Payment Method Section Start ------------------------->
+                            <apex:outputPanel id="selectPaymentMethodSection">
                                 <apex:outputPanel rendered="{!PaymentMethodPage}">
                                     <div class="slds-m-top_small slds-col_padded">
                                         <h1 class="slds-section__title">Select the Payment Method for this Payment</h1>
@@ -540,7 +486,7 @@
 
                             <!-------------------- Create Payment Method Section End --------------------------->
                             <!-- ----------------- Create Payment Section Start -------------------------------->
-                            <apex:outputPanel id="createPaymentSection" rendered="{!isProcessorConnected}">
+                            <apex:outputPanel id="createPaymentSection">
                                 <script>
                                 j$("[id$=paymentCurrencies]").select2();
                                 </script>
@@ -641,7 +587,7 @@
                             </apex:outputPanel>
                         </apex:outputPanel>
                     </apex:outputPanel>
-                    <!-- ----------------- Create Payment Section End ------------------------------ -->
+                    <!-- ----------------- Create Payment Section End -------------------------------->
                 </div>
             </apex:form>
         </body>

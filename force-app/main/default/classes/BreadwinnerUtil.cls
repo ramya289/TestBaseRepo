@@ -5,19 +5,16 @@ Description - This class contains reusable methods.
 public with sharing class BreadwinnerUtil{
 
     // It is used to store the Package Version number. We will update this for every release until we find a way to automate values. Existing way is not supporting in the 2GP.
-    public static final String PKG_VER_NO = '2.5';
+    public static final String PKG_VER_NO = '1.9';
 
     public static final String OBJ_SYNC_CUSTOMER = 'Customer';
     public static final String OBJ_SYNC_PAYMENT = 'Payment';
-    @namespaceAccessible public static final String OBJ_SYNC_PRODUCT = 'Product';
-    @namespaceAccessible public static final String OBJ_SYNC_PRICE = 'Price';
 
     // Current Running Context Variables
     public static final String CNTX_HIST_SYNC = 'HistoricalSyncBatch';
 	public static final String CNTX_HOUR_SYNC = 'HourlySyncBatch';
 	public static final String CNTX_BWAPI = 'Breadwinner API';
 	public static final String CNTX_BW = 'Breadwinner';
-    @namespaceAccessible public static final String CNTX_BB_HIST_SYNC = 'BillingHistoricalSyncBatch';
 
     public static final String SYNC_CNTX_HOURLY = 'BreadwinnerPaymentsHourlySync';
     public static final String SYNC_CNTX_WEEKLY = 'BreadwinnerPaymentsWeeklySync';
@@ -29,8 +26,6 @@ public with sharing class BreadwinnerUtil{
     public static final String OPERATION_PS_NAME = 'Breadwinner_Payments_Operations';
     public static final String STANDARD_PS_NAME = 'Breadwinner_Payments_Standard_User';
     public static final String READONLY_PS_NAME = 'Breadwinner_Payments_Read_Only';
-
-    public static final String BB_EXT_PACKAGE_NAME = 'Breadwinner Billing';
 
     @namespaceAccessible
     public static Boolean isBreadwinnerTransaction {
@@ -208,30 +203,22 @@ public with sharing class BreadwinnerUtil{
         @namespaceAccessible public String accountId                     {get;set;}
         @namespaceAccessible public Datetime lastHistoricalCustomerSyncDateTime {get;set;}
         @namespaceAccessible public Datetime lastHistoricalPaymentSyncDateTime  {get;set;}
-        @namespaceAccessible public Datetime lastHistoricalProductSyncDateTime  {get;set;}
-        @namespaceAccessible public String lastCustomerId                {get;set;}
         @namespaceAccessible public String lastPaymentId                 {get;set;}
-        @namespaceAccessible public String lastProductId                 {get;set;}
-        @namespaceAccessible public String lastPriceId                   {get;set;}
+        @namespaceAccessible public String lastCustomerId                {get;set;}
         @namespaceAccessible public String accessToken                   {get;set;}
         @namespaceAccessible public String refreshToken                  {get;set;}
         @namespaceAccessible public Boolean livemode                     {get;set;}
         @namespaceAccessible public Boolean requireNextCustomerSyncRun   {get;set;}
         @namespaceAccessible public Boolean requireNextPaymentSyncRun    {get;set;}
-        @namespaceAccessible public Boolean requireNextProductSyncRun    {get;set;}
-        @namespaceAccessible public Boolean requireNextPriceSyncRun      {get;set;}
         @namespaceAccessible public Boolean isCustomerMatchComplete      {get;set;}
         @namespaceAccessible public String customerMatchType             {get;set;}
         @namespaceAccessible public Datetime hourlyCustomerSyncLastRun   {get;set;}
         @namespaceAccessible public Datetime hourlyPaymentSyncLastRun    {get;set;}
-        @namespaceAccessible public Datetime hourlyProductSyncLastRun    {get;set;}
         @namespaceAccessible public String defaultCurrency               {get;set;}
         @namespaceAccessible public Boolean isHistoricalCustomerSyncDone {get;set;}
         @namespaceAccessible public Boolean isHistoricalPaymentSyncDone  {get;set;}
-        @namespaceAccessible public Boolean isHistoricalProductSyncDone  {get;set;}
         @namespaceAccessible public Boolean isHourlyCustomerSyncDone     {get;set;}
         @namespaceAccessible public Boolean isHourlyPaymentSyncDone      {get;set;}
-        @namespaceAccessible public Boolean isHourlyProductSyncDone      {get;set;}
         @namespaceAccessible public String currentRunningClassContext    {get;set;}
         @namespaceAccessible public String PaymentProcessorType          {get;set;}
         @namespaceAccessible public String customerSyncConfig            {get;set;}
@@ -593,51 +580,4 @@ public with sharing class BreadwinnerUtil{
     
     public class ProcessorException extends Exception{}
     public class UnsupportedProcessorException extends Exception{}
-
-    public static Boolean isBreadwinnerBillingInstalled(){
-        Boolean isBBInstalled = FALSE;
-        try{
-            HttpRequest req = new HttpRequest();
-            req.setHeader('Authorization', 'Bearer ' + UserInfo.getSessionID());
-            req.setHeader('Content-Type', 'application/json');
-            String SFdomainUrl=URL.getSalesforceBaseUrl().toExternalForm();
-            String query='Select+SubscriberPackage.NamespacePrefix,SubscriberPackage.Name+FROM+InstalledSubscriberPackage';
-            String endpoint = SFdomainUrl+'/services/data/v53.0/tooling/query/?q='+query;
-            req.setEndpoint(endpoint);
-            req.setMethod('GET');
-            req.setTimeout(120000);
-            Http h = new Http();
-            HttpResponse res = new HttpResponse();
-            if (!Test.isRunningTest()) {
-                res = h.send(req);
-                system.debug('Response ::: '+res.getBody());
-            }
-            Records rc = new Records();
-            if(res.getStatusCode() == 200 && res.getBody() != NULL){
-                rc = (Records)JSON.deserialize(res.getBody(), Records.class);
-                System.debug('rc ::: '+rc);                
-                for(Record rec: rc.records){                
-                    String packageName = rec.SubscriberPackage.Name;
-                    if(packageName != NULL && packageName == BB_EXT_PACKAGE_NAME){
-                        isBBInstalled = TRUE;
-                    }
-                }
-                System.debug('isBBInstalled ::: '+isBBInstalled);
-            }
-        }catch(Exception ex) {
-            System.debug('Error occured while checking Stripe Billing package: '+ex.getStackTraceString());
-            APICallHandler.userInteractionLogPush(TRUE, 'Packages', 'ERROR' , 'Error occured while checking Breadwinner Billing package: '+ex.getStackTraceString());
-        }
-        return isBBInstalled;
-    }
-    private class Records{
-        private List<Record> records;
-    }
-    private class Record{
-        private SubscriberPackage subscriberPackage;
-    }
-    private class SubscriberPackage{ 
-        private String Name;
-        private String NamespacePrefix;
-    }
 }

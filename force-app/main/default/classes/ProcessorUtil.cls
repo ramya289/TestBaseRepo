@@ -75,10 +75,7 @@ public with sharing class ProcessorUtil {
     public static final String CMO_SUGGESTED_MATCH = 'suggestedMatch';  
     public static final String CMO_MANUAL_MATCH = 'manualMatch';
     public static final String CMO_DO_NOT_IMPORT = 'doNotImport';
-
-    //Originating Object Field to Id Map, used in associating the originating record to the transaction
-    public static Map<String, Id> originatingObjFieldToIdMap = new Map<String, Id>();
-    
+        
     public class ResponseObject {
         public String status;
         public String responseJSON;
