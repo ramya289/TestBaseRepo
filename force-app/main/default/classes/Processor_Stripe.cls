@@ -1772,16 +1772,15 @@ public with sharing class Processor_Stripe extends Processor {
     public class FetchRequest {
         public String customerId;
         public String createdGreaterThan;
-        public String createdGreaterThanOrEqual;
+        @namespaceAccessible public String createdGreaterThanOrEqual;
         public String createdLessThan;
         public String createdLessThanOrEqual;
         public String ending_before;
         public String email;
-        public String stripe_limit;
-        public String starting_after;
+        @namespaceAccessible public String stripe_limit;
+        @namespaceAccessible public String starting_after;
     }
 
-    @namespaceAccessible
     public class FetchResponse {
         public String last_record_id;
         public boolean requireNextRun;

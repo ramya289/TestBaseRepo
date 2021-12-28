@@ -81,24 +81,24 @@ public with sharing class ProcessorUtil {
     
     @namespaceAccessible
     public class ResponseObject {
-        public String status;
-        public String responseJSON;
+        @namespaceAccessible public String status;
+        @namespaceAccessible public String responseJSON;
         public String checkoutResponseJSON;
         public List<CustomerWrapper> customerList;
         public List<PaymentMethodWrapper> paymentMethodList;
         public List<TransactionWrapper> transactionList;
-        public List<Error> errors = new List<Error>();
+        @namespaceAccessible public List<Error> errors = new List<Error>();
     }
 
     @namespaceAccessible
     public class Error {
-        public String message;
-        public String code;
-        public String detail;
+        @namespaceAccessible public String message;
+        @namespaceAccessible public String code;
+        @namespaceAccessible public String detail;
 
-        public Error() {}
+        @namespaceAccessible public Error() {}
 
-        public Error(String codeValue, String messageValue) {
+        @namespaceAccessible public Error(String codeValue, String messageValue) {
             code = codeValue;
             message = messageValue;
         }
