@@ -4,9 +4,9 @@
             "path": "force-app",
             "default": true,
             "package": "Test BWP Base Package",
-            "versionName": "1.2",
-            "versionNumber": "1.2.0.NEXT",
-            "ancestorVersion": "1.1.0.RELEASED"
+            "versionName": "1.4",
+            "versionNumber": "1.4.0.NEXT",
+            "ancestorVersion": "1.3.0.RELEASED"
         }
     ],
     "name": "TestBaseRepo",
@@ -21,6 +21,8 @@
         "Test BWP Base Package@1.1.0-1": "04t5g000000y3PhAAI",
         "Test BWP Base Package@1.1.0-2": "04t5g000000y3PmAAI",
         "Test BWP Base Package@1.2.0-1": "04t5g000000y3PrAAI",
-        "Test BWP Base Package@1.2.0-2": "04t5g000000y3PwAAI"
+        "Test BWP Base Package@1.2.0-2": "04t5g000000y3PwAAI",
+        "Test BWP Base Package@1.3.0-1": "04t5g000000y3QGAAY",
+        "Test BWP Base Package@1.4.0-1": "04t5g000000y3QLAAY"
     }
 }

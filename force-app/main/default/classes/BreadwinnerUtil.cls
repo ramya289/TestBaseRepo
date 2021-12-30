@@ -173,7 +173,7 @@ public with sharing class BreadwinnerUtil{
 
     /* These methods are related to End point */
     public static String getSupportURL() {
-        return isBreadwinnerInstalled() ? 'https://support.breadwinnerhq.com' : 'https://support-staging.breadwinnerhq.com';
+        return isBreadwinnerInstalled() ? 'https://support-staging.breadwinnerhq.com' : 'https://support-staging.breadwinnerhq.com';
     }
 
     public static String getSupportEndpointBaseURL() {

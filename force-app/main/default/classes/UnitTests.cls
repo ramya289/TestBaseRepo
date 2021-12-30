@@ -940,10 +940,10 @@ public class UnitTests {
     
     @namespaceAccessible
     public class MockHttpResponse implements HttpCalloutMock {
-        public Integer statusCode = 200;
-        public String response = '';
+        @namespaceAccessible public Integer statusCode = 200;
+        @namespaceAccessible public String response = '';
 
-        public HttpResponse respond(HttpRequest req) {
+        @namespaceAccessible public HttpResponse respond(HttpRequest req) {
             HttpResponse res = new HttpResponse();
             res.setHeader('Content-Type', 'application/json');
             res.setBody(response);

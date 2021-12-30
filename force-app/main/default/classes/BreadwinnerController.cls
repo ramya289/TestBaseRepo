@@ -595,7 +595,7 @@ public with sharing class BreadwinnerController {
     public void rescheduleBillingHourlySync(){
         try{
             if(isBreadwinnerAdministrator){
-                Database.batchable<BreadwinnerUtil.AppConfig> instance = (Database.batchable<BreadwinnerUtil.AppConfig>) Type.forName('BillingHourlySyncBatch').newInstance(); 
+                Schedulable instance = (Schedulable) Type.forName('BillingHourlySyncBatch').newInstance();
                 APICallHandler.userInteractionLogPush(FALSE, 'Restarted Hourly Sync', 'Troubleshoot-General' , 'Restarted Billing Hourly Sync from the Troubleshoot section of Breadwinnner tab');
             }
         }
@@ -637,22 +637,17 @@ public with sharing class BreadwinnerController {
         String runningSyncName = String.isNotBlank(syncName) ? syncName : BreadwinnerUtil.OBJ_SYNC_PRODUCT;
         try {
             if(String.isNotBlank(syncProcessor) && appC.accountId == syncProcessor && !BreadwinnerUtil.isBatchRunning(BreadwinnerUtil.CNTX_BB_HIST_SYNC)){
-                List<BreadwinnerUtil.AppConfig> appConfigList = new List<BreadwinnerUtil.AppConfig>();
-                if(BreadwinnerUtil.getBWSetting().Active__c && !appC.needToReconnect && appC.accessToken != NULL) {
-                    appConfigList.add(appC);
-                }
-
-                Type t = Type.forName('BillingHistoricalSyncBatch');
-                Database.batchable<BreadwinnerUtil.AppConfig> instance = (Database.batchable<BreadwinnerUtil.AppConfig>)t.newInstance();           
+                Schedulable instance = (Schedulable) Type.forName('BillingHistoricalSyncBatch').newInstance();
                 Map<String, Object> variableMap = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(instance));
-                variableMap.put('appConfigList', appConfigList);
+                if(BreadwinnerUtil.getBWSetting().Active__c && !appC.needToReconnect && appC.accessToken != NULL) {
+                    variableMap.put('appConfig', appC);
+                }
                 variableMap.put('runningObjectName', runningSyncName);
                 variableMap.put('runThisSyncOnly', String.isNotBlank(syncName) ? true : false);
                 instance = (Database.Batchable<BreadwinnerUtil.AppConfig>)JSON.deserialize(JSON.serialize(variableMap), t);
                 Database.executeBatch(instance, 1);
             } else{
-                Type t = Type.forName('BillingHistoricalSyncBatch');
-                Database.batchable<BreadwinnerUtil.AppConfig> instance = (Database.batchable<BreadwinnerUtil.AppConfig>)t.newInstance();           
+                Schedulable instance = (Schedulable) Type.forName('BillingHistoricalSyncBatch').newInstance();
                 Map<String, Object> variableMap = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(instance));
                 variableMap.put('runningObjectName', runningSyncName);
                 variableMap.put('runThisSyncOnly', String.isNotBlank(syncName) ? true : false);
