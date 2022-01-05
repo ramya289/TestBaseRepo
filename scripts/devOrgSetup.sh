@@ -2,12 +2,15 @@
   
 # This is the bash script to create Scratch Org and Push Code
 
+# bash scripts/devOrgSetup.sh (Use this command to run this file)
+
 echo "This is the bash script to create Scratch Org and Push Code"
 
 # Dev Hub alias name
 # If it's not connected with your CLI then run this below command
 # sfdx auth:web:login -d -a bwDevHub
-devHub=bwDevHub
+# devHub=bwDevHub
+devHub=RBWPDevHub
 
 # Dev Credentials Org alias name, this org contains Custom Metadata Records
 # If it's not connected with your CLI then run this below command
@@ -19,7 +22,7 @@ read scratch_alias
  
 echo "Creating Scratch Org"  
 #sfdx force:org:create -v $devHub -a $scratch_alias orgName=$scratch_alias features=PersonAccounts hasSampleData=true -f config/project-scratch-def.json -d 15 -w 5
-sfdx force:org:create -v $devHub -a $scratch_alias orgName=$scratch_alias hasSampleData=true -f config/project-scratch-def.json -d 15 -w 5
+sfdx force:org:create -v $devHub -a $scratch_alias orgName=$scratch_alias hasSampleData=true -f config/project-scratch-def.json -d 30 -w 5
 # -w: The streaming client socket timeout (in minutes).
 # -d: Duration of the scratch org (in days) (default:7, min:1, max:30).
 echo "=============================================================================" 

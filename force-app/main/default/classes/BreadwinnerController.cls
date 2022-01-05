@@ -595,7 +595,7 @@ public with sharing class BreadwinnerController {
     public void rescheduleBillingHourlySync(){
         try{
             if(isBreadwinnerAdministrator){
-                Schedulable instance = (Schedulable) Type.forName('BillingHourlySyncBatch').newInstance();
+                Schedulable instance = (Schedulable) Type.forName('RamyaTestBWP','BillingHourlySyncBatch').newInstance();
                 APICallHandler.userInteractionLogPush(FALSE, 'Restarted Hourly Sync', 'Troubleshoot-General' , 'Restarted Billing Hourly Sync from the Troubleshoot section of Breadwinnner tab');
             }
         }
@@ -636,23 +636,20 @@ public with sharing class BreadwinnerController {
         isBatchStarted = false;    
         String runningSyncName = String.isNotBlank(syncName) ? syncName : BreadwinnerUtil.OBJ_SYNC_PRODUCT;
         try {
-            if(String.isNotBlank(syncProcessor) && appC.accountId == syncProcessor && !BreadwinnerUtil.isBatchRunning(BreadwinnerUtil.CNTX_BB_HIST_SYNC)){
-                Schedulable instance = (Schedulable) Type.forName('BillingHistoricalSyncBatch').newInstance();
+            if(!BreadwinnerUtil.isBatchRunning(BreadwinnerUtil.CNTX_BB_HIST_SYNC)){
+                Type t = Type.forName('RamyaTestBWP','BillingHistoricalSyncBatch');
+                Schedulable instance = (Schedulable) t.newInstance();
                 Map<String, Object> variableMap = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(instance));
-                if(BreadwinnerUtil.getBWSetting().Active__c && !appC.needToReconnect && appC.accessToken != NULL) {
+                if(BreadwinnerUtil.getBWSetting().Active__c && String.isNotBlank(syncProcessor) && appC.accountId == syncProcessor && !appC.needToReconnect && appC.accessToken != NULL) {
                     variableMap.put('appConfig', appC);
                 }
                 variableMap.put('runningObjectName', runningSyncName);
                 variableMap.put('runThisSyncOnly', String.isNotBlank(syncName) ? true : false);
-                instance = (Database.Batchable<BreadwinnerUtil.AppConfig>)JSON.deserialize(JSON.serialize(variableMap), t);
-                Database.executeBatch(instance, 1);
-            } else{
-                Schedulable instance = (Schedulable) Type.forName('BillingHistoricalSyncBatch').newInstance();
-                Map<String, Object> variableMap = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(instance));
-                variableMap.put('runningObjectName', runningSyncName);
-                variableMap.put('runThisSyncOnly', String.isNotBlank(syncName) ? true : false);
-                instance = (Database.Batchable<BreadwinnerUtil.AppConfig>)JSON.deserialize(JSON.serialize(variableMap), t);
-                Database.executeBatch(instance, 1);
+                instance = (Schedulable)JSON.deserialize(JSON.serialize(variableMap), t);
+
+                DateTime nextScheduleTime = System.now().addMinutes(1);
+                String CronExpression = '0 ' + nextScheduleTime.minute() + ' ' + nextScheduleTime.hour() + ' ' + nextScheduleTime.day() + ' ' + nextScheduleTime.month() + ' ? ' + nextScheduleTime.year() + ' BillingHistoricalSync';
+                System.schedule('BreadwinnerBillingHistoricalSync', CronExpression, instance);
             }
             isBatchStarted = true;
             APICallHandler.userInteractionLogPush(false, 'Restarted Billing Historical '+runningSyncName+' Sync', 'Troubleshoot-'+(String.isNotBlank(syncProcessor) ? 'Connection' : 'General'), 'Restarted Billing Historical Sync from the Troubleshoot section of Breadwinnner tab '+(String.isNotBlank(syncProcessor) ? ' for Processor : '+ appC.paymentProcessorType+' ('+appC.accountName+')' : ' '));

@@ -30,7 +30,7 @@ public with sharing class BreadwinnerUtil{
     public static final String STANDARD_PS_NAME = 'Breadwinner_Payments_Standard_User';
     public static final String READONLY_PS_NAME = 'Breadwinner_Payments_Read_Only';
 
-    public static final String BB_EXT_PACKAGE_NAME = 'Breadwinner Billing';
+    public static final String BB_EXT_PACKAGE_NAME = 'Test BWP Child Package';
 
     @namespaceAccessible
     public static Boolean isBreadwinnerTransaction {
