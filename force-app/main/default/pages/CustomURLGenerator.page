@@ -1,4 +1,4 @@
-<apex:page controller="CustomURLGeneratorController" tabStyle="BWP_Customer__c" sidebar="false">
+<apex:page controller="CustomURLGeneratorController" tabStyle="BWP_Transaction__c" sidebar="false">
     <html xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
         <head>
             <apex:slds />  
@@ -72,7 +72,7 @@
                         <h3 class="slds-section-title_divider">Select Originating Object</h3>
                         <div class="slds-size_1-of-1 slds-medium-size_1-of-1 slds-large-size_6-of-12 slds-m-horizontal_small">
                             <div class="slds-form-element slds-m-top_medium slds-size_1-of-1 slds-medium-size_3-of-6 slds-large-size_6-of-12">
-                                <label class="slds-form-element__label">Select the object from which you want to create a Transaction</label>
+                                <label class="slds-form-element__label">Select the object from which you want to create a Transaction <abbr class="slds-required" title="required"> *</abbr></label>
                                 <div class="slds-form-element__control">
                                     <div class="slds-select_container">
                                         <apex:selectList value="{!selectedObject}" size="1" styleClass="slds-select" >
@@ -89,32 +89,20 @@
                         <h3 class="slds-section-title_divider">Map Transaction fields with {!ParentObjectName} fields</h3>
                         <div class="slds-grid slds-wrap slds-m-horizontal_small">
                             <div class="slds-col slds-size_1-of-2 slds-medium-size_1-of-2 slds-large-size_6-of-12">
-                                <apex:outputPanel layout="block" styleClass ="slds-form-element slds-m-top_small slds-size_1-of-1 slds-medium-size_3-of-6 slds-large-size_6-of-12" rendered="{!isCustomerMatchTypeAccount}">
+                                <apex:outputPanel layout="block" styleClass ="slds-form-element slds-m-top_small slds-size_1-of-1 slds-medium-size_3-of-6 slds-large-size_6-of-12">
                                     <label class="slds-form-element__label">
-                                        Select a field for Salesforce Account
+                                        Select a field for Salesforce {!customerMatchType} <abbr class="slds-required" title="required"> *</abbr>
                                     </label>                                    
                                     <div class="slds-form-element__control">
                                         <div class="slds-select_container">
-                                            <apex:selectList id="SF_Account_Id" value="{!parent_object_reference}" label="Select a field for Salesforce Account" size="1"  styleClass="slds-select">                        
+                                            <apex:selectList id="SF_Parent_Id" value="{!parent_object_reference}" label="Select a field for Salesforce Account" size="1"  styleClass="slds-select">                        
                                                 <apex:selectOption value="{!null}"></apex:selectOption>
-                                                <apex:selectOptions value="{!AccountReferenceFields}" />
+                                                <apex:selectOptions value="{!AccountReferenceFields}" rendered="{!customerMatchType == 'Account'}" />
+                                                <apex:selectOptions value="{!contactReferenceFields}" rendered="{!customerMatchType == 'Contact'}" />
                                             </apex:selectList>
                                         </div>
                                     </div>
-                                </apex:outputPanel>
-                                <apex:outputPanel layout="block" styleClass="slds-form-element slds-m-top_small slds-size_1-of-1 slds-medium-size_3-of-6 slds-large-size_6-of-12" rendered="{!!isCustomerMatchTypeAccount}">
-                                    <label class="slds-form-element__label">
-                                        Select a field for Salesforce Contact
-                                    </label>                                    
-                                    <div class="slds-form-element__control">
-                                        <div class="slds-select_container">
-                                            <apex:selectList id="SF_Contact_Id" value="{!parent_object_reference}" label="Select a field for Salesforce Contact" size="1"  styleClass="slds-select">                        
-                                                <apex:selectOption value="{!null}"></apex:selectOption>
-                                                <apex:selectOptions value="{!contactReferenceFields}" />
-                                            </apex:selectList>
-                                        </div>
-                                    </div>
-                                </apex:outputPanel>
+                                </apex:outputPanel>                                
                                 <div class="slds-form-element slds-m-top_small slds-size_1-of-1 slds-medium-size_3-of-6 slds-large-size_6-of-12">
                                     <label class="slds-form-element__label">Select a field for Payment Amount</label>
                                     <div class="slds-form-element__control">

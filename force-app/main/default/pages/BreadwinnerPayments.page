@@ -5,6 +5,7 @@
                 <meta charset="utf-8" />
                 <apex:variable value="{!OR($User.UIThemeDisplayed == 'Theme4d', $User.UIThemeDisplayed == 'Theme4t')}" var="isLightning" />
                 <apex:slds />
+                <apex:includeLightning />
                 <script src="{!URLFOR($Resource.Breadwinner_Payments,'Breadwinner_Payments/js/jquery-3.5.1.min.js')}"></script>
                 <!-- Version 49 of the google chart loader taken from https://www.gstatic.com/charts/loader.js -->
                 <script src="{!URLFOR($Resource.Breadwinner_Payments,'Breadwinner_Payments/js/gcharts-49.js')}"></script>
@@ -216,9 +217,9 @@
                         showModal('messageModal', 'messageBackdrop', 'deleteMessage', '');
                     }
                     function message() {
-                        j$(".infoM6, .infoM4, .infoM3, .infoM2, .infoS1").addClass("slds-notify slds-notify_alert slds-theme_inverse-text  slds-text-align_left slds-text-heading_small slds-m-bottom_small").css( {"font-weight":"500","line-height":"1.4","word-spacing":"1px","justify-content":"left", "background":"rgba(84,105,141,.95)"} );
-                        j$(".errorM6, .errorM4, .errorM3, .errorM2, .errorS1").addClass("slds-notify slds-notify_alert slds-theme_error  slds-text-align_left slds-text-heading_small slds-m-bottom_small").css({"font-weight":"500","line-height":"1.4","word-spacing":"1px","justify-content":"left"});
-                        j$(".warningM6, .warningM4, .warningM3, .warningM2, .warningS1").addClass("slds-notify slds-notify_alert slds-theme_warning  slds-text-align_left slds-text-heading_small slds-m-bottom_small").css( {"font-weight":"500","line-height":"1.4","word-spacing":"1px","justify-content":"left"}) ;
+                        j$(".infoM6, .infoM4, .infoM3, .infoM2, .infoS1").addClass("slds-notify slds-notify_alert slds-theme_inverse-text  slds-text-align_left slds-text-heading_small slds-m-bottom_small").css( {"font-weight":"500","line-height":"1.4","word-spacing":"1px","justify-content":"left", "background":"rgba(84,105,141,.95)", "border-radius":"4px"} );
+                        j$(".errorM6, .errorM4, .errorM3, .errorM2, .errorS1").addClass("slds-notify slds-notify_alert slds-theme_error  slds-text-align_left slds-text-heading_small slds-m-bottom_small").css({"font-weight":"500","line-height":"1.4","word-spacing":"1px","justify-content":"left","border-radius":"4px"});
+                        j$(".warningM6, .warningM4, .warningM3, .warningM2, .warningS1").addClass("slds-notify slds-notify_alert slds-theme_warning  slds-text-align_left slds-text-heading_small slds-m-bottom_small").css( {"font-weight":"500","line-height":"1.4","word-spacing":"1px","justify-content":"left","border-radius":"4px"}) ;
                         j$(".confirmM6, .confirmM4, .confirmM3, .confirmM2, .confirmS1").addClass("slds-notify slds-notify_alert slds-theme_success slds-text-align_left slds-text-heading_small slds-m-bottom_small").css( {"font-weight":"500","line-height":"1.4","word-spacing":"1px","justify-content":"left","font-size":"1rem !important","border-radius":"4px"} ) ;
 
                         j$("div .messageText h4").css( "color", "white" );
@@ -1017,10 +1018,6 @@
                                                             <div class="slds-text-heading_medium">
                                                                 Connect Breadwinner to your Payment Processor
                                                             </div>
-                                                            <apex:outputPanel layout="block" styleClass="slds-text-body_small" style="margin-left: 0.35rem;" rendered="{!AND(isBreadwinnerAdministrator, !isMultiProcessorEnabled)}">
-                                                                Need to connect more than one Payment Processor to Salesforce? Please&nbsp;
-                                                                <apex:outputLink onclick="OpenContactSupportTab();loadIframesfun('Contact_SupportPage','{!BW_SupportPortalURL}/customer/portal/emails/new?t=711718');" value="javascript:void(0);" id="ContactSupportForMultiOrg" styleClass="GrayLinks">contact Breadwinner Support</apex:outputLink>
-                                                            </apex:outputPanel>
                                                         </apex:outputPanel>
                                                     </td>
                                                     <td>
@@ -1079,7 +1076,7 @@
                                                                             </div>
                                                                         </apex:outputPanel>
                                                                     </apex:repeat>
-                                                                    <apex:outputPanel rendered="{!AND((isMultiProcessorEnabled ),(isBreadwinnerAdministrator),(processorConfigList!=null&&processorConfigList.size>0))}">
+                                                                    <apex:outputPanel rendered="{!AND(isBreadwinnerAdministrator,processorConfigList.size>0)}">
                                                                         <apex:commandlink styleClass="slds-m-left_xx-small" value="Add another Payment Processor" status="assign-action-status" onclick="showModal('chooseProcessorModal','backdrop','','');" rerender="selectPaymentProcessorSection, paymentProcessorsSection, authErrors" >
                                                                         </apex:commandlink>&nbsp;
                                                                     </apex:outputPanel>
@@ -1226,7 +1223,7 @@
                                                     </td>  
                                                     <td>
                                                         <apex:outputPanel id="pageLayoutLinkPanel" rendered="{!canUpdatePageLayouts}">
-                                                            <apex:commandLink action="{!updatePageLayouts}" status="assign-action-status" styleClass="slds-text-heading_small slds-m-left_xx-small">Update {!IF(isCustomerMatchStarted, customerMatchType, '')} Page Layouts</apex:commandLink>
+                                                            <apex:commandLink action="{!updatePageLayouts}" status="assign-action-status" reRender="setupRightContent" styleClass="slds-text-heading_small slds-m-left_xx-small" oncomplete="reRendercheckmarkSVGIcons();HideStyleSheet();message();" >Update {!IF(isCustomerMatchStarted, customerMatchType, '')} Page Layouts</apex:commandLink>
                                                         </apex:outputPanel>                                                 
                                                     </td> 
                                                 </tr> 
@@ -1290,52 +1287,28 @@
                                                     </td>
                                                 </tr>
                                             </table>
-                                            <div class="slds-m-top_small">
-                                                <div class="slds-grid slds-wrap">
-                                                    <div class="slds-size_1-of-1 slds-medium-size_3-of-6 slds-large-size_6-of-12">
-                                                            <apex:commandLink action="{!showEditSettingSection}" status="assign-action-status" rerender="SettingSectionPanel" rendered="{!isBreadwinnerAdministrator}"> .
-                                                            </apex:commandLink>
-                                                            <apex:outputPanel layout="block" styleClass="slds-m-horizontal_medium slds-m-bottom_medium" id="SettingSectionPanel">
-                                                                <apex:outputPanel rendered="{!isEditSettingSection}">  
-                                                                    <div class="slds-box slds-float_left">
-                                                                        <label class="slds-checkbox">
-                                                                            <span class="slds-form-element__label">
-                                                                                {!$ObjectType.Breadwinner_Settings__c.Fields.Multi_Processor_Enabled__c.Label}
-                                                                            </span>
-                                                                            <apex:inputCheckbox value="{!bwSetting.multiProcessorEnabled}"/> 
-                                                                            <span class="slds-checkbox_faux"></span>
-                                                                            
-                                                                        </label>
-                                                                        <div class="slds-m-top_medium">
-                                                                            <apex:commandButton value="Save" styleClass="slds-button slds-button_brand" action="{!saveSettingSection}" status="assign-action-status"/>   
-                                                                            <apex:commandButton value="Cancel" styleClass="slds-button slds-button_neutral" action="{!cancelSettingSection}" reRender="SettingSectionPanel" status="assign-action-status"/>
-                                                                        </div>  
+                                            <div class="slds-grid slds-wrap">
+                                                <div align="right" class="slds-size_1-of-1 slds-p-around_small">
+                                                    <apex:commandLink action="{!showEndpointUrlEditor}" status="action-status" reRender="availableURLs" rendered="{!NOT(isProcessorConnected)}" id="showUrlEditorBtn" styleClass="GrayLinks" oncomplete="createRemoteSiteMetadata('', '');">.</apex:commandLink>
+                                                    <apex:outputPanel id="availableURLs" layout="block">
+                                                        <apex:outputPanel layout="block" styleClass="slds-box slds-float_right" rendered="{!showEndpointURLSetting}">
+                                                            <div class="slds-form-element">
+                                                                <label class="slds-form-element__label" >Endpoint URL</label>
+                                                                <div class="slds-form-element__control">
+                                                                    <div class="slds-select_container">
+                                                                        <apex:selectList value="{!bwSetting.endpointURL}" size="1" styleClass="slds-select">
+                                                                            <apex:selectOptions value="{!AvailableEndpointURLs}" />
+                                                                        </apex:selectList>
                                                                     </div>
-                                                                </apex:outputPanel>
-                                                            </apex:outputPanel>
-                                                        </div>
-                                                        <div align="right" class="slds-size_1-of-1 slds-medium-size_3-of-6 slds-large-size_6-of-12">
-                                                            <apex:commandLink action="{!showEndpointUrlEditor}" status="action-status" reRender="availableURLs" rendered="{!NOT(isProcessorConnected)}" id="showUrlEditorBtn" styleClass="GrayLinks" oncomplete="createRemoteSiteMetadata('', '');">.</apex:commandLink>
-                                                            <apex:outputPanel id="availableURLs" layout="block">
-                                                                <apex:outputPanel layout="block" styleClass="slds-box slds-float_right" rendered="{!showEndpointURLSetting}">
-                                                                    <div class="slds-form-element">
-                                                                        <label class="slds-form-element__label" >Endpoint URL</label>
-                                                                        <div class="slds-form-element__control">
-                                                                            <div class="slds-select_container">
-                                                                                <apex:selectList value="{!bwSetting.endpointURL}" size="1" styleClass="slds-select">
-                                                                                    <apex:selectOptions value="{!AvailableEndpointURLs}" />
-                                                                                </apex:selectList>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div class="slds-m-top_small">
-                                                                        <apex:commandButton value="Save" action="{!updateEndpointUrl}" styleClass="slds-button slds-button_brand" status="action-status" id="saveEndpointURLBtn"/>
-                                                                        <apex:commandButton value="Cancel" action="{!hideEndpointUrlEditor}" reRender="availableURLs" status="action-status" styleClass="slds-button slds-button_neutral" id="CancelUrlEditorBtn"/>
-                                                                    </div>
-                                                                </apex:outputPanel>
-                                                            </apex:outputPanel>
-                                                        </div>
-                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div class="slds-m-top_small">
+                                                                <apex:commandButton value="Save" action="{!updateEndpointUrl}" styleClass="slds-button slds-button_brand" status="action-status" id="saveEndpointURLBtn"/>
+                                                                <apex:commandButton value="Cancel" action="{!hideEndpointUrlEditor}" reRender="availableURLs" status="action-status" styleClass="slds-button slds-button_neutral" id="CancelUrlEditorBtn"/>
+                                                            </div>
+                                                        </apex:outputPanel>
+                                                    </apex:outputPanel>
+                                                </div>
                                             </div>
                                             <div class="form_key"></div>
                                             
@@ -2056,7 +2029,7 @@
                                                     </table>
                                                 </div>
                                             </apex:outputPanel>
-                                            <apex:outputPanel layout="block" rendered="{!isProcessorConnected && isBreadwinnerAdministrator && showGeneralSection}">
+                                            <apex:outputPanel layout="block" rendered="{!isBreadwinnerAdministrator && showGeneralSection}">
                                                 <h3 class="slds-section-title_divider slds-m-bottom_small slds-m-top_medium">Scheduled Jobs Status</h3>
                                                 <div class="slds-m-horizontal_xx-small">
                                                     <apex:outputPanel layout="block" styleclass="slds-m-horizontal_medium slds-m-bottom_small">
@@ -2084,8 +2057,29 @@
                                                     </apex:commandButton>
                                                     <apex:commandButton id="restartHistoricalSync" value="Restart Historical Sync" action="{!restartWeeklySync}" oncomplete="showModal('restartSyncModel','backdropRestart','restartModalContent','{!IF(isBatchStarted,'Historical Sync is started now.','Historical Sync is already running. Please try again later.')}');" status="assign-action-status" styleClass="slds-button slds-button_outline-brand slds-m-top_small slds-m-left_xx-small slds-m-right_small" reRender="nothing" >
                                                     </apex:commandButton>
-                                                    <apex:commandButton id="restartHourlySync" value="Restart Regular Sync" action="{!rescheduleHourlySync}"  oncomplete="showModal('restartSyncModel','backdropRestart','restartModalContent','Hourly Sync batches will be rescheduled now.');" status="assign-action-status" styleClass="slds-button slds-button_outline-brand slds-m-top_small slds-m-right_x-small" reRender="nothing" />
-                                                    <apex:commandButton id="restartBBHourlySync" value="Restart Billing Regular Sync" action="{!rescheduleBillingHourlySync}"  oncomplete="showModal('restartSyncModel','backdropRestart','restartModalContent','Billing Hourly Sync batches will be rescheduled now.');" status="assign-action-status" styleClass="slds-button slds-button_outline-brand slds-m-top_small slds-m-right_x-small" reRender="nothing" rendered="{!isBreadwinnerBillingInstalled}" />
+                                                    <apex:commandButton id="restartRegularSync" value="Restart Regular Sync" action="{!rescheduleRegularSync}"  oncomplete="showModal('restartSyncModel','backdropRestart','restartModalContent','Regular Sync batches will be rescheduled now.');" status="assign-action-status" styleClass="slds-button slds-button_outline-brand slds-m-top_small slds-m-right_x-small" reRender="nothing" />
+                                                    <apex:commandButton id="restartBBRegularSync" value="Restart Billing Regular Sync" action="{!rescheduleBillingRegularSync}"  oncomplete="showModal('restartSyncModel','backdropRestart','restartModalContent','Billing Regular Sync batches will be rescheduled now.');" status="assign-action-status" styleClass="slds-button slds-button_outline-brand slds-m-top_small slds-m-right_x-small" reRender="nothing" rendered="{!isBreadwinnerBillingInstalled}" />
+                                                    <div id="LightningComponentid" />    
+    <script>
+    try{
+        console.log('Entered the component method');
+        console.log('Entered the component method2');
+        $Lightning.use("testBWP002:RestartSyncsApp", function() {
+            console.log('Entered the component method4');
+            $Lightning.createComponent("testBWP002:restartSyncsCmp",
+            { 
+            },
+            "LightningComponentid",
+            function(cmp) {
+                console.log('Entered the component method3');
+                console.log('LWC Componenet added in VF page');
+            });
+        });
+    }
+    catch(ex){
+        console.log('Exception while loading the Component :::: ',ex.message);
+    }
+    </script>
                                                 </apex:outputPanel>
                                                 
                                             </apex:outputPanel>
@@ -2135,10 +2129,10 @@
                                             <apex:outputPanel layout="block" styleClass="slds-m-around_small" rendered="{!NOT(isProcessorConnected)}">
                                                 <apex:pageMessage severity="WARNING" summary="Please connect to a Payment Processor from the Setup section of Breadwinner tab."/>
                                             </apex:outputPanel>
-                                            <apex:outputPanel style='display:{!if(AND(isMultiProcessorEnabled, appConfigList!=NULL, appConfigList.size>1),"block","none")}'>
+                                            <apex:outputPanel style='display:{!if(AND(isBreadwinnerAdministrator, appConfigList.size>1),"block","none")}'>
                                                 <div class="slds-tabs_default">
                                                     <ul class="slds-tabs_default__nav slds-m-bottom_medium slds-m-top_medium" role="tablist">
-                                                        <apex:variable value="{!2}" var="i" rendered="{!IF(AND(appConfigList!=NULL, isBreadwinnerAdministrator),true,false)}">
+                                                        <apex:variable value="{!2}" var="i">
                                                             <apex:repeat value="{!appConfigList}" var="a">
                                                                 <li class="slds-tabs_default__item slds-text-heading_label slds-truncate" title="{!a.accountName}" role="presentation" style='display:{!if(i<=3,"block","none")}'>
                                                                     <a class="slds-tabs_default__link " href="javascript:void(0);" style="text-decoration: none;" role="tab" tabindex="0" aria-selected="false" aria-controls="{!a.accountId}" id="{!a.accountId}__processor" onclick="TroubleshootselectTab(this,'{!JSENCODE(a.accountId)}',null);">

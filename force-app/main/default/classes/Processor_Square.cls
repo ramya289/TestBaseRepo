@@ -344,7 +344,6 @@ public with sharing class Processor_Square  extends Processor {
         catch (Exception ex) {
             response.errors.add(new ProcessorUtil.Error('Exception Occurred','An Exception occurred while charging. ' + ex.getMessage()));
             System.debug('Exception occurred while charging' + ex.getStackTraceString());
-            APICallHandler.userInteractionLogPush(FALSE, 'Create Square Payment', 'ERROR', 'Exception: '+ex.getMessage());
         }
         return response;
     }
@@ -1252,9 +1251,7 @@ public with sharing class Processor_Square  extends Processor {
                 }
             }
         }
-        if(!squareIdCustomerMap.isEmpty()){
-            returnprocessorToCustomerMap.put(ProcessorUtil.PAT_SQUARE, squareIdCustomerMap);
-        }
+        returnprocessorToCustomerMap.put(ProcessorUtil.PAT_SQUARE, squareIdCustomerMap);
         return returnprocessorToCustomerMap;
     }
 

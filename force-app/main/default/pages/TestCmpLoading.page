@@ -1,0 +1,24 @@
+<apex:page showHeader="false" sidebar="false">
+    <apex:includeLightning />    
+    <div id="LightningComponentid" />    
+    <script>
+    try{
+        console.log('Entered the component method');
+        console.log('Entered the component method2');
+        $Lightning.use("testBWP002:RestartSyncsApp", function() {
+            console.log('Entered the component method4');
+            $Lightning.createComponent("testBWP002:restartSyncsCmp",
+            { 
+            },
+            "LightningComponentid",
+            function(cmp) {
+                console.log('Entered the component method3');
+                console.log('LWC Componenet added in VF page');
+            });
+        });
+    }
+    catch(ex){
+        console.log('Exception while loading the Component :::: ',ex.message);
+    }
+    </script>
+</apex:page>

@@ -15,7 +15,7 @@ public class CustomURLGeneratorController {
     public string payment_description                        {get; set;}
     public string url                                        {get; set;}  
     public Boolean showURLBlock                              {get; private set;}
-    public Boolean isCustomerMatchTypeAccount                {get; private set;}
+    public String customerMatchType                          {get; private set;}
     public Boolean isProcessorConnected                      {get; private set;}
     private Set<String> breadwinnerObjectNameSet;
     
@@ -24,20 +24,17 @@ public class CustomURLGeneratorController {
         showFieldsMapping = False;
         isProcessorConnected = False;
         breadwinnerObjectNameSet = new Set<String>{'BWP_Customer__c', 'BWP_Payment_Method__c', 'BWP_Transaction__c' };
-        accountReferenceFields = new List<SelectOption>();
-        contactReferenceFields = new List<SelectOption>();
-        sobjectTextFields = new List<SelectOption>();
-        sobjectNumberFields = new List<SelectOption>();
         
         objectNames = fetchObjects();
         
         List<BWP_Processor_Config__c> payConfigList = BreadwinnerUtil.processorConfigList;
         if(!(payConfigList?.isEmpty())){
-            if(payConfigList[0].Customer_Match_Type__c == ProcessorUtil.CMT_ACCOUNT) isCustomerMatchTypeAccount = True;
-            else isCustomerMatchTypeAccount = False;
+            customerMatchType = payConfigList[0].Customer_Match_Type__c;
             isProcessorConnected = True;
         }
         else ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.WARNING,' Please connect to a Payment Processor from the setup section of Breadwinner tab.'));
+        customerMatchType = String.isNotBlank(customerMatchType) ? customerMatchType : ProcessorUtil.CMT_Account;
+
     }
     
     public pagereference parentObjectFields(){          
@@ -53,6 +50,10 @@ public class CustomURLGeneratorController {
                     return null;
                 }
                 showOriginatingObjects=false;
+                accountReferenceFields = new List<SelectOption>();
+                contactReferenceFields = new List<SelectOption>();
+                sobjectTextFields = new List<SelectOption>();
+                sobjectNumberFields = new List<SelectOption>();
                 for(String name : Fields){
                     Schema.DescribeFieldResult fieldDescribe = sobjFields.get(name).getDescribe();
                     string FieldLabel = fieldDescribe.getLabel();
@@ -85,8 +86,7 @@ public class CustomURLGeneratorController {
     
     public PageReference generateURL() {
         if(string.isBlank(parent_object_reference)){
-            String customerMatchType = isCustomerMatchTypeAccount ? ProcessorUtil.CMT_ACCOUNT : ProcessorUtil.CMT_CONTACT;
-            Apexpages.addmessage(new Apexpages.Message(ApexPages.Severity.ERROR,' Please select a Parent Salesforce '+customerMatchType+' to proceed further.'));
+            Apexpages.addmessage(new Apexpages.Message(ApexPages.Severity.ERROR,' Please select Salesforce '+customerMatchType+' to proceed further.'));
             return null;
         }
         showURLBlock=true;

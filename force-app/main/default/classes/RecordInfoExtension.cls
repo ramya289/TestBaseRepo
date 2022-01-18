@@ -100,6 +100,9 @@ public with sharing class RecordInfoExtension{
     public String customermatchType                                                  {get; set;}
     public Boolean showShippingAddress                                               {get; set;}
     public String cardCreationKey                                                    {get; set;}
+    public Boolean isControlSyncStatus                                               {get; private set;}
+    public Boolean isAssociatedToSFObject                                            {get; set;}
+
     // This is used so we can dump debug statements to the screen into a hidden field
     // since we can't get debug info from the RC package.
     public String debugTextArea {get; set;}
@@ -114,7 +117,6 @@ public with sharing class RecordInfoExtension{
             appNameSpace = BreadwinnerUtil.namespace!='' ? BreadwinnerUtil.namespace+'__' : '';//BreadwinnerUtil.isBreadwinnerPaymentsInstalled ? (BreadwinnerUtil.namespace!='' ? BreadwinnerUtil.namespace+'__' : '') : '';
             bwSetting =  BreadwinnerUtil.getBWSetting();
             isBreadwinnerReadOnlyMode = bwSetting.Read_Only_Mode__c;
-            Boolean isMultiProcessorEnabled =  bwSetting.Multi_Processor_Enabled__c;
             transactionsList =new List<TransactionWrapper>();
             createdTransactionInfo = new BWP_Transaction__c();
             paymentsCardList = new List<BWP_Payment_Method__c>();
@@ -174,9 +176,10 @@ public with sharing class RecordInfoExtension{
                     customerMatchType = appC.Customer_Match_Type__c;
                 }
                 appConfigMap.put(appC.Provider_Id__c, appC);
-                if(!isMultiProcessorEnabled)
-                    break;
             }
+            customerMatchType = String.isNotBlank(customerMatchType) ? customerMatchType : ProcessorUtil.CMT_Account;
+            isControlSyncStatus = false;
+            isAssociatedToSFObject = false;
             //recordId = ApexPages.currentPage().getParameters().get('id');  
             showBWLayout = ApexPages.currentPage().getParameters().get('showBWLayout')!=null &&Boolean.valueof(ApexPages.currentPage().getParameters().get('showBWLayout'))? true:false;
             List<String> zeroDecimalCurrenciesList = BreadwinnerUtil.getZeroDecimalStripeCurrencies();
@@ -365,6 +368,32 @@ public with sharing class RecordInfoExtension{
             selectedPaymentMethod = String.isNotBlank(payMethod.Id) ? payMethod.Id : null;
         }
     }
+    public void showControlSyncStatus(){
+        isControlSyncStatus = true;
+        isAssociatedToSFObject = !(customerMatchType == ProcessorUtil.CMT_ACCOUNT ? customer.No_Associated_SF_Account__c : customer.No_Associated_SF_Contact__c);
+    }
+    public PageReference saveControlSyncStatus(){
+        try{
+            if(isAssociatedToSFObject && ((customerMatchType == ProcessorUtil.CMT_ACCOUNT && customer.Salesforce_Account__c==null) || (customerMatchType == ProcessorUtil.CMT_CONTACT && customer.Salesforce_Contact__c==null))){
+                ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.ERROR, ' You must choose a Salesforce '+customerMatchType+' to associate.'));
+            }
+            else{
+                customer.No_Associated_SF_Account__c = customerMatchType == ProcessorUtil.CMT_ACCOUNT ? !isAssociatedToSFObject : customer.No_Associated_SF_Account__c;
+                customer.No_Associated_SF_Contact__c = customerMatchType == ProcessorUtil.CMT_CONTACT ? !isAssociatedToSFObject : customer.No_Associated_SF_Contact__c;    
+                if(customer.No_Associated_SF_Account__c) customer.Salesforce_Account__c=null;
+                if(customer.No_Associated_SF_Contact__c) customer.Salesforce_Contact__c=null;
+                SecurityUtil.dmlUpdate(customer);
+                isControlSyncStatus = false;
+                return new PageReference('/' + customer.Id);
+            }
+        }
+        catch(Exception e){
+            APICallHandler.userInteractionLogPush(true, 'Control Sync Status', 'ERROR', 'Exception: '+e.getMessage());
+            ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.ERROR, ' '+e.getMessage()));
+        }
+        return null;
+    }
+    
     public void chargeCustomer(){
         //paymethod
         fetchCustomerRelatedPaymentMethods();

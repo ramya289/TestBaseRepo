@@ -35,6 +35,11 @@
             }
             </script>
             <style>
+                .slds-scope .slds-page-header{
+                border:0px;
+                border-bottom: 1px solid #d8dde6;
+                background: #f7f9fb;
+                }
                 .message {
                 background-color: inherit;
                 border-style: none;
@@ -55,7 +60,7 @@
         </head>
         <body>
             <apex:form id="theForm">
-                <div class="slds-scope slds-p-around_small" style="background-color: white;">
+                <div class="slds-scope slds-p-around_x-small" style="background-color: white;">
                     <apex:actionStatus id="action-status" layout="block">
                         <apex:facet name="start">
                             <div class="slds-spinner_container">

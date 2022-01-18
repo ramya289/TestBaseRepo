@@ -27,8 +27,7 @@ public class UnitTests {
         return configs;
     }
     
-    @namespaceAccessible
-    public static List<BWP_Processor_Config__c> instantiatePayConfig(Integer count, String paymentProcessorType) {
+    private static List<BWP_Processor_Config__c> instantiatePayConfig(Integer count, String paymentProcessorType) {
         Integer settingsCount = [SELECT COUNT() FROM Breadwinner_Settings__c LIMIT 1];
         if (settingsCount == 0) {
             createBWSetting();
@@ -350,7 +349,7 @@ public class UnitTests {
             b.appC =  UnitTests.getProcessorConfigWrapper(ProcessorUtil.PAT_STRIPE);
             b.syncProcessor = b.appC.accountId;
             b.restartHistoricalSync();
-            HourlySyncBatch runHourlSync = new HourlySyncBatch(b.syncName, new List<BreadwinnerUtil.AppConfig>{b.appC});
+            HourlySyncBatch runRegularSync = new HourlySyncBatch(b.syncName, new List<BreadwinnerUtil.AppConfig>{b.appC});
             
             
             System.assert([Select Id from BWP_Customer__c].size() == 0);
@@ -388,7 +387,7 @@ public class UnitTests {
         System.assertEquals(createdVia, 'Historical Sync');
     }
     @IsTest
-    private static void coverCreatedViaMethod_When_CRCV_HourlySync(){
+    private static void coverCreatedViaMethod_When_CRCV_RegularSync(){
         String createdVia = BreadwinnerUtil.getCreatedViaValue(BreadwinnerUtil.CNTX_HOUR_SYNC);
         System.assertEquals(createdVia, 'Regular Sync');
     }
@@ -433,7 +432,7 @@ public class UnitTests {
             BreadwinnerController b = new BreadwinnerController();
             Test.startTest();
             String jobId = System.schedule('ScheduleApexClassTest',  CRON_EXP, new breadwinnerMonitor());
-            b.rescheduleHourlySync();
+            b.rescheduleRegularSync();
             BreadwinnerController.checkAndScheduleBreadwinnerMonitor();
             Test.stopTest();
         }
@@ -548,8 +547,6 @@ public class UnitTests {
             bc.initializeApp();
             bc.getAvailableEndpointURLs();
             bc.refreshAppConfig();
-            bc.showEditSettingSection();
-            bc.saveSettingSection();
             bc.getPaymentProcessorsList();
             bc.restartHistoricalSync();
             bc.restartWeeklySync();
@@ -747,7 +744,6 @@ public class UnitTests {
         System.runAs(adminUser){
             BreadwinnerController bwCon = new BreadwinnerController();
             bwCon.rerenderThisPage();
-            bwCon.cancelSettingSection();
             BreadwinnerController.createService();
         }
     }

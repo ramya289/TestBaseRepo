@@ -14,7 +14,7 @@ public with sharing class CustomerOperationsController {
     public BreadwinnerUtil.AppConfig appC                                        {get;set;}
     public Transient Map<String, String> mapProcessorCustIdAndDefaultAction      {get; set;}
     Map<String,Integer> suggestedMatchPriorityMap;
-    public Map<String,BWP_Customer__c> mapProcessorRefIdManualMatchLookupSelector{get; set;}
+    public Map<String,BWP_Customer__c> mapProcessorRefIdSfRecord                 {get; set;}
     public String jsonUserSelectedActions                                        {get; set;}
     public Set<String> processorCustIdSet                                        {get; set;}
     public Integer selectedPageNumber                                            {get; set;}
@@ -64,7 +64,7 @@ public with sharing class CustomerOperationsController {
         referenceIdListForCreateNew = new List<String>();
         mapofContacts=New Map<String, List<Contact>>();
         processorCustIdSet = new Set<String>();
-        mapProcessorRefIdManualMatchLookupSelector = new Map<String,BWP_Customer__c>();
+        mapProcessorRefIdSfRecord = new Map<String,BWP_Customer__c>();
         sfMode = BreadwinnerUtil.isLightning() ? 'lightning' : 'classic'; 
         breadwinnerPageName = BreadwinnerUtil.namespaceApi + 'BreadwinnerPayments';
         if(canPerformBreadwinnerOperations) {
@@ -97,13 +97,13 @@ public with sharing class CustomerOperationsController {
         cPageNo++;
         
         for(String referenceId : mapProcessorCustIdAndObjectCopy.keySet()) {
-            mapProcessorRefIdManualMatchLookupSelector.put(referenceId,new BWP_Customer__c());
+            mapProcessorRefIdSfRecord.put(referenceId,new BWP_Customer__c());
         }
     }
     
     public void fetchProcessorCustomers() {
         exceptionMessage = '';
-        mapProcessorRefIdManualMatchLookupSelector = new Map<String,BWP_Customer__c>();
+        mapProcessorRefIdSfRecord = new Map<String,BWP_Customer__c>();
         try {
             if(appConfig != Null) {
                 customerNo = 0;
@@ -378,7 +378,7 @@ public with sharing class CustomerOperationsController {
             exceptionMessage ='';
             Map<String, SObject> mapStrCusRefIdAndSFRecordInsert = new Map<String, SObject>();
             Map<String,RecordMatchWrapper> mapProcessorCustRefIdAndSFRecordBackupForCreateNew = new Map<String,RecordMatchWrapper>();
-            Map<String,BWP_Customer__c> mapProcessorRefIdManualMatchLookupSelectorBackup = new Map<String,BWP_Customer__c>(mapProcessorRefIdManualMatchLookupSelector);
+            Map<String,BWP_Customer__c> mapProcessorRefIdManualMatchLookupSelectorBackup = new Map<String,BWP_Customer__c>(mapProcessorRefIdSfRecord);
             Integer suggestedMatchCount = 0;
             Integer manualMatchCount = 0;
             Integer createNewCount = 0;
@@ -394,10 +394,18 @@ public with sharing class CustomerOperationsController {
                     RecordMatchWrapper aw = new RecordMatchWrapper();
                     SObject sfObj = getObjectWrapper(selectedMatchType, mapStrCustIdAndSFRecord.get(processorCustRefId));
                     aw = mapProcessorCustIdAndObjectCopy.get(processorCustRefId);
-
+                    BWP_Customer__c cust = mapProcessorRefIdSfRecord.get(processorCustRefId);
                     // Create New
                     if(action.equalsIgnoreCase(ProcessorUtil.CMO_CREATE_NEW) && aw != Null) {
                         createNewCount++;
+                        if(cust != null){
+                            if(selectedMatchType == ProcessorUtil.CMT_ACCOUNT && String.isNotBlank(cust.Name)){
+                                aw.name = cust.Name;
+                            }
+                            else if(selectedMatchType == ProcessorUtil.CMT_CONTACT && String.isNotBlank(cust.Last_Name__c)){
+                                aw.lastname = cust.Last_Name__c;
+                            }
+                        }
                         mapProcessorCustRefIdAndSFRecordBackupForCreateNew.put(processorCustRefId,aw );
                         mapStrCusRefIdAndSFRecordInsert.put(processorCustRefId, getObjectWrapper(selectedMatchType, aw));
                         referenceIdListForCreateNew.add(processorCustRefId);
@@ -496,7 +504,7 @@ public with sharing class CustomerOperationsController {
                                 if(mapProcessorCustRefIdAndSFRecordBackupForCreateNew.containsKey(tempRefId)) {
                                     RecordMatchWrapper awTemp = mapProcessorCustRefIdAndSFRecordBackupForCreateNew.get(tempRefId);
                                     awTemp.isUnableToCreateAccount = True;
-                                    awTemp.errorMessage = String.valueOf(firstError.getStatusCode())+' '+firstError.getMessage();
+                                    awTemp.errorMessage = String.valueOf(firstError.getMessage());
                                 }
                             }
                         }
@@ -542,8 +550,7 @@ public with sharing class CustomerOperationsController {
                     if(!mapProcessorCustIdAndObjectCopy.containsKey(refId)) {
                         failedRecordsIdList.add(refId);
                         mapProcessorCustIdAndObjectCopy.put(refId,fetchedProcessorCustomer);
-                        system.debug('Account failed:::'+fetchedProcessorCustomer);
-                        mapProcessorRefIdManualMatchLookupSelector.put(refId,new BWP_Customer__c());
+                        mapProcessorRefIdSfRecord.put(refId,new BWP_Customer__c());
                         processorCustIdSet.add(refId);
                     }
                 }
@@ -571,7 +578,7 @@ public with sharing class CustomerOperationsController {
             BreadwinnerUtil.isBreadwinnerTransaction = true;
             SecurityUtil.dmlUpdate(appConfig);
             restartHistoricalSync();
-            HourlySyncBatch.scheduleBreadwinnerHourlySync(15, true);
+            HourlySyncBatch.scheduleBreadwinnerRegularSync(15, true);
             APICallHandler.userInteractionLogPush(FALSE, 'Customers Matching', 'Success' ,  'BWP Customers to Salesforce Accounts Mapping is done');
         }
         else{

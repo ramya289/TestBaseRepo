@@ -60,7 +60,7 @@
             
             function message() {
                 j$(".infoM6, .infoM4, .infoM3, .infoM2, .infoS1").addClass("slds-notify slds-notify_alert slds-theme_info slds-text-align_left slds-text-heading_small").css( {"font-weight":"500","line-height":"1.4","word-spacing":"1px","display":"block", "background":"rgba(84,105,141,.95)"} );
-                j$(".errorM6, .errorM4, .errorM3, .errorM2, .errorS1").addClass("slds-notify slds-notify_alert slds-theme_error slds-text-align_left slds-text-heading_small slds-m-top_xxx-small slds-m-bottom_xx-small").css({"font-weight":"500","line-height":"1.4","word-spacing":"1px","display":"block"});
+                j$(".errorM6, .errorM4, .errorM3, .errorM2, .errorS1").addClass("slds-notify slds-notify_alert slds-theme_error slds-text-align_left slds-text-heading_small slds-m-top_xxx-small").css({"font-weight":"500","line-height":"1.4","word-spacing":"1px","display":"block"});
                 j$(".warningM6, .warningM4, .warningM3, .warningM2, .warningS1").addClass("slds-notify slds-notify_alert slds-theme_warning slds-text-align_left slds-text-heading_small slds-m-top_small").css( {"font-weight":"500","line-height":"1.4","word-spacing":"1px","display":"block"} ) ;
                 j$(".confirmM6, .confirmM4, .confirmM3, .confirmM2, .confirmS1").addClass("slds-notify slds-notify_alert slds-theme_success slds-text-align_left slds-text-heading_small").css( {"font-weight":"500","line-height":"1.4","word-spacing":"1px","display":"block"} ) ;
                 
@@ -629,9 +629,6 @@
                 margin-top: 0rem !important;
                 margin-bottom: 0rem !important;
                 }
-                .slds-scope .slds-page-header {
-                padding: 0rem!important;
-                }
                 .slds-scope .slds-modal__container {
                 z-index: 9999;
                 }
@@ -645,7 +642,7 @@
                 background-color: inherit;
                 border-style: none;
                 padding: initial;
-                margin: 0px !important;
+                margin: 0px;
                 }
                 
                 table.messageTable td {
@@ -707,11 +704,11 @@
                             </table>
                         </div>
                     </apex:outputPanel>
-                    <apex:outputPanel rendered="{!AND(showBWLayout,NOT(ISNULL(customer.id)))}" layout="block" styleClass="{!IF(isLightning,'slds-p-around_small slds-brand-band slds-brand-band_cover slds-brand-band_medium','')}">
+                    <apex:outputPanel rendered="{!AND(showBWLayout,NOT(isControlSyncStatus),NOT(ISNULL(customer.id)))}" layout="block" styleClass="{!IF(isLightning,'slds-p-around_small slds-brand-band slds-brand-band_cover slds-brand-band_medium','')}">
                         <!--------- Page Header section starts -------------------------->
                         <div class="slds-card slds-p-bottom_none slds-m-bottom_xx-small">
                             <div class="slds-card__header slds-m-bottom_none" style="background: rgb(243, 242, 242);">
-                                <div class="slds-page-header slds-grid slds-wrap" role="banner">
+                                <div class="slds-grid slds-wrap" role="banner">
                                     <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-1 slds-large-size_4-of-12">
                                         <div class="slds-media slds-media_center slds-has-flexi-truncate">
                                             <div class="slds-media__figure">
@@ -750,6 +747,9 @@
                                                 <div class="slds-col paddingtop">
                                                     <apex:commandButton id="createPayment" status="assign-action-status" rendered="{!canCreateTransaction}" value="Charge this Customer" action="{!renderpage}" onclick="showModal('tsModal','tsBackdrop','deleteMessage','payment');rerenderPaymentValues();message();" oncomplete="message();" styleClass="slds-button slds-button_brand slds-m-top_x-small slds-m-right_x-small" reRender="chargeSection,paymentButtonsSection, chargeAmount" disabled="{!OR(!isCustomerRelatedOrgConnected, allPaymentsMethodsList.size == 0)}" />
                                                 </div>
+                                                <div class="slds-col paddingtop">
+                                                    <apex:commandButton id="controlSync" status="assign-action-status" value="Control Sync Status" action="{!showControlSyncStatus}" oncomplete="message();" styleClass="slds-button slds-button_brand slds-m-top_x-small slds-m-right_x-small" reRender="formId" disabled="{!!isCustomerRelatedOrgConnected}" />
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -757,7 +757,7 @@
                             </div>
                             <div>
                                 <apex:outputPanel layout="block" styleClass="slds-card__footer slds-m-top_none" style="text-align:left;" rendered="{!customer.Processor_Type__c != 'Authorize.Net'}">
-                                    <p>Customer was created on &nbsp;
+                                    <p>Customer was created on&nbsp;
                                         <apex:outputField value="{!customer.Created_Date_in_Processor__c}" />
                                     </p>
                                 </apex:outputPanel>
@@ -769,7 +769,7 @@
                         <apex:outputPanel id="editCustomerModalSection">
                             <div id="ceModal" class="slds-modal slds-modal_x-small" aria-hidden="false" role="dialog">
                                 <div class="slds-modal__container" >
-                                     <div class="slds-modal__header">
+                                    <div class="slds-modal__header">
                                                 <button class="slds-button slds-button_icon-inverse slds-modal__close" type="button" onclick="closeModal('ceModal','ceBackdrop');resetEditCustomerValues();">
                                                     <svg aria-hidden="true" class="slds-button__icon slds-button__icon_large" >
                                                         <use xlink:href="{!URLFOR($Asset.SLDS, 'assets/icons/action-sprite/svg/symbols.svg#close')}" ></use>
@@ -789,7 +789,7 @@
                                             <apex:outputPanel rendered="{!customer.Processor_Type__c == 'Stripe'}">
                                                 <label class="slds-form-element__label" >{!$ObjectType.BWP_Customer__c.fields.Customer_Name__c.label}</label>
                                                 <div class="slds-form-element__control ceValue">
-                                                    <apex:inputField id="customerName" value="{!customer.Customer_Name__c}" styleClass="slds-input"/>  
+                                                    <apex:inputText id="customerName" value="{!customer.Customer_Name__c}" styleClass="slds-input"/>  
                                                 </div>
                                             </apex:outputPanel>
                                             <apex:outputPanel rendered="{!OR(customer.Processor_Type__c == 'Braintree', customer.Processor_Type__c == 'Square')}">
@@ -910,7 +910,7 @@
                                                     <apex:outputPanel rendered="{!customer.Processor_Type__c == 'Stripe'}">     
                                                         <div id="card-element" style="border: 1px solid rgb(221, 219, 218);margin-top: 1.0rem;"/>     <!-- Add Card Details here  -->
                                                         <div id="card-errors"  style="padding-top:10px; color:red;"/>    <!-- display card errors here  -->
-                                                       
+                                                    
                                                         <div id="moreoptions">
                                                             <div class="slds-section" id="moreOptionsSectionHeader">
                                                                 <h3 class="slds-section__title ">
@@ -1117,7 +1117,7 @@
                                                         </div>
                                                     </div>
                                                     <div class="slds-form-element">
-                                                         <label class="slds-form-element__label" for="RoutingNumber">Routing Number</label>
+                                                        <label class="slds-form-element__label" for="RoutingNumber">Routing Number</label>
                                                         <div class="slds-form-element__control ">
                                                             <apex:inputText value="{!bankPMRoutingNumber}" styleClass="slds-input" id="braintreeRoutingNumber"/>
                                                         </div>
@@ -1543,7 +1543,7 @@
                                                 </svg>
                                                 Additional Information
                                             </button>
-                                           
+                                        
                                             <!--button class="slds-button slds-section__title-action salesOrderIcon"  type="button" onclick="showHideSectionConent('SectionHeader','addSection');">
                                                 <svg aria-hidden="true" class="slds-section__title-action-icon slds-button__icon slds-button__icon_left ">
                                                     <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="{!URLFOR($Asset.SLDS, '/assets/icons/utility-sprite/svg/symbols.svg#switch')}"></use>
@@ -1777,6 +1777,80 @@
                                 <!-- Payments Section ends -->
                         </apex:outputPanel>
                     </apex:outputPanel>
+                    <!-- Control Sync Status Section starts -->
+                    <apex:outputPanel id="controlSyncStatusSection" >
+                        <apex:outputPanel rendered="{!isControlSyncStatus}" layout="block" styleClass="{!IF(isLightning,'slds-p-around_small','')}">
+                            <apex:outputPanel rendered="{!isLightning}">
+                                <script>
+                                    document.getElementsByTagName('body')[0].style.background = 'white';
+                                </script>
+                            </apex:outputPanel>
+                            <script>
+                                //adding css 
+                                j$('[id$=SFAccount]').addClass("slds-select");
+                                j$('[id$=SFContact]').addClass("slds-select");
+                                // avoid enter key press
+                                j$('form input').on('keypress', function(e) {
+                                    return e.which !== 13;
+                                });
+                            </script>
+                            <div class="slds-page-header slds-m-bottom_small" role="banner">
+                                <div class="slds-media__body">
+                                    <p class="slds-page-header__title slds-truncate slds-align-middle">Change Payments Customer Sync Status</p>
+                                    <p class="slds-text-body_small">Breadwinner • Payments </p>
+                                </div>
+                            </div>
+                            <apex:pageMessages escape="false" id="pMsgs"/>
+                            <div class="slds-box slds-m-top_small">
+                                <div class="slds-section slds-is-open">
+                                    <h3 class="slds-section__title slds-theme_shade">
+                                        <span class="slds-truncate slds-p-horizontal_small">Associated Salesforce {!customerMatchType}</span>
+                                    </h3>
+                                    <div class="slds-section__content slds-p-horizontal_small">
+                                        <table Class="slds-table slds-no-row-hover slds-max-medium-table_stacked-horizontal">
+                                            <tr>
+                                                <td style="width:50%;vertical-align:middle">
+                                                    <div class="slds-text-heading_small" >Associate&nbsp;<apex:outputText value="{!customer.Name}" style="color: blue;"/> with a Salesforce {!customerMatchType}? </div>
+                                                </td>
+                                                <td style="vertical-align:middle">
+                                                    <div class="slds-form-element">
+                                                        <label class="slds-checkbox_toggle slds-grid">
+                                                            <apex:inputCheckbox id="checkbox-toggle-1" value="{!isAssociatedToSFObject}" >
+                                                                <apex:actionSupport event="onchange" status="assign-action-status" reRender="controlSyncStatusSection" />
+                                                            </apex:inputCheckbox>
+                                                            <span class="slds-checkbox_faux_container" aria-live="assertive">
+                                                                <span class="slds-checkbox_faux"></span>
+                                                                <span class="slds-checkbox_on">Associate</span>
+                                                                <span class="slds-checkbox_off">Do not associate</span>
+                                                            </span>
+                                                        </label>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <tr style="display: {!IF(isAssociatedToSFObject,'contents','none')}">
+                                                <td style="width:50%;vertical-align:middle">
+                                                    <apex:outputPanel id="associatedText">
+                                                        <apex:outputtext >
+                                                            <div class="slds-text-heading_small">Please choose the Salesforce {!customerMatchType}</div>
+                                                        </apex:outputtext>
+                                                    </apex:outputPanel>
+                                                </td>
+                                                <td style="vertical-align:middle">
+                                                    <apex:inputfield id="SFAccount" value="{!Customer.Salesforce_Account__c}" styleclass="slds-text-heading_small" style="width:200px;" rendered="{!customerMatchType == 'Account'}"/>
+                                                    <apex:inputfield id="SFContact" value="{!Customer.Salesforce_Contact__c}" styleclass="slds-text-heading_small" style="width:200px;" rendered="{!customerMatchType == 'Contact'}"/>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="slds-m-top_large slds-text-heading_small" style="text-align:center;">                            
+                                <apex:commandButton value="Save"  styleClass="slds-m-top_medium slds-button slds-button_brand"  status="assign-action-status"  id="savebutton" action="{!saveControlSyncStatus}" reRender="controlSyncStatusSection" oncomplete="message();"/>
+                                <apex:commandButton value="Cancel" styleClass="slds-m-top_medium slds-button slds-button_neutral" action="{!Cancel}"/>
+                            </div>
+                        </apex:outputPanel>
+                    </apex:outputPanel>
+                    <!-- Control Sync Status Section ends -->
 
                     <apex:inputHidden id="debugTextArea" value="{!debugTextArea}" rendered="{!isDebugMode}" />
 

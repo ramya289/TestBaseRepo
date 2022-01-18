@@ -57,6 +57,7 @@ public with sharing class ProcessorUtil {
     public static final String CHARGE_REJECTED = 'REJECTED';
     public static final String CHARGE_DECLINED = 'DECLINED';
     public static final String CHARGE_EXCEPTION = 'PAYMENTEXCEPTION';
+    public static final String CHARGE_ACTIONREQUIRED = 'REQUIRES_ACTION';
     
     // Redirect Url
     
@@ -277,7 +278,7 @@ public with sharing class ProcessorUtil {
 
     @namespaceAccessible
     public static string getLogAction(String currentRunningContext, String currentAction){
-        return (currentRunningContext == BreadwinnerUtil.CNTX_HIST_SYNC ? 'Historical Sync' : (currentRunningContext == BreadwinnerUtil.CNTX_HOUR_SYNC ? 'Hourly Sync' : currentAction));
+        return (currentRunningContext == BreadwinnerUtil.CNTX_HIST_SYNC ? 'Historical Sync' : (currentRunningContext == BreadwinnerUtil.CNTX_HOUR_SYNC ? 'Regular Sync' : currentAction));
     }
 
     /**

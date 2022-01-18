@@ -38,6 +38,7 @@ public with sharing class BreadwinnerController {
     public Boolean isUnauthorizedEndpoint        {get; private set;}
     public List<BWP_Processor_Config__c> processorConfigList {get; private set;}
     String namespacePrefix = '';
+    public String cmpNameSpacePrefix            {get; set;}
     public Boolean isBreadwinnerInstalled = false;
     
     //Auth
@@ -45,8 +46,6 @@ public with sharing class BreadwinnerController {
     public String sfMode                         {get;set;} 
     public String breadwinnerPageName            {get;set;}
     public Boolean showBWSetupContent            {get;set;} 
-    public Boolean isEditSettingSection			 {get;set;}
-    public Boolean isMultiProcessorEnabled		 {get;set;}
     public List<BreadwinnerUtil.AppConfig> appConfigList	{get;set;}
     public Map<String,Boolean> unmatchedCustomersStatusMap  {get; private set;}
     public Boolean areThereUnmatchedCustomers 				{get; private set;}
@@ -114,8 +113,7 @@ public with sharing class BreadwinnerController {
                     BreadwinnerUtil.deleteConfigsWhenSandboxRefresh();
                     refreshAppConfig();
                     APICallHandler.asyncGetSFOrgInfo();
-                }
-                else APICallHandler.AccountResponse ar = APICallHandler.SyncBreadwinnerSetting();
+                } else APICallHandler.AccountResponse ar = APICallHandler.SyncBreadwinnerSetting();
             }
             bwSettings = BreadwinnerUtil.getBWSetting();
             bwsetting = getBreadwinnerSettingWrapper(bwsettings);
@@ -153,8 +151,8 @@ public with sharing class BreadwinnerController {
         isBraintreeProduction = false;
         disconnectPaymentProcessorType = '';
         namespacePrefix = BreadwinnerUtil.namespaceApi;
+        cmpNameSpacePrefix = BreadwinnerUtil.namespace;
         isBraintreeConnected = false;
-        isEditSettingSection = false;
         syncName = '';
         processorAccountId = '';
         isCustomerMatchStarted = false;
@@ -186,19 +184,16 @@ public with sharing class BreadwinnerController {
 
         bwSettings = BreadwinnerUtil.getBWSetting();
         bwSetting  = getBreadwinnerSettingWrapper(bwSettings);
-        isMultiProcessorEnabled = bwSettings.Multi_Processor_Enabled__c;
         noOfDaysLeft = bwSettings.Date_of_Expiration__c != null ? calculateNoOfDaysLeft(String.valueOf(bwSettings.Date_of_Expiration__c)): 0;
         isAdministrator = BreadwinnerUtil.isAdministrator();
         Set<String> selectedMatchType = new Set<String>();
         for(BWP_Processor_Config__c appC : BreadwinnerUtil.processorConfigList){
-            if(appC.Is_Customer_Match_Completed__c && String.isNotBlank(appC.Customer_Match_Type__c)){
+            if(String.isNotBlank(appC.Customer_Match_Type__c)){
                 selectedMatchType.add(appC.Customer_Match_Type__c);
             }
             processorConfigList.add(appC);
             payConfigMap.put(appC.Provider_ID__c, appC);
             appConfigList.add(BreadwinnerUtil.getProcessorConfigWrapper(appC));
-            if(!isMultiProcessorEnabled)
-                break;
         }
         if(selectedMatchType.size()>1){
             ApexPages.addmessage(new ApexPages.message(ApexPages.severity.Error, ' You can only match Account or Contact, not Both'));
@@ -266,8 +261,6 @@ public with sharing class BreadwinnerController {
             for(BWP_Processor_Config__c appC : processorConfigList){
                 payConfigMap.put(appC.Name, appC);
                 appConfigList.add(BreadwinnerUtil.getProcessorConfigWrapper(appC));
-                if(!isMultiProcessorEnabled)
-                    break;
             }
             config = processorConfigList[0];
             appC = BreadwinnerUtil.getProcessorConfigWrapper(config);
@@ -335,38 +328,6 @@ public with sharing class BreadwinnerController {
         return pageRef;
     }
 
-    /*
-    * Description  - To set the Boolean variable for displaying edit setting section of multi org pop up
-    * Invoked from - "." link at the end of setup sub tab
-    */
-    public void showEditSettingSection(){
-        isEditSettingSection = true;
-    }
-     /*
-    * Description  - To insert or update the custom setting record
-    * Invoked from - Save button of multi org pop up
-    */
-    public Pagereference saveSettingSection(){
-        Breadwinner_Settings__c updatebwSettings;
-        updatebwSettings = Breadwinner_Settings__c.getAll().Values().size()>0 ? Breadwinner_Settings__c.getAll().Values().get(0) : new Breadwinner_Settings__c(Name=BreadwinnerUtil.CNTX_BW);
-        system.debug('updatebwSettings----'+updatebwSettings);
-        try{
-            updatebwSettings.Multi_Processor_Enabled__c = bwSetting.multiProcessorEnabled;
-            SecurityUtil.dmlUpdate(updatebwSettings);
-            Pagereference p = Page.BreadwinnerPayments;//ApexPages.currentPage();
-            p.setredirect(true);
-            return P;
-        }
-        catch(Exception e){
-            ApexPages.addmessage(new ApexPages.message(ApexPages.severity.Error, e.getMessage())); 
-            return null;                          
-        }
-        
-    }  
-    public void cancelSettingSection(){
-        isEditSettingSection = false;
-        bwSettings = Breadwinner_Settings__c.getAll().Values().size()>0 ? Breadwinner_Settings__c.getAll().Values().get(0) : new Breadwinner_Settings__c(Name=BreadwinnerUtil.CNTX_BW);
-    }
     // This Method will return list of Payment Processors
     public List<SelectOption> getPaymentProcessorsList(){
         List<SelectOption> paymentProcessorsList = new List<selectOption>();
@@ -578,29 +539,16 @@ public with sharing class BreadwinnerController {
         return null;
     }
     
-    //To reschedule all hourly sync batches.
-    public void rescheduleHourlySync(){
+    //To reschedule all Regular sync batches.
+    public void rescheduleRegularSync(){
         try{
             if(isBreadwinnerAdministrator){
-                HourlySyncBatch.scheduleBreadwinnerHourlySync(1,true);
-                APICallHandler.userInteractionLogPush(FALSE, 'Restarted Hourly Sync', 'Troubleshoot-General' , 'Restarted Hourly Sync from the Troubleshoot section of Breadwinnner tab');
+                HourlySyncBatch.scheduleBreadwinnerRegularSync(1,true);
+                APICallHandler.userInteractionLogPush(FALSE, 'Restarted Regular Sync', 'Troubleshoot-General' , 'Restarted Regular Sync from the Troubleshoot section of Breadwinnner tab');
             }
         }
         catch(exception e){
-            APICallHandler.userInteractionLogPush(FALSE, 'Restarted Hourly Sync', 'ERROR' , 'Error occurred while restarting Hourly Sync from the Troubleshoot section of Breadwinnner tab' +e);
-        }
-    }
-
-    //To reschedule all hourly sync batches.
-    public void rescheduleBillingHourlySync(){
-        try{
-            if(isBreadwinnerAdministrator){
-                Schedulable instance = (Schedulable) Type.forName('RamyaTestBWP','BillingHourlySyncBatch').newInstance();
-                APICallHandler.userInteractionLogPush(FALSE, 'Restarted Hourly Sync', 'Troubleshoot-General' , 'Restarted Billing Hourly Sync from the Troubleshoot section of Breadwinnner tab');
-            }
-        }
-        catch(exception e){
-            APICallHandler.userInteractionLogPush(FALSE, 'Restarted Hourly Sync', 'ERROR' , 'Error occurred while restarting Hourly Sync from the Troubleshoot section of Breadwinnner tab' +e);
+            APICallHandler.userInteractionLogPush(FALSE, 'Restarted Regular Sync', 'ERROR' , 'Error occurred while restarting Regular Sync from the Troubleshoot section of Breadwinnner tab' +e);
         }
     }
 
@@ -632,12 +580,26 @@ public with sharing class BreadwinnerController {
         }
     }
 
+    //To reschedule all Billing Regular sync batches.
+    public void rescheduleBillingRegularSync(){
+        try{
+            if(isBreadwinnerAdministrator){
+                Schedulable instance = (Schedulable) Type.forName(BreadwinnerUtil.namespace,'BillingRegularSyncBatch').newInstance();
+                scheduleBillingSyncs(1, true, 'BreadwinnerBillingRegularSync', 'BillingBreadwinnerSync', instance);
+                APICallHandler.userInteractionLogPush(FALSE, 'Restarted Billing Regular Sync', 'Troubleshoot-General' , 'Restarted Billing Regular Sync from the Troubleshoot section of Breadwinnner tab');
+            }
+        }
+        catch(exception e){
+            APICallHandler.userInteractionLogPush(FALSE, 'Restarted Billing Regular Sync', 'ERROR' , 'Error occurred while restarting Billing Regular Sync from the Troubleshoot section of Breadwinnner tab' +e);
+        }
+    }
+
     public void restartBillingHistoricalSync(){
         isBatchStarted = false;    
         String runningSyncName = String.isNotBlank(syncName) ? syncName : BreadwinnerUtil.OBJ_SYNC_PRODUCT;
         try {
             if(!BreadwinnerUtil.isBatchRunning(BreadwinnerUtil.CNTX_BB_HIST_SYNC)){
-                Type t = Type.forName('RamyaTestBWP','BillingHistoricalSyncBatch');
+                Type t = Type.forName(BreadwinnerUtil.namespace,'BillingHistoricalSyncBatch');
                 Schedulable instance = (Schedulable) t.newInstance();
                 Map<String, Object> variableMap = (Map<String, Object>)JSON.deserializeUntyped(JSON.serialize(instance));
                 if(BreadwinnerUtil.getBWSetting().Active__c && String.isNotBlank(syncProcessor) && appC.accountId == syncProcessor && !appC.needToReconnect && appC.accessToken != NULL) {
@@ -646,15 +608,35 @@ public with sharing class BreadwinnerController {
                 variableMap.put('runningObjectName', runningSyncName);
                 variableMap.put('runThisSyncOnly', String.isNotBlank(syncName) ? true : false);
                 instance = (Schedulable)JSON.deserialize(JSON.serialize(variableMap), t);
-
-                DateTime nextScheduleTime = System.now().addMinutes(1);
-                String CronExpression = '0 ' + nextScheduleTime.minute() + ' ' + nextScheduleTime.hour() + ' ' + nextScheduleTime.day() + ' ' + nextScheduleTime.month() + ' ? ' + nextScheduleTime.year() + ' BillingHistoricalSync';
-                System.schedule('BreadwinnerBillingHistoricalSync', CronExpression, instance);
+                scheduleBillingSyncs(1, true, 'BreadwinnerBillingHistoricalSync', 'BillingHistoricalSync', instance);
             }
             isBatchStarted = true;
             APICallHandler.userInteractionLogPush(false, 'Restarted Billing Historical '+runningSyncName+' Sync', 'Troubleshoot-'+(String.isNotBlank(syncProcessor) ? 'Connection' : 'General'), 'Restarted Billing Historical Sync from the Troubleshoot section of Breadwinnner tab '+(String.isNotBlank(syncProcessor) ? ' for Processor : '+ appC.paymentProcessorType+' ('+appC.accountName+')' : ' '));
         } catch (Exception e) {
             APICallHandler.userInteractionLogPush(FALSE, 'Restarted Billing Historical '+runningSyncName+' Sync', 'ERROR' , 'Error occurred while restarting Billing Historical Sync from the Troubleshoot section of Breadwinnner tab '+(String.isNotBlank(syncProcessor) ? ' for Processor : '+ appC.paymentProcessorType+' ('+appC.accountName+').' : '.') +e.getMessage());
+        }
+    }
+
+    public static void scheduleBillingSyncs(Integer minutes, Boolean abortExistedJobs, String jobName, String cronJobName, Schedulable instance) {
+        if(BreadwinnerUtil.isBreadwinnerAdministrator()) {
+            try {
+                List<CronTrigger> existedScheduledJobs = BreadwinnerUtil.getCronTrigger(jobName);
+
+                if(existedScheduledJobs.size()>0 && abortExistedJobs) {
+                    for(CronTrigger ct : existedScheduledJobs) {
+                        System.abortJob(ct.id); //-- Abort the pending jobs
+                    }
+                }
+                if(jobName == 'BreadwinnerBillingRegularSync') jobName = jobName + System.now();
+                if(existedScheduledJobs.size() == 0 || abortExistedJobs) {
+                    DateTime nextScheduleTime = System.now().addMinutes(minutes);
+                    String CronExpression = '0 ' + nextScheduleTime.minute() + ' ' + nextScheduleTime.hour() + ' ' + nextScheduleTime.day() + ' ' + nextScheduleTime.month() + ' ? ' + nextScheduleTime.year() + ' '+cronJobName;
+                    System.schedule(jobName, CronExpression, instance);
+                }
+            }
+            catch(Exception e) {
+                System.debug('Exception occured while scheduling Breadwinner Sync: ' + e.getMessage());
+            }
         }
     }
     
@@ -674,7 +656,7 @@ public with sharing class BreadwinnerController {
       
     public void restartScheduledJobs(){
         BreadwinnerUtil.abortAllBreadwinnerPaymentsJobs();
-        HourlySyncBatch.runHourlySyncBatch();
+        HourlySyncBatch.runRegularSyncBatch();
         HistoricalSyncBatch.runHistoricalSyncBatch('');
         HistoricalSyncBatch.scheduleWeeklyHistoricalSync();
         checkAndScheduleBreadwinnerMonitor();
@@ -1309,8 +1291,7 @@ public with sharing class BreadwinnerController {
             }
         }
         if(!exceptionMessages.isEmpty()){
-            system.debug('Exception while updating page layouts ' +exceptionMessages);
-            APICallHandler.userInteractionLogPush(TRUE, 'Page Layouts', 'ERROR', 'Exception while updating page layouts ' +exceptionMessages);
+            system.debug('Exception while updating page layouts in updateModifiedLayouts method ' +exceptionMessages);
         }
         if(!relatedListNameToFieldMap.isEmpty()){
             listOfLayoutList = removeFLS_HiddenFieldsFromLayouts(listOfLayoutList, relatedListNameToFieldMap);
@@ -1494,7 +1475,6 @@ public with sharing class BreadwinnerController {
         public String Plan_Name                        {get; set;}
         public String Status                           {get; set;}
         public Datetime Date_of_Expiration             {get; set;}
-        public Boolean multiProcessorEnabled           {get; set;}
         public Boolean activeMode                      {get; set;}
         public String endpointURL                      {get; set;}
         public Boolean pageLayoutsUpdated              {get; set;}
@@ -1517,7 +1497,6 @@ public with sharing class BreadwinnerController {
             bwSetting.Plan_Name = bws.Plan_Name__c;
             bwSetting.Status = bws.Status__c;
             bwSetting.Date_of_Expiration = bws.Date_of_Expiration__c;
-            bwSetting.multiProcessorEnabled = bws.Multi_Processor_Enabled__c;
             bwSetting.activeMode = bws.Read_Only_Mode__c ? FALSE : TRUE;
             bwSetting.endpointURL = bws.Support_URL__c;
             bwSetting.pageLayoutsUpdated = bws.Page_Layouts_Updated__c;

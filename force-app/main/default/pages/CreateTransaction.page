@@ -21,7 +21,7 @@
             function message() {
                 j$(".infoM6, .infoM4, .infoM3, .infoM2, .infoS1").addClass("slds-notify slds-notify_alert slds-theme_info slds-text-align_left slds-text-heading_small slds-m-bottom_small").css( {"font-weight":"500","line-height":"1.4","word-spacing":"1px","display":"block","background":"rgba(84,105,141,.95)"} );
                 j$(".errorM6, .errorM4, .errorM3, .errorM2, .errorS1").addClass("slds-notify slds-notify_alert slds-theme_error slds-text-align_left slds-text-heading_small slds-m-bottom_small").css({"font-weight":"500","line-height":"1.4","word-spacing":"1px","display":"block","Justify-content":"left"});
-                j$(".warningM6, .warningM4, .warningM3, .warningM2, .warningS1").addClass("slds-notify slds-notify_alert slds-theme_warning slds-text-align_left slds-text-heading_small").css( {"font-weight":"500","line-height":"1.4","word-spacing":"1px","display":"block","Justify-content":"left"} ) ;
+                j$(".warningM6, .warningM4, .warningM3, .warningM2, .warningS1").addClass("slds-notify slds-notify_alert slds-theme_warning slds-text-align_left slds-text-heading_small slds-m-bottom_small").css( {"font-weight":"500","line-height":"1.4","word-spacing":"1px","display":"block","Justify-content":"left"} ) ;
                 j$(".confirmM6, .confirmM4, .confirmM3, .confirmM2, .confirmS1").addClass("slds-notify slds-notify_alert slds-theme_success slds-text-align_left slds-text-heading_small slds-m-bottom_small").css( {"font-weight":"500","line-height":"1.4","word-spacing":"1px","display":"block"} ) ;
 
                 j$("div .messageText h4").css( "color", "white" );
@@ -286,13 +286,14 @@
                         </apex:facet>
                     </apex:actionStatus>
                     <apex:outputPanel layout="block" id="warningMsg">
-                        <apex:outputPanel layout="block" styleClass="slds-notify slds-notify_alert slds-theme_warning slds-text-align_left slds-text-heading_small" style="color:black; border-radius: 4px; display:block; font-weight:500; line-height:1.4; word-spacing:1px; Justify-content:left" rendered="{!isPaymentFromStandardNewButton}" >
+                        <apex:outputPanel layout="block" styleClass="slds-notify slds-notify_alert slds-theme_warning slds-text-align_left slds-text-heading_small" style="color:black; border-radius: 4px; display:block; font-weight:500; line-height:1.4; word-spacing:1px; Justify-content:left" rendered="{!AND(ISBLANK(testingPageException),isPaymentFromStandardNewButton)}" >
                             Please go to a Breadwinner Payments Customer or Payment Method and click the <b>Charge this Customer</b> button from that Customer / Payment Method.
                             <br/>
                             Alternatively, if this is for an entirely new Breadwinner Payments Customer, you can create a&nbsp;<apex:commandLink action="{!standardNewPaymentButtonToCreateNewCustomer}" reRender="mainPanel, warningMsg" oncomplete="reRenderHeaderSVG();">new Customer, Payment Method, and Payment</apex:commandLink>.
                         </apex:outputPanel>
                     </apex:outputPanel>
-                    <apex:outputPanel rendered="{!IF(testingPage == 'true', true, false)}" id="testingPage">
+
+                    <apex:outputPanel rendered="{!OR(testingPage == 'true',!ISBLANK(testingPageException))}" id="testingPage">
                         <!-- ---------------------------- Page Header Start ------------------------------>
                         <div class="slds-page-header slds-m-bottom_medium" role="banner">
                             <div class="slds-media slds-media_center">
@@ -342,7 +343,7 @@
                                 </tr>
                             </table>
                             <div align="center" class="slds-m-vertical_medium">
-                                <apex:commandButton styleClass="slds-button slds-button_brand" value="Next" action="{!redirectToNewTransactionPage}" status="action-status" reRender="theForm" id="goToNewTransactionPanelBtn"  />
+                                <apex:commandButton styleClass="slds-button slds-button_brand" value="Next" action="{!redirectToNewTransactionPage}" status="action-status" id="goToNewTransactionPanelBtn" disabled="{!!ISBLANK(testingPageException)}" />
                             </div>
                         </apex:outputPanel>
                     </apex:outputPanel>

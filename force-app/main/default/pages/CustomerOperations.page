@@ -84,7 +84,27 @@
                 mapRecordIdAndAction[key] = value; 
                 UpdateInfo();
             }
-            
+            // This function is to check Create New radio button automatically when input is entered
+            function checkRadioButtonForCreateNew(createNewRadioButtonId){
+                document.getElementById(createNewRadioButtonId).checked = true;        
+            }
+            // This function is to clear input field value on selecting other option
+            function clearCreateNewInputValue(key){
+                var mappingSpanId = key+'-cn-input';
+                try{
+                    var mappingSpanEle = document.getElementById(mappingSpanId);
+                        if(mappingSpanEle.getElementsByClassName("createNew")[0].value){
+                            mappingSpanEle.getElementsByClassName("createNew")[0].value = '';
+                        } 
+                        if(j$("[id$=customerCreateError]").text()){
+                            j$("[id$=customerCreateError]").text('');
+                        }
+                }
+                catch(Error){
+                    console.log(Error);
+                }
+            }
+
             function clearManualMatchOnSelectingOther(key){
                 //refreshlookupPanelPanel();
                 var mappingSpanId = key+'-mm-lookup';
@@ -295,7 +315,7 @@
                                                                 <table style="width: 100%;">
                                                                     <tr>
                                                                         <td style="width: 3%;padding-right: 10px;">
-                                                                            <input type="radio" name="{!HTMLENCODE(refId)}" id="{!HTMLENCODE(refId)}-sm" onChange="clearManualMatchOnSelectingOther('{!JSENCODE(refId)}');pushToMapRecordIdAndAction('{!JSENCODE(refId)}', 'suggestedMatch');hideData('{!JSENCODE(refId)}');"/>
+                                                                            <input type="radio" name="{!HTMLENCODE(refId)}" id="{!HTMLENCODE(refId)}-sm" onChange="clearCreateNewInputValue('{!JSENCODE(refId)}');clearManualMatchOnSelectingOther('{!JSENCODE(refId)}');pushToMapRecordIdAndAction('{!JSENCODE(refId)}', 'suggestedMatch');hideData('{!JSENCODE(refId)}');"/>
                                                                         </td>
                                                                         <td style="width: 97%;">
                                                                             <span class="slds-radio">
@@ -333,12 +353,27 @@
                                                                     </span>
                                                                 </div>
                                                             </div>
+                                                            <apex:outputPanel layout="block" id="createNewPanel" rendered="{!(StrCustomer['name'] == '')}" >
+                                                                <apex:actionRegion>
+                                                                    <div class="slds-form-element__control slds-p-around_none slds-m-top_x-small slds-m-left_x-large" id="{!refId}-cn-input">
+                                                                        <apex:inputField value="{!mapProcessorRefIdSfRecord[refId].Name}" styleClass="createNew slds-size_1-of-2 slds-input" rendered="{!selectedMatchType == 'Account'}">
+                                                                            <apex:actionSupport event="onchange" oncomplete="checkRadioButtonForCreateNew('{!JSENCODE(refId)}-cn');clearManualMatchOnSelectingOther('{!JSENCODE(refId)}');pushToMapRecordIdAndAction('{!JSENCODE(refId)}', 'createNew');" reRender="createNewPanel,messagesSection"/>  
+                                                                        </apex:inputField>
+                                                                        <apex:inputField value="{!mapProcessorRefIdSfRecord[refId].Last_Name__c}" styleClass="createNew slds-size_1-of-2 slds-input" rendered="{!selectedMatchType == 'Contact'}"> 
+                                                                            <apex:actionSupport event="onchange" oncomplete="checkRadioButtonForCreateNew('{!JSENCODE(refId)}-cn');clearManualMatchOnSelectingOther('{!JSENCODE(refId)}');pushToMapRecordIdAndAction('{!JSENCODE(refId)}', 'createNew');" reRender="createNewPanel,messagesSection"/>  
+                                                                        </apex:inputField>
+                                                                        <apex:outputPanel layout="block" id="customerCreateError" rendered="{!AND(StrCustomer.isUnableToCreateAccount, actionByDefault=='createNew')}">
+                                                                            <p style="background-color: white; color: red;">{!HTMLENCODE(StrCustomer.errorMessage)}</p>  
+                                                                        </apex:outputPanel>
+                                                                    </div>
+                                                                </apex:actionRegion>
+                                                            </apex:outputPanel>
                                                         </div>
                                                         <!-- Manual Match -->
                                                         <div class="slds-m-top_x-small">
                                                             <div class="slds-clearfix" style="display: inline-flex">
                                                                 <div class="slds-float_left" style="margin-top: 3px">
-                                                                    <input type="radio" name="{!refId}"  id="{!refId}-mm" onChange="pushToMapRecordIdAndAction('{!JSENCODE(refId)}', 'manualMatch');hideData('{!JSENCODE(refId)}');" />
+                                                                    <input type="radio" name="{!refId}"  id="{!refId}-mm" onChange="clearCreateNewInputValue('{!JSENCODE(refId)}');pushToMapRecordIdAndAction('{!JSENCODE(refId)}', 'manualMatch');hideData('{!JSENCODE(refId)}');" />
                                                                 </div>
                                                                 <div class="slds-float_left">
                                                                     <span class="slds-radio">
@@ -349,15 +384,15 @@
                                                         </div> 
                                                         <apex:outputPanel id="lookupPanel">
                                                             <apex:actionRegion >
-                                                                <div class="lookup slds-form-element__control slds-p-around_none slds-m-top_x-small" id="{!refId}-mm-lookup" style="margin-left: 2.25rem;">
+                                                                <div class="lookup slds-form-element__control slds-p-around_none slds-m-top_x-small slds-m-left_x-large" id="{!refId}-mm-lookup">
                                                                     <apex:outputPanel rendered="{!selectedMatchType == 'Account'}" >
-                                                                        <apex:inputField value="{!mapProcessorRefIdManualMatchLookupSelector[refId].Salesforce_Account__c}" id="accountLookup" styleClass="slds-size_1-of-2 slds-input" >
-                                                                            <apex:actionSupport event="onchange" oncomplete="checkRadioButtonForManualMatch('{!JSENCODE(refId)}-mm');pushToMapRecordIdAndAction('{!JSENCODE(refId)}', 'manualMatch');addallstyles();message();" reRender="lookupPanel,options,messagesSection"/>  
+                                                                        <apex:inputField value="{!mapProcessorRefIdSfRecord[refId].Salesforce_Account__c}" id="accountLookup" styleClass="slds-size_1-of-2 slds-input" >
+                                                                            <apex:actionSupport event="onchange" oncomplete="checkRadioButtonForManualMatch('{!JSENCODE(refId)}-mm');clearCreateNewInputValue('{!JSENCODE(refId)}');pushToMapRecordIdAndAction('{!JSENCODE(refId)}', 'manualMatch');addallstyles();message();" reRender="lookupPanel,options,messagesSection"/>  
                                                                         </apex:inputField>
                                                                     </apex:outputPanel>
                                                                     <apex:outputPanel rendered="{!selectedMatchType == 'Contact'}" >
-                                                                        <apex:inputField value="{!mapProcessorRefIdManualMatchLookupSelector[refId].Salesforce_Contact__c}" id="contactLookup" styleClass="slds-size_1-of-2 slds-input" >
-                                                                            <apex:actionSupport event="onchange" oncomplete="checkRadioButtonForManualMatch('{!JSENCODE(refId)}-mm');pushToMapRecordIdAndAction('{!JSENCODE(refId)}', 'manualMatch');addallstyles();message();" reRender="lookupPanel,options,messagesSection"/>  
+                                                                        <apex:inputField value="{!mapProcessorRefIdSfRecord[refId].Salesforce_Contact__c}" id="contactLookup" styleClass="slds-size_1-of-2 slds-input" >
+                                                                            <apex:actionSupport event="onchange" oncomplete="checkRadioButtonForManualMatch('{!JSENCODE(refId)}-mm');clearCreateNewInputValue('{!JSENCODE(refId)}');pushToMapRecordIdAndAction('{!JSENCODE(refId)}', 'manualMatch');addallstyles();message();" reRender="lookupPanel,options,messagesSection"/>  
                                                                         </apex:inputField>
                                                                     </apex:outputPanel>
                                                                 </div>
@@ -367,7 +402,7 @@
                                                         <div class="slds-m-top_x-small">
                                                             <div class="slds-clearfix" style="display: inline-flex">
                                                                 <div class="slds-float_left" style="margin-top: 3px">
-                                                                    <input type="radio" name="{!refId}" id="{!refId}-dn" onChange="clearManualMatchOnSelectingOther('{!JSENCODE(refId)}');pushToMapRecordIdAndAction('{!JSENCODE(refId)}', 'doNotImport');hideData('{!JSENCODE(refId)}');" />
+                                                                    <input type="radio" name="{!refId}" id="{!refId}-dn" onChange="clearCreateNewInputValue('{!JSENCODE(refId)}');clearManualMatchOnSelectingOther('{!JSENCODE(refId)}');pushToMapRecordIdAndAction('{!JSENCODE(refId)}', 'doNotImport');hideData('{!JSENCODE(refId)}');" />
                                                                 </div>
                                                                 <div class="slds-float_left">
                                                                     <span class="slds-radio">
@@ -376,10 +411,6 @@
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                        <apex:outputPanel layout="block" styleClass="slds-m-horizontal_medium errorM3" rendered="{!StrCustomer.isUnableToCreateAccount}">
-                                                            <p>Breadwinner was unable to create this {!selectedMatchType} </p>
-                                                            <p>{!HTMLENCODE(StrCustomer.errorMessage)}</p>  
-                                                        </apex:outputPanel>
                                                     </div>
                                                     <script>
                                                     if('{!JSENCODE(actionByDefault)}' == 'createNew'){
@@ -468,12 +499,12 @@
                             }
                             var infoMessage = document.getElementById('info');
                             if(newRecords>0 || matchRecords >0 || doNotImportRecords >0){
-                                var infoMessageText = 'Clicking "Next" button will create '+newRecords+' new Salesforce '+(newRecords == 1 ? '{!selectedMatchType} from {!appC.paymentProcessorType} Customers' : '{!selectedMatchType}s from {!appC.paymentProcessorType} Customers');
+                                var infoMessageText = 'Clicking "Next" button will create ' + newRecords+' new Salesforce {!selectedMatchType}'+(newRecords == 1 ? '' : 's'+' from {!appC.paymentProcessorType} Customers');
                                if(matchRecords > 0){
-                                    infoMessageText = infoMessageText+', '+(doNotImportRecords == 0 ? 'and' : '')+' will match '+matchRecords+(matchRecords == 1 ?  ' {!appC.paymentProcessorType} Customer to existing Salesforce {!selectedMatchType}' : ' {!appC.paymentProcessorType} Customers to existing Salesforce {!selectedMatchType}s');
+                                    infoMessageText += ', '+(doNotImportRecords == 0 ? 'and' : '')+' will match '+matchRecords+' {!appC.paymentProcessorType} Customer to existing Salesforce {!selectedMatchType}'+(matchRecords == 1 ?  '' : 's');
                                 }
                                 if(doNotImportRecords > 0){
-                                    infoMessageText = infoMessageText+', and will not associate '+doNotImportRecords+(doNotImportRecords == 1 ? ' {!appC.paymentProcessorType} Customer to any Salesforce {!selectedMatchType}' : ' {!appC.paymentProcessorType} Customers to any Salesforce {!selectedMatchType}s');
+                                    infoMessageText += ', and will not associate '+doNotImportRecords+' {!appC.paymentProcessorType} Customer to any Salesforce {!selectedMatchType}'+(doNotImportRecords == 1 ? '' : 's');
                                 }
                                 infoMessage.innerHTML = infoMessageText+'.';
                             }

@@ -545,7 +545,7 @@ private class Test_RecordCreationExtension {
         User adminUser =  [SELECT Id FROM User WHERE Alias = 'TestUser' LIMIT 1];
         System.runAs(adminUser){
             Test.setCurrentPage(Page.PaymentMethodRecordInfo);
-            
+            UnitTests.createPayConfig(ProcessorUtil.PAT_BRAINTREE);
             ApexPages.StandardController sc = new ApexPages.StandardController(new BWP_Transaction__c());
             RecordCreationExtension ccExt = new RecordCreationExtension(sc);
             

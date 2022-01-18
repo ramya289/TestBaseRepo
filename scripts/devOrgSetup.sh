@@ -9,8 +9,7 @@ echo "This is the bash script to create Scratch Org and Push Code"
 # Dev Hub alias name
 # If it's not connected with your CLI then run this below command
 # sfdx auth:web:login -d -a bwDevHub
-# devHub=bwDevHub
-devHub=RBWPDevHub
+devHub=BPDevHub
 
 # Dev Credentials Org alias name, this org contains Custom Metadata Records
 # If it's not connected with your CLI then run this below command

@@ -536,9 +536,15 @@ public with sharing class Processor_Stripe extends Processor {
                     System.debug('Created Stripe BankAcount Charges ' + stripeIdChargeMapResponse.keySet());
                 } else {
                     PaymentIntent responseData = (PaymentIntent) parser.readValueAs(PaymentIntent.class);
-                    Charge.StripeCharge chargeReceived = responseData.charges.data[0];
-                    stripeIdChargeMapResponse.put(chargeReceived.id, chargeReceived);
-                    System.debug('Created Stripe Card Charges ' + stripeIdChargeMapResponse.keySet());
+                    if(responseData.status == ProcessorUtil.CHARGE_ACTIONREQUIRED){
+                        response.errors.add(new ProcessorUtil.Error('','The Payment creation is failed due to 3D secure authentication. As of now, Breadwinner does not support this. Please contact Breadwinner Support for more information.'));
+                        return response;
+                    }
+                    else if(!responseData.charges.data.isEmpty() && responseData.status == ProcessorUtil.CHARGE_SUCCEEDED){
+                        Charge.StripeCharge chargeReceived = responseData.charges.data[0];
+                        stripeIdChargeMapResponse.put(chargeReceived.id, chargeReceived);
+                        System.debug('Created Stripe Card Charges ' + stripeIdChargeMapResponse.keySet());
+                    }
                 }
 
                 Map<String, Object> processorToPaymentMap = new Map<String, Object>();
@@ -568,7 +574,6 @@ public with sharing class Processor_Stripe extends Processor {
         catch (Exception ex) {
             response.errors.add(new ProcessorUtil.Error('Exception Occurred','An Exception occurred while charging. ' + ex.getMessage()));
             System.debug('Exception occurred while charging' + ex.getStackTraceString());
-            APICallHandler.userInteractionLogPush(FALSE, 'Create Stripe Payment', 'ERROR', 'Exception: '+ex.getMessage());
         }
 
         return response;
@@ -1510,15 +1515,13 @@ public with sharing class Processor_Stripe extends Processor {
                 }
             }
         }
-        if(!stripeIdCustomerMap.isEmpty()){
-            returnprocessorToCustomerMap.put(ProcessorUtil.PAT_STRIPE, stripeIdCustomerMap);
-        }
+        returnprocessorToCustomerMap.put(ProcessorUtil.PAT_STRIPE, stripeIdCustomerMap);
         return returnprocessorToCustomerMap;
     }
 
     private static String getUrlBody(Customer.StripeCustomer stripeCustomer, Boolean updatingCustomer) {
         String reqBody = '';
-		if (stripeCustomer.name != null) {
+        if (stripeCustomer.name != null) {
             reqBody += '&name=' + getURLEncodeData(stripeCustomer.name); 
         }
         if (stripeCustomer.balance != null) {
@@ -1761,6 +1764,7 @@ public with sharing class Processor_Stripe extends Processor {
         public String id;
         public String stripe_object;
         public ChargesList charges;
+        public String status;
     }
 
     private class ChargesList {

@@ -1425,10 +1425,7 @@ public with sharing class Processor_Braintree extends Processor {
                 }
             }
         }
-        if(!braintreeIdCustomerMap.isEmpty()){
-            returnProcessorToCustomerMap.put(ProcessorUtil.PAT_BRAINTREE, braintreeIdCustomerMap);
-        }
-
+        returnProcessorToCustomerMap.put(ProcessorUtil.PAT_BRAINTREE, braintreeIdCustomerMap);
         return returnProcessorToCustomerMap;
     }
 

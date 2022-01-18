@@ -55,7 +55,7 @@ public with sharing class Processor_PayPal extends Processor{
         } else {
             apcWrapper.needToReconnect = true;
             apcWrapper.requireNextPaymentSyncRun = false;
-            String Action_Type = apcWrapper.currentRunningClassContext == BreadwinnerUtil.CNTX_HIST_SYNC ? 'Historical Sync':(apcWrapper.currentRunningClassContext == BreadwinnerUtil.CNTX_HOUR_SYNC ? 'Hourly Sync':'Fetching Transactions');
+            String Action_Type = apcWrapper.currentRunningClassContext == BreadwinnerUtil.CNTX_HIST_SYNC ? 'Historical Sync':(apcWrapper.currentRunningClassContext == BreadwinnerUtil.CNTX_HOUR_SYNC ? 'Regular Sync':'Fetching Transactions');
                 APICallHandler.userInteractionLogPush(true, Action_Type, 'ERROR' , 'Response for Processor Org Name('+apcWrapper.accountName+'): Status Code: '+res.getStatusCode()+' Response Body: '+res.getBody() );
             
             JSONParser parser = JSON.createParser(res.getBody());

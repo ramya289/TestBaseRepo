@@ -40,6 +40,7 @@ public class RecordCreationExtension {
     private List<String> cURLParamsList = new List<String> {'originating_record', 'parent_id', 'payment_amount', 'payment_currency', 'payment_description'};
     private String cPageParams = '';
     public String testingPage                                                     {get; private set;}
+    public String testingPageException                                            {get; private set;}
     public sObject sObj                                                           {get; private set;}    
     public String parentField                                                     {get; private set;}
     public String paymentAmountField                                              {get; private set;}
@@ -75,7 +76,6 @@ public class RecordCreationExtension {
         private set;
     }
 
-    public String PageException                                                    {get; set;}
     
     public String selectedRecordId                                                  {get; private set;}    //useful to retrieve related Customers of a selected Account/Contact
     public Boolean notInitializedWithAccount                                        {get; set;}
@@ -147,7 +147,6 @@ public class RecordCreationExtension {
     public String selectedProcessorAccountType                                      {get; set;}
     public List<SelectOption> connectedProcessorsList                               {get; set;}
     public Boolean isProcessorConnected                                             {get; private set;}
-    public Boolean isMultiProcessorEnabled                                          {get; set;}
     public String selectedProcessorName                                             {get; set;}
     public String selectedProcessorAccountName                                      {get; set;}
     public Boolean isPaymentFromStandardNewButton                                   {get; set;}
@@ -259,7 +258,6 @@ public class RecordCreationExtension {
         }
         notInitializedWithAccount = false;
         connectedProcessorsList = new List<SelectOption>();
-        isMultiProcessorEnabled = bwSetting.Multi_Processor_Enabled__c;
         listOfPaymentMethods = new List<SelectOption>();
         isCustomerCreated = false;
         isCustomerSelected = false;
@@ -296,7 +294,6 @@ public class RecordCreationExtension {
             cardPanel = true;
             bankPanel = false;
             PMType = ProcessorUtil.PM_CARD;
-            PageException = '';
             unMatchedAccount = false;
             doNotAddPM = false;
             bankPMCountry = 'US';
@@ -385,7 +382,11 @@ public class RecordCreationExtension {
         paymentAmountField = currentPageParams.get('payment_amount');
         paymentCurrencyField = currentPageParams.get('payment_currency');
         paymentDescriptionField = currentPageParams.get('payment_description');
-
+        if(sObj.get(parentField) == null){
+            testingPageException = 'Salesforce '+customerMatchType+ ' is required to create a Transacation, Please check the mapped fields, and make sure required fields have the values.';
+            ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.WARNING,' '+testingPageException));
+            return;
+        }
         parentId = (String)sObj.get(parentField);
         if(parentId.startsWith('001') && customerMatchType == ProcessorUtil.CMT_ACCOUNT){
             newTransaction.Salesforce_Account__c = (Id)parentId;
@@ -393,10 +394,14 @@ public class RecordCreationExtension {
         else if(parentId.startsWith('003') && customerMatchType == ProcessorUtil.CMT_CONTACT){
             newTransaction.Salesforce_Contact__c = (Id)parentId;
         }
-
+        List<SelectOption> selectOptions = getCurrencies();
+        Set<String> currencySet = new Set<String>();
+        for(SelectOption so: selectOptions){
+            currencySet.add(so.getValue());
+        }
         newTransaction.Amount__c = String.isNotBlank(paymentAmountField) && Sobj.get(paymentAmountField)!=NULL ? (Decimal)sObj?.get(paymentAmountField) : 0;
         newTransaction.Description__c = String.isNotBlank(paymentDescriptionField) && Sobj.get(paymentDescriptionField)!=NULL ? (String)sObj?.get(paymentDescriptionField) : '';
-        newTransaction.Currency__c = String.isNotBlank(paymentCurrencyField) && Sobj.get(paymentCurrencyField)!=NULL ? ((String)sObj?.get(paymentCurrencyField)).toLowerCase().trim() : '';
+        newTransaction.Currency__c = String.isNotBlank(paymentCurrencyField) && (Sobj.get(paymentCurrencyField)!=NULL && currencySet.contains(((String)sObj?.get(paymentCurrencyField)).toLowerCase().trim())) ? ((String)sObj?.get(paymentCurrencyField)).toLowerCase().trim() : 'usd';
     }
     public static String getCurrentPageRecordId(){
         return (String.isNotBlank(ApexPages.currentPage().getParameters().get('recordId')) ? ApexPages.currentPage().getParameters().get('recordId') : '');
@@ -532,7 +537,7 @@ public class RecordCreationExtension {
     public List<SelectOption> getListOfPaymentMethods(String customerProcessorId){
         List<SelectOption> paymentMethods = new List<SelectOption>();
         paymentMethodsMap = new Map<String, BWP_Payment_Method__c>();
-        List<BWP_Payment_Method__c> pmList = selectorPaymentMethod.selectWhere('Customer__r.Processor_Customer_Id__c = \'' + customerProcessorId + '\'');
+        List<BWP_Payment_Method__c> pmList = selectorPaymentMethod.selectWhere('Customer__r.Processor_Customer_Id__c = \'' + customerProcessorId + '\' Order By CreatedDate ASC');
         for(BWP_Payment_Method__c paymentMethod: pmList){
             if(paymentMethod.Type__c == ProcessorUtil.PM_CARD){
                 paymentMethodsMap.put(paymentMethod.Processor_Id__c, paymentMethod);
@@ -585,7 +590,7 @@ public class RecordCreationExtension {
             }
             isChargeSuccess = ProcessorUtil.isValidResponse(response);
             if(isChargeSuccess){
-                APICallHandler.userInteractionLogPush(FALSE, 'Payment Created', ((String.isNotBlank(originatingObjName) && String.isNotBlank(originatingObjLabel)) ? (originatingObjLabel + ' (' + originatingObjName + ')') : (String.isNotBlank(selectedRecordId) ? customerMatchType : 'BWP Customer')), 'A new '+customerInfo.Processor_Type__c+' Payment is created from Breadwinner Payments');
+                APICallHandler.userInteractionLogPush(FALSE, 'Payment Created', ((String.isNotBlank(originatingObjName) && String.isNotBlank(originatingObjLabel)) ? (originatingObjLabel + ' (' + originatingObjName + ')') : (String.isNotBlank(selectedRecordId) ? customerMatchType : 'BWP Customer')), 'A new '+customerInfo.Processor_Type__c+' Payment is created in '+customerInfo.Processor_Org_Name__c+' from Breadwinner Payments');
                 List<ProcessorUtil.TransactionWrapper> transactionResp = (List<ProcessorUtil.TransactionWrapper>) response.get(ProcessorUtil.PAYMENT_RESP);
                 BWP_Transaction__c newTransaction = selectorTransaction.selectByProcessorId(new Set<String>{transactionResp[0].processorId}, null)[0];
 				return new PageReference('/' + newTransaction.Id);
@@ -596,7 +601,7 @@ public class RecordCreationExtension {
         } catch(Exception e){
             System.debug('Exception'+e.getStackTraceString());
             ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.ERROR,' '+e.getMessage()));
-            APICallHandler.userInteractionLogPush(false, 'Create Payment', 'ERROR', 'Exception: '+e.getMessage());
+            APICallHandler.userInteractionLogPush(false, 'Create Payment', 'ERROR', ' Processor Org Name: '+customerInfo.Processor_Org_Name__c+' Exception: '+e.getMessage());
         }
         return null;    
     }
@@ -725,7 +730,7 @@ public class RecordCreationExtension {
                     selectedBWPCustomer = customerInfo.Processor_Customer_Id__c;
                     selectedProcessorName = customerInfo.Processor_Org_Id__c;
                     authorizeBankMessage = authorizeBankMessage(customerInfo);
-                    APICallHandler.userInteractionLogPush(FALSE, 'Customer Created', ((String.isNotBlank(originatingObjName) && String.isNotBlank(originatingObjLabel)) ? (originatingObjLabel + ' (' + originatingObjName + ')') : (String.isNotBlank(selectedRecordId) ? customerMatchType : 'BWP Customer')), 'A new '+selectedProcessorAccountType+' Customer is created from Breadwinner Payments');
+                    APICallHandler.userInteractionLogPush(FALSE, 'Customer Created', ((String.isNotBlank(originatingObjName) && String.isNotBlank(originatingObjLabel)) ? (originatingObjLabel + ' (' + originatingObjName + ')') : (String.isNotBlank(selectedRecordId) ? customerMatchType : 'BWP Customer')), 'A new '+selectedProcessorAccountType+' Customer is created in '+customerInfo.Processor_Org_Name__c+' from Breadwinner Payments');
 
                 }
             }
@@ -736,7 +741,7 @@ public class RecordCreationExtension {
         }
         catch(exception e){
             ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.ERROR,' '+e.getMessage()));
-            APICallHandler.userInteractionLogPush(false, 'Create Customer', 'ERROR', 'Exception: '+e.getMessage());
+            APICallHandler.userInteractionLogPush(false, 'Create Customer', 'ERROR', ' Processor Org Name: '+payConfig.Account_Name__c+' Exception: '+e.getMessage());
             system.debug(e.getStackTraceString());
             return null;
         }
@@ -937,7 +942,7 @@ public class RecordCreationExtension {
             for(ProcessorUtil.PaymentMethodWrapper payMethod : payMethodList){
                 createdPayMethodIds.add(payMethod.processorId);                
             }
-            APICallHandler.userInteractionLogPush(false, 'Payment Method Created', ((String.isNotBlank(originatingObjName) && String.isNotBlank(originatingObjLabel)) ? (originatingObjLabel +' ('+originatingObjName+')') : (String.isNotBlank(selectedRecordId) ? customerMatchType : 'BWP Customer')), 'A new '+payConfig.Payment_Processor_Type__c+' Payment Method is created from Breadwinner Payments');
+            APICallHandler.userInteractionLogPush(false, 'Payment Method Created', ((String.isNotBlank(originatingObjName) && String.isNotBlank(originatingObjLabel)) ? (originatingObjLabel +' ('+originatingObjName+')') : (String.isNotBlank(selectedRecordId) ? customerMatchType : 'BWP Customer')), 'A new '+payConfig.Payment_Processor_Type__c+' Payment Method is created in '+payConfig.Account_Name__c+' from Breadwinner Payments');
             newPayMethod = selectorPaymentMethod.selectByProcessorId(createdPayMethodIds,1)[0];
             paymentMethodInfo = newPayMethod;
             selectedPaymentMethod = newPayMethod.Processor_Id__c;
@@ -1113,7 +1118,7 @@ public class RecordCreationExtension {
         catch(Exception ex){
             isBankAccountVerified = false;
             System.debug('Exception occurred while Verifying Bank Account in '+payConfig.Payment_Processor_Type__c+'.'+ex.getStackTraceString()+'\n'+ex.getmessage());
-            APICallHandler.userInteractionLogPush(false, 'Verify Bank Account', 'ERROR', 'Exception: '+ex.getMessage());
+            APICallHandler.userInteractionLogPush(false, 'Verify Bank Account', 'ERROR', ' Processor Org Name: '+payConfig.Account_Name__c+' Exception: '+ex.getMessage());
         }
         return null;
     }
@@ -1151,7 +1156,7 @@ public class RecordCreationExtension {
                 errorMessage += error.message;
                 ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.ERROR,' '+ error.message));
             }
-            APICallHandler.userInteractionLogPush(FALSE, createdInstance, 'ERROR', 'Exception: '+errorMessage);
+            APICallHandler.userInteractionLogPush(FALSE, createdInstance, 'ERROR', ' Processor Org Name: '+payConfig.Account_Name__c+' Exception: '+errorMessage);
         }
         else if (processingErrors != null){
             for (ProcessorUtil.Error error : processingErrors){
@@ -1159,11 +1164,11 @@ public class RecordCreationExtension {
             }
             if(response.get(ProcessorUtil.API_ACTION) == ProcessorUtil.ACT_CHARGE_PROCESSOR && errorMessage.contains('Read timed out')){
                 ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.ERROR,'We attempted to process the card but were unable to confirm transaction due to the following error: Read timed out'));
-                APICallHandler.userInteractionLogPush(FALSE, 'Create Payment', 'PEX', 'Exception: '+errorMessage);
+                APICallHandler.userInteractionLogPush(FALSE, 'Create Payment', 'PEX', ' Processor Org Name: '+payConfig.Account_Name__c+' Exception: '+errorMessage);
             }
             else{
                 ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.ERROR,' '+ errorMessage.capitalize()));
-                APICallHandler.userInteractionLogPush(FALSE, createdInstance, 'ERROR', 'Exception: '+errorMessage);
+                APICallHandler.userInteractionLogPush(FALSE, createdInstance, 'ERROR', ' Processor Org Name: '+payConfig.Account_Name__c+' Exception: '+errorMessage);
             }
         }
     }
@@ -1287,8 +1292,10 @@ public class RecordCreationExtension {
         transactionPage = false;
         isPaymentMethodSelected = false;
         errorMessage = '';
-        newTransaction.Amount__c = 0;
-        newTransaction.Description__c = '';
+        if(!isCustomURL){
+            newTransaction.Amount__c = 0;
+            newTransaction.Description__c = '';
+        }        
         chargeTaxAmount = 0;
         chargeIsTaxExempt = false;
         

@@ -23,19 +23,19 @@ public with sharing class BreadwinnerMonitor implements Schedulable {
             BreadwinnerUtil.deleteConfigsWhenSandboxRefresh();
             APICallHandler.asyncGetSFOrgInfo();
             //Check batches are in queue and NextFireTime is not null
-            List<CronTrigger> listCronTrigger = BreadwinnerUtil.getCronTrigger(BreadwinnerUtil.SYNC_CNTX_HOURLY);
-            Boolean scheduleHourlySync = false;
+            List<CronTrigger> listCronTrigger = BreadwinnerUtil.getCronTrigger(BreadwinnerUtil.SYNC_CNTX_REGULAR);
+            Boolean scheduleRegularSync = false;
             for(CronTrigger ct : listCronTrigger) {    
                 
                 if(ct.NextFireTime == NULL) {
                     System.abortJob(ct.Id);
-                    if(ct.CronJobDetail.Name.containsIgnoreCase(BreadwinnerUtil.SYNC_CNTX_HOURLY)) {
-                        scheduleHourlySync = true;
+                    if(ct.CronJobDetail.Name.containsIgnoreCase(BreadwinnerUtil.SYNC_CNTX_REGULAR)) {
+                        scheduleRegularSync = true;
                     }
                 }
             }
-            if(scheduleHourlySync || listCronTrigger.size() == 0) {
-                HourlySyncBatch.scheduleBreadwinnerHourlySync(15, true);
+            if(scheduleRegularSync || listCronTrigger.size() == 0) {
+                HourlySyncBatch.scheduleBreadwinnerRegularSync(15, true);
             }
             //Schedule weekly sync
             HistoricalSyncBatch.scheduleWeeklyHistoricalSync();

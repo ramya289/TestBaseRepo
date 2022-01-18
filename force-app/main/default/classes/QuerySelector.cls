@@ -36,14 +36,11 @@ public abstract with sharing class QuerySelector {
         l_throwFLSException = throwFLS;
     }
 
-    @namespaceAccessible
-    public abstract Schema.SObjectType getSObjectType();
+    @namespaceAccessible public abstract Schema.SObjectType getSObjectType();
 
-    @namespaceAccessible
-    public abstract List<Schema.SObjectField> getSObjectFieldList();
+    @namespaceAccessible public abstract List<Schema.SObjectField> getSObjectFieldList();
 
-    @namespaceAccessible
-    public abstract String getOrderBy();
+    @namespaceAccessible public abstract String getOrderBy();
 
     @namespaceAccessible
     public QueryBuilder newQueryBuilder(){

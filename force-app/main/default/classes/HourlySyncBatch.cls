@@ -1,6 +1,6 @@
 /*
 * Created By  :  Surender & Suchimitha (Dhruvsoft) 
-* Description :  This class is to run hourly sync, which will run for each 15 minutes. It also includes sources(Payment Methods),payments for each customer. 
+* Description :  This class is to run Regular sync, which will run for each 15 minutes. It also includes sources(Payment Methods),payments for each customer. 
 * Functionalities : All customers & respective payment methods, and transactions will be fetched and linked accordingly.
 */
 public with sharing class HourlySyncBatch implements Database.Batchable<BreadwinnerUtil.AppConfig>, Database.AllowsCallouts, Database.Stateful, Schedulable {
@@ -66,7 +66,7 @@ public with sharing class HourlySyncBatch implements Database.Batchable<Breadwin
                 request.put(ProcessorUtil.API_ACTION, ProcessorUtil.ACT_FETCH_CUSTOMERS_ALL);
                 if(apc.paymentProcessorType == ProcessorUtil.PAT_STRIPE){
                     Processor_Stripe.FetchRequest fetchRequest = new Processor_Stripe.FetchRequest();
-                    DateTime lastHourDateTime = apc.hourlyCustomerSyncLastRun != null ? apc.hourlyCustomerSyncLastRun.addMinutes(-20) : System.now().addMinutes(-200);
+                    DateTime lastHourDateTime = apc.regularCustomerSyncLastRun != null ? apc.regularCustomerSyncLastRun.addMinutes(-20) : System.now().addMinutes(-200);
                     fetchRequest.createdGreaterThanOrEqual = String.valueOf(lastHourDateTime);
                     if(apC.lastCustomerId != NULL){
                         fetchRequest.starting_after = apC.lastCustomerId;
@@ -76,11 +76,11 @@ public with sharing class HourlySyncBatch implements Database.Batchable<Breadwin
                 }
 
                 else if(apc.PaymentProcessorType == ProcessorUtil.PAT_BRAINTREE){
-                    Datetime hourlySyncDatetime;
+                    Datetime regularSyncDatetime;
                     String requestJSON = Processor_Braintree.getRequestBody(ProcessorUtil.ACT_FETCH_CUSTOMERS_RECENT, (String.isNotBlank(apc.lastCustomerId) ? (apc.lastCustomerId) : null));
                     String reqBodyWithFilters = '';
-                    hourlySyncDatetime = apc.hourlyCustomerSyncLastRun != null ? (apc.hourlyCustomerSyncLastRun.addMinutes(-20)) : (System.now().addMinutes(-20));
-                    reqBodyWithFilters += '"variables": { "input": { "createdAt": { "greaterThanOrEqualTo": "'+(hourlySyncDatetime.formatGmt('yyyy-MM-dd\'T\'HH:mm:ss\'+\'00:00'))+'"';
+                    regularSyncDatetime = apc.regularCustomerSyncLastRun != null ? (apc.regularCustomerSyncLastRun.addMinutes(-20)) : (System.now().addMinutes(-20));
+                    reqBodyWithFilters += '"variables": { "input": { "createdAt": { "greaterThanOrEqualTo": "'+(regularSyncDatetime.formatGmt('yyyy-MM-dd\'T\'HH:mm:ss\'+\'00:00'))+'"';
                     reqBodyWithFilters += ',"lessThanOrEqualTo": "'+(datetime.now().formatGMT('yyyy-MM-dd\'T\'HH:mm:ss\'+\'00:00'))+'"';
                     reqBodyWithFilters +=  '} } } }';
                     requestJSON += reqBodyWithFilters;
@@ -88,7 +88,7 @@ public with sharing class HourlySyncBatch implements Database.Batchable<Breadwin
                 }
                 else if(apc.PaymentProcessorType == ProcessorUtil.PAT_SQUARE){
                     Processor_Square.FetchRequest fetchRequest = new Processor_Square.FetchRequest();
-                    String beginTime = apc.hourlyCustomerSyncLastRun != null ? String.valueOf(json.serialize(apc.hourlyCustomerSyncLastRun.addMinutes(-20))) : String.valueOf(json.serialize(datetime.now().addMinutes(-200)));
+                    String beginTime = apc.regularCustomerSyncLastRun != null ? String.valueOf(json.serialize(apc.regularCustomerSyncLastRun.addMinutes(-20))) : String.valueOf(json.serialize(datetime.now().addMinutes(-200)));
                     if(apC.lastCustomerId != NULL){
                         fetchRequest.cursor = apC.lastCustomerId;
                     }
@@ -101,13 +101,13 @@ public with sharing class HourlySyncBatch implements Database.Batchable<Breadwin
                     for (ProcessorUtil.Error error : apiErrors){
                         errors += error.message;
                     }
-                    APICallHandler.userInteractionLogPush(TRUE, 'Hourly Sync', 'ERROR', 'Customer Sync Errors: ' + errors);
+                    APICallHandler.userInteractionLogPush(TRUE, 'Regular Sync', 'ERROR', 'Customer Sync Errors: ' + errors);
                 } else if (processingErrors != null){
                     for (ProcessorUtil.Error error : processingErrors){
                         errors += error.message;
                         ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.ERROR,error.code + ' '+ error.message));
                     }
-                    APICallHandler.userInteractionLogPush(TRUE, 'Hourly Sync', 'ERROR', 'Customer Sync Errors: ' + errors);
+                    APICallHandler.userInteractionLogPush(TRUE, 'Regular Sync', 'ERROR', 'Customer Sync Errors: ' + errors);
                 } else {
                     if(response.get(ProcessorUtil.RESP_JSON) != NULL){
                         if(apc.PaymentProcessorType == ProcessorUtil.PAT_STRIPE){
@@ -131,7 +131,7 @@ public with sharing class HourlySyncBatch implements Database.Batchable<Breadwin
                 request.put(ProcessorUtil.API_ACTION, ProcessorUtil.ACT_FETCH_TRANSACTIONS_ALL);
                 if(apc.paymentProcessorType == ProcessorUtil.PAT_STRIPE){
                     Processor_Stripe.FetchRequest fetchRequest = new Processor_Stripe.FetchRequest();
-                    DateTime lastHourDateTime = apc.hourlyPaymentSyncLastRun != null ? apc.hourlyPaymentSyncLastRun.addMinutes(-20) : System.now().addMinutes(-200);
+                    DateTime lastHourDateTime = apc.regularPaymentSyncLastRun != null ? apc.regularPaymentSyncLastRun.addMinutes(-20) : System.now().addMinutes(-200);
                     fetchRequest.createdGreaterThanOrEqual = String.valueOf(lastHourDateTime);
                     if(apC.lastPaymentId != NULL){
                         fetchRequest.starting_after = apC.lastPaymentId;
@@ -140,11 +140,11 @@ public with sharing class HourlySyncBatch implements Database.Batchable<Breadwin
                     request.put(ProcessorUtil.API_REQUEST_JSON, JSON.serializePretty(fetchRequest));
                 }
                 else if(apc.PaymentProcessorType == ProcessorUtil.PAT_BRAINTREE){
-                    Datetime hourlySyncDatetime;
+                    Datetime regularSyncDatetime;
                     String requestJSON = Processor_Braintree.getRequestBody(ProcessorUtil.ACT_FETCH_TRANSACTIONS_RECENT, (String.isNotBlank(apc.lastPaymentId) ? (apc.lastPaymentId) : null));
                     String reqBodyWithFilters = '';
-                    hourlySyncDatetime = apc.hourlyPaymentSyncLastRun != null ? (apc.hourlyPaymentSyncLastRun.addMinutes(-20)) : (System.now().addMinutes(-20));
-                    reqBodyWithFilters += '"variables": { "input": { "createdAt": { "greaterThanOrEqualTo": "'+(hourlySyncDatetime.formatGmt('yyyy-MM-dd\'T\'HH:mm:ss\'+\'00:00'))+'"';
+                    regularSyncDatetime = apc.regularPaymentSyncLastRun != null ? (apc.regularPaymentSyncLastRun.addMinutes(-20)) : (System.now().addMinutes(-20));
+                    reqBodyWithFilters += '"variables": { "input": { "createdAt": { "greaterThanOrEqualTo": "'+(regularSyncDatetime.formatGmt('yyyy-MM-dd\'T\'HH:mm:ss\'+\'00:00'))+'"';
                     reqBodyWithFilters += ',"lessThanOrEqualTo": "'+(datetime.now().formatGMT('yyyy-MM-dd\'T\'HH:mm:ss\'+\'00:00'))+'"';
                     reqBodyWithFilters +=  '} } } }';
                     requestJSON += reqBodyWithFilters;
@@ -152,7 +152,7 @@ public with sharing class HourlySyncBatch implements Database.Batchable<Breadwin
                 }
                 else if(apc.PaymentProcessorType == ProcessorUtil.PAT_SQUARE){
                     Processor_Square.FetchRequest fetchRequest = new Processor_Square.FetchRequest();
-                    String beginTime = apc.hourlyPaymentSyncLastRun != null ? String.valueOf(json.serialize(apc.hourlyPaymentSyncLastRun.addMinutes(-20))).remove('"') : String.valueOf(json.serialize(datetime.now().addMinutes(-200))).remove('"');
+                    String beginTime = apc.regularPaymentSyncLastRun != null ? String.valueOf(json.serialize(apc.regularPaymentSyncLastRun.addMinutes(-20))).remove('"') : String.valueOf(json.serialize(datetime.now().addMinutes(-200))).remove('"');
                     if(apC.lastCustomerId != NULL){
                         fetchRequest.cursor = apC.lastCustomerId;
                     }
@@ -161,7 +161,7 @@ public with sharing class HourlySyncBatch implements Database.Batchable<Breadwin
                     request.put(ProcessorUtil.API_REQUEST_JSON, JSON.serializePretty(fetchRequest));
                 }
               	/*else if(apc.PaymentProcessorType == ProcessorUtil.PAT_PAYPAL){
-                    String beginTime = apc.hourlyPaymentSyncLastRun != null ? String.valueOf(json.serialize(apc.hourlyPaymentSyncLastRun.addMinutes(-20))).remove('"') : String.valueOf(json.serialize(datetime.now().addMinutes(-200))).remove('"');
+                    String beginTime = apc.regularPaymentSyncLastRun != null ? String.valueOf(json.serialize(apc.regularPaymentSyncLastRun.addMinutes(-20))).remove('"') : String.valueOf(json.serialize(datetime.now().addMinutes(-200))).remove('"');
                     Processor_PayPal.FetchRequest fetchRequest = new Processor_PayPal.FetchRequest();
                     if(apC.lastPaymentId != NULL)
                         fetchRequest.lastPage = apC.lastPaymentId;
@@ -175,12 +175,12 @@ public with sharing class HourlySyncBatch implements Database.Batchable<Breadwin
                     for (ProcessorUtil.Error error : apiErrors){
                         errors += error.message;
                     }
-                    APICallHandler.userInteractionLogPush(TRUE, 'Hourly Sync', 'ERROR', 'Payment Sync Errors: ' + errors);
+                    APICallHandler.userInteractionLogPush(TRUE, 'Regular Sync', 'ERROR', 'Payment Sync Errors: ' + errors);
                 } else if (processingErrors != null){
                     for (ProcessorUtil.Error error : processingErrors){
                         errors += error.message;
                     }
-                    APICallHandler.userInteractionLogPush(TRUE, 'Hourly Sync', 'ERROR', 'Payment Sync Errors: ' + errors);
+                    APICallHandler.userInteractionLogPush(TRUE, 'Regular Sync', 'ERROR', 'Payment Sync Errors: ' + errors);
                 } else {
                     if(response.get(ProcessorUtil.RESP_JSON) != NULL){
                         if(apc.PaymentProcessorType == ProcessorUtil.PAT_STRIPE){
@@ -236,12 +236,12 @@ public with sharing class HourlySyncBatch implements Database.Batchable<Breadwin
                 if(runningObject.containsIgnoreCase(BreadwinnerUtil.OBJ_SYNC_CUSTOMER)){
                     System.debug('Customer Sync running at '+System.now());
                     if(appConfigWrapper.requireNextCustomerSyncRun && !appConfigWrapper.needToReconnect) { //if more records
-                        appConfigWrapper.isHourlyCustomerSyncDone = false;
+                        appConfigWrapper.isRegularCustomerSyncDone = false;
                         appConfigNeedToRun.add(appConfigWrapper);
                     } else if(appConfigWrapper.requireNextCustomerSyncRun && appConfigWrapper.needToReconnect) { // Failed records
                         failedAppConfigs.add(appConfigWrapper);
                     } else {
-                        APICallHandler.userInteractionLogPush(TRUE, 'Hourly Sync', 'FINISHED' , 'Object Name: Customer, Syncing Processor: '+appConfigWrapper.paymentProcessorType+' ('+appConfigWrapper.accountName+'), Requested LastSyncDateTime: '+appConfigCompleteRecord.Hourly_Customer_Sync_Last_Run__c+', CurrentPage Parsed Records: '+requestRecordsCount);
+                        APICallHandler.userInteractionLogPush(TRUE, 'Regular Sync', 'FINISHED' , 'Object Name: Customer, Syncing Processor: '+appConfigWrapper.paymentProcessorType+' ('+appConfigWrapper.accountName+'), Requested LastSyncDateTime: '+appConfigCompleteRecord.Hourly_Customer_Sync_Last_Run__c+', CurrentPage Parsed Records: '+requestRecordsCount);
                     }
                     appConfigCompleteRecord.Hourly_Customer_Sync_Last_Run__c = System.now();
                     appConfigCompleteRecord.Need_To_Reconnect__c = appConfigWrapper.needToReconnect;
@@ -251,13 +251,13 @@ public with sharing class HourlySyncBatch implements Database.Batchable<Breadwin
                     
                     if(appConfigWrapper.requireNextPaymentSyncRun && !appConfigWrapper.needToReconnect) { //if more records
                         system.debug('need transaction sync run');
-                        appConfigWrapper.isHourlyPaymentSyncDone = false;
+                        appConfigWrapper.isRegularPaymentSyncDone = false;
                         appConfigNeedToRun.add(appConfigWrapper);
                     } else if(appConfigWrapper.requireNextPaymentSyncRun && appConfigWrapper.needToReconnect) { // Failed records
                         failedAppConfigs.add(appConfigWrapper);
                     } else {
                         //appConfigCompleteRecord.Is_Hourly_Payment_Sync_Done__c = true;
-                        APICallHandler.userInteractionLogPush(TRUE, 'Hourly Sync', 'FINISHED' , 'Object Name: Payment, Syncing Processor: '+appConfigWrapper.paymentProcessorType+' ('+appConfigWrapper.accountName+'), Requested LastSyncDateTime: '+appConfigCompleteRecord.Hourly_Payment_Sync_Last_Run__c+', CurrentPage Parsed Records: '+requestRecordsCount);
+                        APICallHandler.userInteractionLogPush(TRUE, 'Regular Sync', 'FINISHED' , 'Object Name: Payment, Syncing Processor: '+appConfigWrapper.paymentProcessorType+' ('+appConfigWrapper.accountName+'), Requested LastSyncDateTime: '+appConfigCompleteRecord.Hourly_Payment_Sync_Last_Run__c+', CurrentPage Parsed Records: '+requestRecordsCount);
                     }
                     appConfigCompleteRecord.Hourly_Payment_Sync_Last_Run__c = System.now();
                     appConfigCompleteRecord.Need_To_Reconnect__c = appConfigWrapper.needToReconnect;
@@ -274,8 +274,8 @@ public with sharing class HourlySyncBatch implements Database.Batchable<Breadwin
             if(!appConfigNeedToRun.isEmpty()) {
                 system.debug('execute---another');
                 if(!Test.isRunningTest()){
-                    HourlySyncBatch hourlySync = new HourlySyncBatch(runningObject, appConfigNeedToRun);
-                    Database.executeBatch(hourlySync, 1);
+                    HourlySyncBatch regularSync = new HourlySyncBatch(runningObject, appConfigNeedToRun);
+                    Database.executeBatch(regularSync, 1);
                 }
             } else if(appConfigNeedToRun.isEmpty() && appConfigNeedToUpdate.size()>0) { //No more batches to run. So start transactions batch.
                 if(!BreadwinnerUtil.isBatchRunning(BreadwinnerUtil.CNTX_HOUR_SYNC)) {
@@ -284,7 +284,7 @@ public with sharing class HourlySyncBatch implements Database.Batchable<Breadwin
                     if(String.isNotBlank(getNextSyncObjectName)) {
                         Database.executeBatch(new HourlySyncBatch(getNextSyncObjectName), 1);
                     } else {
-                        scheduleBreadwinnerHourlySync(15, true);
+                        scheduleBreadwinnerRegularSync(15, true);
                     }
                 }
             }
@@ -296,34 +296,34 @@ public with sharing class HourlySyncBatch implements Database.Batchable<Breadwin
         BreadwinnerUtil.deleteConfigsWhenSandboxRefresh();
         if(BreadwinnerUtil.isAdministrator()) {
             if(BreadwinnerUtil.isBreadwinnerActive()) {
-                runHourlySyncBatch();
+                runRegularSyncBatch();
             }
             else {
-                APICallHandler.userInteractionLogPush(FALSE, 'Hourly Scheduler', 'INFO', 'Trial or Subscription Expired');
+                APICallHandler.userInteractionLogPush(FALSE, 'Regular Scheduler', 'INFO', 'Trial or Subscription Expired');
             }
         }
         else {
-            APICallHandler.userInteractionLogPush(FALSE, 'Hourly Scheduler', 'INFO', 'Running user is not an Administrator');
+            APICallHandler.userInteractionLogPush(FALSE, 'Regular Scheduler', 'INFO', 'Running user is not an Administrator');
         }
     }
 
-    /* This method is used to run hourly sync batch */
-    public static void runHourlySyncBatch(){
+    /* This method is used to run regular sync batch */
+    public static void runRegularSyncBatch(){
         try{
             if(BreadwinnerUtil.isBreadwinnerAdministrator() && !BreadwinnerUtil.isBatchRunning(BreadwinnerUtil.CNTX_HOUR_SYNC)) {
-                HourlySyncBatch hourlySync = new HourlySyncBatch(BreadwinnerUtil.OBJ_SYNC_CUSTOMER);
-                Database.executeBatch(hourlySync, 1); //At a time only one company should be run. Don't make it other than 1.
+                HourlySyncBatch regularSync = new HourlySyncBatch(BreadwinnerUtil.OBJ_SYNC_CUSTOMER);
+                Database.executeBatch(regularSync, 1); //At a time only one company should be run. Don't make it other than 1.
             }
         }
         catch(Exception e){
-            APICallHandler.userInteractionLogPush(false, 'Hourly Sync', 'ERROR' , 'Error occurred while restarting Hourly Sync ' +e);
+            APICallHandler.userInteractionLogPush(false, 'Regular Sync', 'ERROR' , 'Error occurred while restarting Regular Sync ' +e);
         }
     }
 
-    public static void scheduleBreadwinnerHourlySync(Integer minutes, Boolean abortExistedJobs) {
+    public static void scheduleBreadwinnerRegularSync(Integer minutes, Boolean abortExistedJobs) {
         if(BreadwinnerUtil.isBreadwinnerAdministrator()) {
             try {
-                List<CronTrigger> existedScheduledJobs = BreadwinnerUtil.getCronTrigger(BreadwinnerUtil.SYNC_CNTX_HOURLY);
+                List<CronTrigger> existedScheduledJobs = BreadwinnerUtil.getCronTrigger(BreadwinnerUtil.SYNC_CNTX_REGULAR);
 
                 if(existedScheduledJobs.size()>0 && abortExistedJobs) {
                     for(CronTrigger ct : existedScheduledJobs) {
@@ -333,12 +333,12 @@ public with sharing class HourlySyncBatch implements Database.Batchable<Breadwin
                 if(existedScheduledJobs.size() == 0 || abortExistedJobs) {
                     DateTime nextScheduleTime = System.now().addMinutes(minutes);
                     String CronExpression = '0 ' + nextScheduleTime.minute() + ' ' + nextScheduleTime.hour() + ' ' + nextScheduleTime.day() + ' ' + nextScheduleTime.month() + ' ? ' + nextScheduleTime.year() + ' BreadwinnerSync';
-                    HourlySyncBatch hourlySync = new HourlySyncBatch(BreadwinnerUtil.OBJ_SYNC_CUSTOMER);
-                    System.schedule(BreadwinnerUtil.SYNC_CNTX_HOURLY + System.now(), CronExpression, hourlySync);
+                    HourlySyncBatch regularSync = new HourlySyncBatch(BreadwinnerUtil.OBJ_SYNC_CUSTOMER);
+                    System.schedule(BreadwinnerUtil.SYNC_CNTX_REGULAR + System.now(), CronExpression, regularSync);
                 }
             }
             catch(Exception e) {
-                System.debug('Exception occured while scheduling Breadwinner Hourly Sync: ' + e.getMessage());
+                System.debug('Exception occured while scheduling Breadwinner Regular Sync: ' + e.getMessage());
             }
         }
     }
